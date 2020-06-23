@@ -1,0 +1,29 @@
+#pragma once
+
+#include <QSystemTrayIcon>
+
+class QAction;
+class SystemTray : public QSystemTrayIcon
+{
+	Q_OBJECT
+
+public:
+	SystemTray(QWidget *parent);
+	~SystemTray();
+
+signals:
+	void sigReload();
+
+private slots:
+    void onScreenshot();
+    void onPin();
+    void onSetting();
+    void onExit();
+    void onSettingChanged();
+
+private:
+	QWidget *parent_;
+    QAction *screenshotAction_;
+    QAction *pinAction_;
+	QMenu *menu_;
+};

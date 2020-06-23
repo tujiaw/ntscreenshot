@@ -1,0 +1,24 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/icon_window_close.png</file>
+        <file>images/icon_window_maximize.png</file>
+        <file>images/icon_window_minimize.png</file>
+        <file>images/icon_window_restore.png</file>
+        <file>images/folder_open.png</file>
+        <file>images/folder_open_hover.png</file>
+        <file>images/shield.png</file>
+        <file>images/shield_hover.png</file>
+        <file>images/ntscreenshot.ico</file>
+        <file>images/arrow.png</file>
+        <file>images/ellipse.png</file>
+        <file>images/line.png</file>
+        <file>images/rectangle.png</file>
+        <file>images/clipboard.png</file>
+        <file>images/pin.png</file>
+        <file>images/save.png</file>
+        <file>images/undo.png</file>
+        <file>images/color.png</file>
+        <file>images/ok.png</file>
+        <file>images/remove.png</file>
+    </qresource>
+</RCC>
