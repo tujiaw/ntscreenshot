@@ -54,6 +54,12 @@ public:
     QGridLayout *gridLayout_2;
     QTableWidget *tablePath;
     QWidget *tab_2;
+    QHBoxLayout *horizontalLayout_3;
+    QVBoxLayout *verticalLayout_3;
+    QLabel *label_3;
+    QLabel *label_4;
+    QLabel *label_5;
+    QSpacerItem *verticalSpacer_2;
     QHBoxLayout *horizontalLayout;
     QSpacerItem *horizontalSpacer_2;
     QPushButton *pbRevert;
@@ -171,6 +177,35 @@ public:
         tabWidget->addTab(tab_3, QString());
         tab_2 = new QWidget();
         tab_2->setObjectName(QStringLiteral("tab_2"));
+        horizontalLayout_3 = new QHBoxLayout(tab_2);
+        horizontalLayout_3->setSpacing(6);
+        horizontalLayout_3->setContentsMargins(11, 11, 11, 11);
+        horizontalLayout_3->setObjectName(QStringLiteral("horizontalLayout_3"));
+        verticalLayout_3 = new QVBoxLayout();
+        verticalLayout_3->setSpacing(6);
+        verticalLayout_3->setObjectName(QStringLiteral("verticalLayout_3"));
+        label_3 = new QLabel(tab_2);
+        label_3->setObjectName(QStringLiteral("label_3"));
+
+        verticalLayout_3->addWidget(label_3);
+
+        label_4 = new QLabel(tab_2);
+        label_4->setObjectName(QStringLiteral("label_4"));
+
+        verticalLayout_3->addWidget(label_4);
+
+        label_5 = new QLabel(tab_2);
+        label_5->setObjectName(QStringLiteral("label_5"));
+
+        verticalLayout_3->addWidget(label_5);
+
+        verticalSpacer_2 = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
+
+        verticalLayout_3->addItem(verticalSpacer_2);
+
+
+        horizontalLayout_3->addLayout(verticalLayout_3);
+
         tabWidget->addTab(tab_2, QString());
 
         verticalLayout->addWidget(tabWidget);
@@ -214,6 +249,9 @@ public:
         pbScreenshotStatus->setText(QString());
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("Settings", "\345\270\270\350\247\204\350\256\276\347\275\256", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("Settings", "\350\267\257\345\276\204", Q_NULLPTR));
+        label_3->setText(QApplication::translate("Settings", "ntscreenshot", Q_NULLPTR));
+        label_4->setText(QApplication::translate("Settings", "\347\211\210\346\234\254 v1.0.0", Q_NULLPTR));
+        label_5->setText(QApplication::translate("Settings", "\345\261\217\345\271\225\346\210\252\345\233\276\345\267\245\345\205\267\357\274\214\345\217\257\344\273\245\350\264\264\345\233\276\343\200\201\347\273\230\345\233\276\343\200\201\344\270\212\344\274\240\345\233\276\345\272\212", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("Settings", "\345\205\263\344\272\216", Q_NULLPTR));
         pbRevert->setText(QApplication::translate("Settings", "\346\201\242\345\244\215\351\273\230\350\256\244", Q_NULLPTR));
     } // retranslateUi

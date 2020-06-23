@@ -329,8 +329,8 @@ int SelectedScreenSizeWidget::qt_metacall(QMetaObject::Call _c, int _id, void **
     return _id;
 }
 struct qt_meta_stringdata_SelectedScreenWidget_t {
-    QByteArrayData data[16];
-    char stringdata0[186];
+    QByteArrayData data[19];
+    char stringdata0[210];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -354,14 +354,18 @@ QT_MOC_LITERAL(11, 121, 9), // "onSticker"
 QT_MOC_LITERAL(12, 131, 8), // "onUpload"
 QT_MOC_LITERAL(13, 140, 12), // "onSaveScreen"
 QT_MOC_LITERAL(14, 153, 17), // "onSaveScreenOther"
-QT_MOC_LITERAL(15, 171, 14) // "quitScreenshot"
+QT_MOC_LITERAL(15, 171, 10), // "onKeyEvent"
+QT_MOC_LITERAL(16, 182, 10), // "QKeyEvent*"
+QT_MOC_LITERAL(17, 193, 1), // "e"
+QT_MOC_LITERAL(18, 195, 14) // "quitScreenshot"
 
     },
     "SelectedScreenWidget\0sizeChange\0\0"
     "postionChange\0doubleClick\0sigBorderPressed\0"
     "sigBorderReleased\0sigClose\0onMouseChange\0"
     "x\0y\0onSticker\0onUpload\0onSaveScreen\0"
-    "onSaveScreenOther\0quitScreenshot"
+    "onSaveScreenOther\0onKeyEvent\0QKeyEvent*\0"
+    "e\0quitScreenshot"
 };
 #undef QT_MOC_LITERAL
 
@@ -371,7 +375,7 @@ static const uint qt_meta_data_SelectedScreenWidget[] = {
        7,       // revision
        0,       // classname
        0,    0, // classinfo
-      12,   14, // methods
+      13,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -379,20 +383,21 @@ static const uint qt_meta_data_SelectedScreenWidget[] = {
        6,       // signalCount
 
  // signals: name, argc, parameters, tag, flags
-       1,    2,   74,    2, 0x06 /* Public */,
-       3,    2,   79,    2, 0x06 /* Public */,
-       4,    0,   84,    2, 0x06 /* Public */,
-       5,    0,   85,    2, 0x06 /* Public */,
-       6,    0,   86,    2, 0x06 /* Public */,
-       7,    0,   87,    2, 0x06 /* Public */,
+       1,    2,   79,    2, 0x06 /* Public */,
+       3,    2,   84,    2, 0x06 /* Public */,
+       4,    0,   89,    2, 0x06 /* Public */,
+       5,    0,   90,    2, 0x06 /* Public */,
+       6,    0,   91,    2, 0x06 /* Public */,
+       7,    0,   92,    2, 0x06 /* Public */,
 
  // slots: name, argc, parameters, tag, flags
-       8,    2,   88,    2, 0x0a /* Public */,
-      11,    0,   93,    2, 0x0a /* Public */,
-      12,    0,   94,    2, 0x0a /* Public */,
-      13,    0,   95,    2, 0x0a /* Public */,
-      14,    0,   96,    2, 0x0a /* Public */,
-      15,    0,   97,    2, 0x0a /* Public */,
+       8,    2,   93,    2, 0x0a /* Public */,
+      11,    0,   98,    2, 0x0a /* Public */,
+      12,    0,   99,    2, 0x0a /* Public */,
+      13,    0,  100,    2, 0x0a /* Public */,
+      14,    0,  101,    2, 0x0a /* Public */,
+      15,    1,  102,    2, 0x0a /* Public */,
+      18,    0,  105,    2, 0x0a /* Public */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::Int, QMetaType::Int,    2,    2,
@@ -408,6 +413,7 @@ static const uint qt_meta_data_SelectedScreenWidget[] = {
     QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
+    QMetaType::Void, 0x80000000 | 16,   17,
     QMetaType::Void,
 
        0        // eod
@@ -430,7 +436,8 @@ void SelectedScreenWidget::qt_static_metacall(QObject *_o, QMetaObject::Call _c,
         case 8: _t->onUpload(); break;
         case 9: _t->onSaveScreen(); break;
         case 10: _t->onSaveScreenOther(); break;
-        case 11: _t->quitScreenshot(); break;
+        case 11: _t->onKeyEvent((*reinterpret_cast< QKeyEvent*(*)>(_a[1]))); break;
+        case 12: _t->quitScreenshot(); break;
         default: ;
         }
     } else if (_c == QMetaObject::IndexOfMethod) {
@@ -506,13 +513,13 @@ int SelectedScreenWidget::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 12)
+        if (_id < 13)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 12;
+        _id -= 13;
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 12)
+        if (_id < 13)
             *reinterpret_cast<int*>(_a[0]) = -1;
-        _id -= 12;
+        _id -= 13;
     }
     return _id;
 }
