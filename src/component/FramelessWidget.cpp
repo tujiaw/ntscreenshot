@@ -131,10 +131,10 @@ void FramelessWidget::mouseMoveEvent(QMouseEvent *event)
 
 void FramelessWidget::keyPressEvent(QKeyEvent* event)
 {
-	if (enableEscClose_ && event->key() == Qt::Key_Escape) {
-		this->close();
-	}
-	QFrame::keyPressEvent(event);
+    if (enableEscClose_ && event->key() == Qt::Key_Escape) {
+        this->close();
+    }
+    QFrame::keyPressEvent(event);
 }
 
 bool FramelessWidget::nativeEvent(const QByteArray & eventType, void * message, long * result)
@@ -202,7 +202,7 @@ bool FramelessWidget::eventFilter(QObject* watched, QEvent* event)
 			this->setStyleSheet("QWidget#FramelessWidget{ background: transparent; border: 1px solid rgb(170, 170, 170);}");
 		}
 	}
-	return QFrame::eventFilter(watched, event);
+    return false;
 }
 
 void FramelessWidget::setEnableHighlight(bool enable)

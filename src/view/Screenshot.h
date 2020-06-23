@@ -158,6 +158,7 @@ public slots:
     void onUpload();
     void onSaveScreen(void);
     void onSaveScreenOther(void);
+    void onKeyEvent(QKeyEvent *e);
     void quitScreenshot(void);
 
 private:

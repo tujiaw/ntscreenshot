@@ -14,6 +14,7 @@ public:
     static void popup(const QPixmap &pixmap, const QPoint &pos);
 
 protected:
+    virtual void keyPressEvent(QKeyEvent *event);
 	virtual void contextMenuEvent(QContextMenuEvent*);
 
 private slots:

@@ -384,14 +384,12 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
             clipboard->setText(text);
             return;
         }
-    }  else {
-        if (selectedScreen_ && !PIN_KEY.isEmpty()) {
-            if (Util::strKeyEvent(e) == PIN_KEY) {
-                selectedScreen_->onSticker();
-                return;
-            }
-        }
     }
+
+    if (selectedScreen_) {
+        selectedScreen_->onKeyEvent(e);
+    }
+
     e->ignore();
 }
 
@@ -450,14 +448,14 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
 {
     uploadImageUtil_ = new UploadImageUtil(this);
     menu_ = new QMenu(this);
-    menu_->addAction(QStringLiteral("完成"), this, SLOT(onSaveScreen()));
-    menu_->addAction(QStringLiteral("保存"), this, SLOT(onSaveScreenOther()));
-    menu_->addAction(QStringLiteral("贴图"), this, SLOT(onSticker()));
+    menu_->addAction(QStringLiteral("完成"), this, SLOT(onSaveScreen()), QKeySequence("Ctrl+C"));
+    menu_->addAction(QStringLiteral("保存"), this, SLOT(onSaveScreenOther()), QKeySequence("Ctrl+S"));
+    menu_->addAction(QStringLiteral("贴图"), this, SLOT(onSticker()), QKeySequence(PIN_KEY));
     if (!UPLOAD_IMAGE_URL.isEmpty()) {
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
     menu_->addSeparator();
-    menu_->addAction(QStringLiteral("退出(Esc)"), this, SLOT(quitScreenshot()));
+    menu_->addAction(QStringLiteral("退出"), this, SLOT(quitScreenshot()));
 
     /// 双击即完成
     connect(this, SIGNAL(doubleClick()), this, SLOT(onSaveScreen()));
@@ -688,11 +686,13 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
     currentRect_ = geometry();
 }
 
-void SelectedScreenWidget::moveEvent(QMoveEvent *) {
+void SelectedScreenWidget::moveEvent(QMoveEvent *) 
+{
     emit postionChange(x(), y());
 }
 
-void SelectedScreenWidget::resizeEvent(QResizeEvent *) {
+void SelectedScreenWidget::resizeEvent(QResizeEvent *) 
+{
     listMarker_.clear();
 
     /// 重新计算八个锚点
@@ -770,6 +770,25 @@ void SelectedScreenWidget::onSaveScreenOther(void) {
         }
         pixmap.save(fileName, "jpg");
         quitScreenshot();
+    }
+}
+
+void SelectedScreenWidget::onKeyEvent(QKeyEvent *e)
+{
+    QString key = Util::strKeyEvent(e);
+    if (key.isEmpty()) {
+        return;
+    }
+
+    qDebug() << "key:" << key;
+    QList<QAction*> actions = menu_->actions();
+    for (int i = 0; i < actions.size(); i++) {
+        QKeySequence seq = actions[i]->shortcut();
+        if (!seq.isEmpty() && seq == key) {
+            qDebug() << "seq:" << seq;
+            emit actions[i]->triggered();
+            break;
+        }
     }
 }
 

@@ -25,13 +25,13 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     uploadImageUtil_ = new UploadImageUtil(this);
 
 	menu_ = new QMenu(this);
-	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()));
-	menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()));
+	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
+    menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
+	menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
+    menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
     if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
-	menu_->addAction(QStringLiteral("销毁(Esc)"), this, SLOT(onClose()));
-	menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
 
 	label_ = new QLabel(this);
 	label_->setPixmap(pixmap);
@@ -40,12 +40,12 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
 	vLayout->setContentsMargins(0, 0, 0, 0);
 	vLayout->setSpacing(0);
 	vLayout->addWidget(label_);
+    this->setFocusPolicy(Qt::StrongFocus);
 }
 
 void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
 {
     FramelessWidget* widget = new FramelessWidget();
-    widget->setEnableEscClose(true);
 	widget->setEnableHighlight(!WindowManager::instance()->setting()->pinNoBorder());
     StickerWidget* content = new StickerWidget(pixmap, widget);
     widget->setContent(content);
@@ -54,6 +54,23 @@ void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
     Util::setWndTopMost(widget);
     widget->show();
     widget->raise();
+}
+
+void StickerWidget::keyPressEvent(QKeyEvent *event)
+{
+    QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+    QString key = Util::strKeyEvent(keyEvent);
+    if (!key.isEmpty()) {
+        QList<QAction*> actions = menu_->actions();
+        for (int i = 0; i < actions.size(); i++) {
+            QKeySequence seq = actions[i]->shortcut();
+            if (!seq.isEmpty() && Util::strKeySequence(seq) == key) {
+                emit actions[i]->triggered();
+                break;
+            }
+        }
+    }
+    QWidget::keyPressEvent(event);
 }
 
 void StickerWidget::contextMenuEvent(QContextMenuEvent*)
