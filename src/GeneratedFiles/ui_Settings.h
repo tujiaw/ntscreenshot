@@ -69,7 +69,7 @@ public:
     {
         if (Settings->objectName().isEmpty())
             Settings->setObjectName(QStringLiteral("Settings"));
-        Settings->resize(450, 360);
+        Settings->resize(450, 281);
         Settings->setMaximumSize(QSize(450, 16777215));
         verticalLayout = new QVBoxLayout(Settings);
         verticalLayout->setSpacing(6);

@@ -75,6 +75,12 @@ void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
 
 void StickerWidget::showAll()
 {
+    qSort(HidedStickerList.begin(), HidedStickerList.end(), [](const QPair<QPoint, QPixmap> &left, const QPair<QPoint, QPixmap> &right)->bool {
+        if (left.first.x() != right.first.x()) {
+            return left.first.x() < right.first.x();
+        }
+        return left.first.y() < right.first.y();
+    });
     for (int i = 0; i < HidedStickerList.size(); i++) {
         popup(HidedStickerList[i].second, HidedStickerList[i].first);
     }
