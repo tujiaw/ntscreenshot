@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>450</width>
-    <height>360</height>
+    <height>281</height>
    </rect>
   </property>
   <property name="maximumSize">
@@ -36,20 +36,6 @@
           <widget class="QCheckBox" name="cbAutoStart">
            <property name="text">
             <string>开机自启动</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="cbPinNoBorder">
-           <property name="text">
-            <string>贴图无边框</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="checkBox">
-           <property name="text">
-            <string>链接复制成Markdown格式</string>
            </property>
           </widget>
          </item>
@@ -157,6 +143,20 @@
           </spacer>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="cbPinNoBorder">
+         <property name="text">
+          <string>贴图无边框</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox">
+         <property name="text">
+          <string>链接复制成Markdown格式</string>
+         </property>
+        </widget>
        </item>
        <item>
         <spacer name="horizontalSpacer_3">

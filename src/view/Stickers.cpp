@@ -28,11 +28,14 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
 	menu_ = new QMenu(this);
 	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
-	menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
-    menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
+    menu_->addSeparator();
     menu_->addAction(QStringLiteral("隐藏"), this, SLOT(onHide()), QKeySequence("Ctrl+H"));
     menu_->addAction(QStringLiteral("隐藏所有"), this, SLOT(onHideAll()));
+    menu_->addSeparator();
+    menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
+    menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
     if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
+        menu_->addSeparator();
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
 
