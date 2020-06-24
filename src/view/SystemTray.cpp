@@ -5,14 +5,12 @@
 SystemTray::SystemTray(QWidget *parent)
 	: QSystemTrayIcon(parent)
 {
-    SettingModel *setting = WindowManager::instance()->setting();
-
 	this->setIcon(QIcon(":/images/ntscreenshot.ico"));
 	menu_ = new QMenu(parent);
-	screenshotAction_ = menu_->addAction(QStringLiteral("½ØÆÁ ") + setting->screenhotGlobalKey());
+	screenshotAction_ = menu_->addAction(QStringLiteral("½ØÆÁ"));
     connect(screenshotAction_, &QAction::triggered, this, &SystemTray::onScreenshot);
     
-    pinAction_ = menu_->addAction(QStringLiteral("ÌùÍ¼ ") + setting->pinKey());
+    pinAction_ = menu_->addAction(QStringLiteral("ÌùÍ¼"));
     connect(pinAction_, &QAction::triggered, this, &SystemTray::onPin);
 
 	QAction *settingAction = menu_->addAction(QStringLiteral("ÉèÖÃ"));
@@ -25,7 +23,9 @@ SystemTray::SystemTray(QWidget *parent)
 
 	this->setContextMenu(menu_);
 
-    connect(WindowManager::instance(), &WindowManager::sigSettingChanged, this, &SystemTray::onSettingChanged);
+    onUpdate();
+    connect(WindowManager::instance(), &WindowManager::sigSettingChanged, this, &SystemTray::onUpdate);
+    connect(WindowManager::instance(), &WindowManager::sigStickerCountChanged, this, &SystemTray::onUpdate);
 }
 
 SystemTray::~SystemTray()
@@ -39,7 +39,7 @@ void SystemTray::onScreenshot()
 
 void SystemTray::onPin()
 {
-
+    WindowManager::instance()->showAllSticker();
 }
 
 void SystemTray::onSetting()
@@ -52,9 +52,16 @@ void SystemTray::onExit()
     qApp->exit();
 }
 
-void SystemTray::onSettingChanged()
+void SystemTray::onUpdate()
 {
-    SettingModel *setting = WindowManager::instance()->setting();
-    screenshotAction_->setText(QStringLiteral("½ØÆÁ ") + setting->screenhotGlobalKey());
-    pinAction_->setText(QStringLiteral("ÌùÍ¼ ") + setting->pinKey());
+    QStringList tips;
+    tips << "ntscreenshot";
+    tips << QStringLiteral("°æ±¾v1.0.0");
+    tips << QStringLiteral("½ØÍ¼¿ì½Ý¼ü£º%1").arg(WindowManager::instance()->setting()->screenhotGlobalKey());
+    tips << QStringLiteral("ÌùÍ¼¿ì½Ý¼ü£º%1").arg(WindowManager::instance()->setting()->pinGlobalKey());
+    tips << QStringLiteral("ÌùÍ¼ÊýÄ¿£º%1").arg(WindowManager::instance()->allStickerCount());
+    this->setToolTip(tips.join("\r\n"));
+
+    screenshotAction_->setText(QStringLiteral("½ØÆÁ %1").arg(WindowManager::instance()->setting()->screenhotGlobalKey()));
+    pinAction_->setText(QStringLiteral("ÌùÍ¼ %1").arg(WindowManager::instance()->setting()->pinGlobalKey()));
 }

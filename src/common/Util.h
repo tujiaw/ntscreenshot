@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <functional>
 #include "Constants.h"
 
 class QWidget;
@@ -40,4 +41,7 @@ namespace Util {
 	std::wstring utf8_to_wstring(const std::string& str);
 	std::string wstring_to_utf8(const std::wstring& str);
 	std::string getImageFormat(const char* data, int size);
+    void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func);
 }
+
+#define interval_handle_once(msTime, func)  Util::intervalHandleOnce(QString("%1%2").arg(__FILE__).arg(__LINE__).toStdString(), msTime, func);

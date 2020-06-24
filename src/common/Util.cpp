@@ -15,6 +15,7 @@
 #include <QBuffer>
 #include <QImageReader>
 #include <QStandardPaths>
+#include <QTimer>
 #pragma warning(disable:4091)
 #include <ShlObj.h>
 #pragma comment(lib, "Shell32.lib")
@@ -558,4 +559,47 @@ namespace Util
 		}
 		return size;
 	}
+
+    void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func)
+    {
+        static QMap<std::string, QTimer*> s_intervalHandleTimers;
+        QTimer *timer = s_intervalHandleTimers[name];
+        if (func == nullptr) {
+            if (timer) {
+                timer->stop();
+                timer->deleteLater();
+                s_intervalHandleTimers.remove(name);
+            }
+            return;
+        }
+
+        if (!timer) {
+            timer = new QTimer();
+            s_intervalHandleTimers[name] = timer;
+            timer->setSingleShot(true);
+            timer->setInterval(msTime);
+            QObject::connect(timer, &QTimer::timeout, [name, func]() {
+                auto iter = s_intervalHandleTimers.find(name);
+                if (iter != s_intervalHandleTimers.end()) {
+                    if (iter.value()) {
+                        iter.value()->stop();
+                        iter.value()->deleteLater();
+                    }
+                    s_intervalHandleTimers.erase(iter);
+                }
+                func();
+            });
+        }
+
+        if (timer->interval() != msTime) {
+            timer->setInterval(msTime);
+            timer->stop();
+        }
+
+        if (timer->isActive()) {
+            return;
+        }
+
+        timer->start();
+    }
 }

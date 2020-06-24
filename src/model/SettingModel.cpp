@@ -4,7 +4,7 @@
 
 static const QString REG_RUN = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const QString SCREENSHOT_GLOBAL_KEY = "SCREENSHOT_GLOBAL_KEY";
-static const QString PIN_KEY = "PIN_KEY";
+static const QString PIN_GLOBAL_KEY = "PIN_GLOBAL_KEY";
 static const QString UPLOAD_IMAGE_URL_KEY = "UPLOAD_IMAGE_URL_KEY";
 static const QString PIN_NO_BORDER = "PIN_NO_BORDER";
 
@@ -30,7 +30,7 @@ void SettingModel::revertDefault()
 {
     setAutoStart(false);
     setScreenshotGlobalKey(defaultScreenshotGlobalKey);
-    setPinKey(defaultPinKey);
+    setPinGlobalKey(defaultPinKey);
     settings_.sync();
 }
 
@@ -64,14 +64,14 @@ QString SettingModel::screenhotGlobalKey() const
     return settings_.value(SCREENSHOT_GLOBAL_KEY, "F5").toString();
 }
 
-void SettingModel::setPinKey(const QString &key)
+void SettingModel::setPinGlobalKey(const QString &key)
 {
-    settings_.setValue(PIN_KEY, key);
+    settings_.setValue(PIN_GLOBAL_KEY, key);
 }
 
-QString SettingModel::pinKey() const
+QString SettingModel::pinGlobalKey() const
 {
-    return settings_.value(PIN_KEY, "F6").toString();
+    return settings_.value(PIN_GLOBAL_KEY, "F6").toString();
 }
 
 void SettingModel::setUploadImageUrl(const QString &url)

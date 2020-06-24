@@ -6,10 +6,12 @@
 #include "view/MainWidget.h"
 #include "view/Screenshot.h"
 #include "view/Settings.h"
+#include "view/Stickers.h"
 
 WindowManager::WindowManager()
 {
     settingModel_.reset(new SettingModel(nullptr));
+    connect(this, &WindowManager::sigPin, this, &WindowManager::onPin);
 }
 
 WindowManager::~WindowManager()
@@ -38,7 +40,7 @@ void WindowManager::openWidget(const QString &id)
         QEventLoop loop;
         loop.processEvents();
         screenshot_.reset(new ScreenshotWidget());
-        ScreenshotWidget::setPinKey(settingModel_->pinKey());
+        ScreenshotWidget::setPinGlobalKey(settingModel_->pinGlobalKey());
         ScreenshotWidget::setUploadImageUrl(settingModel_->uploadImageUrl());
         connect(screenshot_.get(), &ScreenshotWidget::sigReopen, this, &WindowManager::onScreenshotReopen, Qt::QueuedConnection);
         connect(screenshot_.get(), &ScreenshotWidget::sigClose, this, &WindowManager::onScreenshotClose, Qt::QueuedConnection);
@@ -118,6 +120,19 @@ void WindowManager::onScreenshotClose()
     closeWidget(WidgetID::SCREENSHOT);
 }
 
+void WindowManager::onPin()
+{
+    if (screenshot_) {
+        screenshot_->pin();
+    } else {
+        if (StickerWidget::allCount() == StickerWidget::visibleCount()) {
+            StickerWidget::hideAll();
+        } else {
+            StickerWidget::showAll();
+        }
+    }
+}
+
 bool WindowManager::setScreenshotGlobalKey(const QString &key)
 {
     MainWidget *mainWidget = qobject_cast<MainWidget*>(content(WidgetID::MAIN));
@@ -127,6 +142,21 @@ bool WindowManager::setScreenshotGlobalKey(const QString &key)
     return false;
 }
 
-void WindowManager::directDraw(const QRect &rect)
+bool WindowManager::setPinGlobalKey(const QString &key)
 {
+    MainWidget *mainWidget = qobject_cast<MainWidget*>(content(WidgetID::MAIN));
+    if (mainWidget) {
+        return mainWidget->setPinGlobalKey(key);
+    }
+    return false;
+}
+
+void WindowManager::showAllSticker()
+{
+    StickerWidget::showAll();
+}
+
+int WindowManager::allStickerCount()
+{
+    return StickerWidget::allCount();
 }

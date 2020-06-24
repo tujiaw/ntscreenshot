@@ -21,14 +21,19 @@ public:
 
     SettingModel* setting() { return settingModel_.get(); }
     bool setScreenshotGlobalKey(const QString &key);
-    void directDraw(const QRect &rect);
+    bool setPinGlobalKey(const QString &key);
+    void showAllSticker();
+    int allStickerCount();
 
 signals:
+    void sigPin();
     void sigSettingChanged();
+    void sigStickerCountChanged();
 
 private slots:
     void onScreenshotReopen();
     void onScreenshotClose();
+    void onPin();
 
 private:
 	WindowManager();

@@ -17,6 +17,10 @@ MainWidget::MainWidget(QWidget *parent)
 	connect(mainShortcut_, &QxtGlobalShortcut::activated, this, &MainWidget::slotMainShortcut);
     setScreenshotGlobalKey(WindowManager::instance()->setting()->screenhotGlobalKey());
 
+    pinShortcut_ = new QxtGlobalShortcut(this);
+    connect(pinShortcut_, &QxtGlobalShortcut::activated, this, &MainWidget::slotPinShortcut);
+    setPinGlobalKey(WindowManager::instance()->setting()->pinGlobalKey());
+
     QxtGlobalShortcut *exitShortcut = new QxtGlobalShortcut(this);
     exitShortcut->setShortcut(QKeySequence(Qt::ALT + Qt::Key_Q));
     connect(exitShortcut, &QxtGlobalShortcut::activated, this, &MainWidget::slotExit);
@@ -37,6 +41,11 @@ bool MainWidget::setScreenshotGlobalKey(const QString &key)
     return mainShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
 }
 
+bool MainWidget::setPinGlobalKey(const QString &key)
+{
+    return pinShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
+}
+
 void MainWidget::slotReload()
 {
 }
@@ -51,6 +60,11 @@ void MainWidget::slotTrayActivated(QSystemTrayIcon::ActivationReason reason)
 void MainWidget::slotMainShortcut()
 {
 	WindowManager::instance()->openWidget(WidgetID::SCREENSHOT);
+}
+
+void MainWidget::slotPinShortcut()
+{
+    emit WindowManager::instance()->sigPin();
 }
 
 void MainWidget::slotExit()

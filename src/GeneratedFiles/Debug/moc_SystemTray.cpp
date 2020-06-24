@@ -20,7 +20,7 @@
 QT_BEGIN_MOC_NAMESPACE
 struct qt_meta_stringdata_SystemTray_t {
     QByteArrayData data[8];
-    char stringdata0[75];
+    char stringdata0[67];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -36,11 +36,11 @@ QT_MOC_LITERAL(3, 22, 12), // "onScreenshot"
 QT_MOC_LITERAL(4, 35, 5), // "onPin"
 QT_MOC_LITERAL(5, 41, 9), // "onSetting"
 QT_MOC_LITERAL(6, 51, 6), // "onExit"
-QT_MOC_LITERAL(7, 58, 16) // "onSettingChanged"
+QT_MOC_LITERAL(7, 58, 8) // "onUpdate"
 
     },
     "SystemTray\0sigReload\0\0onScreenshot\0"
-    "onPin\0onSetting\0onExit\0onSettingChanged"
+    "onPin\0onSetting\0onExit\0onUpdate"
 };
 #undef QT_MOC_LITERAL
 
@@ -91,7 +91,7 @@ void SystemTray::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 2: _t->onPin(); break;
         case 3: _t->onSetting(); break;
         case 4: _t->onExit(); break;
-        case 5: _t->onSettingChanged(); break;
+        case 5: _t->onUpdate(); break;
         default: ;
         }
     } else if (_c == QMetaObject::IndexOfMethod) {

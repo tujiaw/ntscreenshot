@@ -17,7 +17,8 @@ class ScreenshotWidget : public QWidget {
 public:
     explicit ScreenshotWidget(QWidget *parent = 0);
     ~ScreenshotWidget(void);
-    static void setPinKey(const QString &key);
+    void pin();
+    static void setPinGlobalKey(const QString &key);
     static void setUploadImageUrl(const QString &url);
 
 signals:

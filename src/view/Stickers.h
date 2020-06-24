@@ -1,17 +1,25 @@
 #pragma once
 
 #include <QWidget>
+#include <QVariantMap>
 
 class QLabel;
 class QContextMenuEvent;
 class QMenu;
 class HttpRequest;
+
 class StickerWidget : public QWidget
 {
 	Q_OBJECT
 public:
 	StickerWidget(const QPixmap& pixmap, QWidget* parent);
+    ~StickerWidget();
     static void popup(const QPixmap &pixmap, const QPoint &pos);
+    static void showAll();
+    static void hideAll();
+    static int allCount();
+    static int visibleCount();
+    static QList<StickerWidget*> getAllSticker();
 
 protected:
     virtual void keyPressEvent(QKeyEvent *event);
@@ -23,6 +31,8 @@ private slots:
     void onUpload();
 	void onClose();
 	void onCloseAll();
+    void onHide();
+    void onHideAll();
 
 private:
 	QLabel* label_;

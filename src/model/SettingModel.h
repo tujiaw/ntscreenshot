@@ -19,8 +19,8 @@ public:
     void setScreenshotGlobalKey(const QString &key);
     QString screenhotGlobalKey() const;
 
-    void setPinKey(const QString &key);
-    QString pinKey() const;
+    void setPinGlobalKey(const QString &key);
+    QString pinGlobalKey() const;
 
     void setUploadImageUrl(const QString &url);
     QString uploadImageUrl() const;

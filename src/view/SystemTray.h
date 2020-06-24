@@ -19,7 +19,7 @@ private slots:
     void onPin();
     void onSetting();
     void onExit();
-    void onSettingChanged();
+    void onUpdate();
 
 private:
 	QWidget *parent_;

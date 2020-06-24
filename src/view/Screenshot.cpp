@@ -93,8 +93,14 @@ ScreenshotWidget::~ScreenshotWidget(void)
 {
 }
 
+void ScreenshotWidget::pin()
+{
+    if (selectedScreen_) {
+        selectedScreen_->onSticker();
+    }
+}
 
-void ScreenshotWidget::setPinKey(const QString &key)
+void ScreenshotWidget::setPinGlobalKey(const QString &key)
 {
     PIN_KEY = key;
 }
@@ -371,7 +377,7 @@ void ScreenshotWidget::updateMouse(void) {
     ::EnableWindow((HWND)winId(), TRUE);
     update();
 }
-
+    
 void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
     if (e->key() == Qt::Key_Escape) {
         emit sigClose();

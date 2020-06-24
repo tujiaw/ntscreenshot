@@ -38,6 +38,7 @@ public:
     QHBoxLayout *horizontalLayout_2;
     QCheckBox *cbAutoStart;
     QCheckBox *cbPinNoBorder;
+    QCheckBox *checkBox;
     QSpacerItem *horizontalSpacer;
     QGridLayout *gridLayout;
     QPushButton *pbPinStatus;
@@ -94,6 +95,11 @@ public:
         cbPinNoBorder->setObjectName(QStringLiteral("cbPinNoBorder"));
 
         horizontalLayout_2->addWidget(cbPinNoBorder);
+
+        checkBox = new QCheckBox(tab);
+        checkBox->setObjectName(QStringLiteral("checkBox"));
+
+        horizontalLayout_2->addWidget(checkBox);
 
         horizontalSpacer = new QSpacerItem(313, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
@@ -241,6 +247,7 @@ public:
         Settings->setWindowTitle(QApplication::translate("Settings", "Settings", Q_NULLPTR));
         cbAutoStart->setText(QApplication::translate("Settings", "\345\274\200\346\234\272\350\207\252\345\220\257\345\212\250", Q_NULLPTR));
         cbPinNoBorder->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\346\227\240\350\276\271\346\241\206", Q_NULLPTR));
+        checkBox->setText(QApplication::translate("Settings", "\351\223\276\346\216\245\345\244\215\345\210\266\346\210\220Markdown\346\240\274\345\274\217", Q_NULLPTR));
         pbPinStatus->setText(QString());
         label_2->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\345\277\253\346\215\267\351\224\256\357\274\232", Q_NULLPTR));
         lePin->setPlaceholderText(QApplication::translate("Settings", "\347\202\271\345\207\273\351\234\200\350\246\201\350\256\276\347\275\256\347\232\204\345\277\253\346\215\267\351\224\256", Q_NULLPTR));

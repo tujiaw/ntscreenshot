@@ -19,6 +19,7 @@
 #include "controller/WindowManager.h"
 #include "component/TipsWidget.h"
 
+static QList<QPair<QPoint, QPixmap>> HidedStickerList;
 StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     : QWidget(parent)
 {
@@ -29,6 +30,8 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
 	menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
     menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
+    menu_->addAction(QStringLiteral("隐藏"), this, SLOT(onHide()), QKeySequence("Ctrl+H"));
+    menu_->addAction(QStringLiteral("隐藏所有"), this, SLOT(onHideAll()));
     if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
@@ -41,6 +44,17 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
 	vLayout->setSpacing(0);
 	vLayout->addWidget(label_);
     this->setFocusPolicy(Qt::StrongFocus);
+
+    interval_handle_once(100, [this]() {
+        emit WindowManager::instance()->sigStickerCountChanged();
+    });
+}
+
+StickerWidget::~StickerWidget()
+{
+    interval_handle_once(100, [this]() {
+        emit WindowManager::instance()->sigStickerCountChanged();
+    });
 }
 
 void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
@@ -54,6 +68,49 @@ void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
     Util::setWndTopMost(widget);
     widget->show();
     widget->raise();
+}
+
+void StickerWidget::showAll()
+{
+    for (int i = 0; i < HidedStickerList.size(); i++) {
+        popup(HidedStickerList[i].second, HidedStickerList[i].first);
+    }
+    HidedStickerList.clear();
+}
+
+void StickerWidget::hideAll()
+{
+    QList<StickerWidget*> widgets = getAllSticker();
+    for (int i = 0; i < widgets.size(); i++) {
+        widgets[i]->onHide();
+    }
+}
+
+int StickerWidget::allCount()
+{
+    return HidedStickerList.size() + visibleCount();
+}
+
+int StickerWidget::visibleCount()
+{
+    return getAllSticker().size();
+}
+
+QList<StickerWidget*> StickerWidget::getAllSticker()
+{
+    QList<StickerWidget*> result;
+    QWidgetList widgets = QApplication::allWidgets();
+    for (int i = 0; i < widgets.size(); i++) {
+        QWidget* p = widgets.at(i);
+        FramelessWidget* frame = qobject_cast<FramelessWidget*>(p);
+        if (frame) {
+            StickerWidget* sticker = qobject_cast<StickerWidget*>(frame->getContent());
+            if (sticker) {
+                result.push_back(sticker);
+            }
+        }
+    }
+    return result;
 }
 
 void StickerWidget::keyPressEvent(QKeyEvent *event)
@@ -106,17 +163,25 @@ void StickerWidget::onClose()
 
 void StickerWidget::onCloseAll()
 {
-	QWidgetList widgets = QApplication::allWidgets();
-	for (int i = 0; i < widgets.size(); i++) {
-		QWidget* p = widgets.at(i);
-		FramelessWidget* frame = qobject_cast<FramelessWidget*>(p);
-		if (frame) {
-			StickerWidget* sticker = qobject_cast<StickerWidget*>(frame->getContent());
-			if (sticker) {
-				frame->close();
-			}
-		}
-	}
+    QList<StickerWidget*> widgets = getAllSticker();
+    for (int i = 0; i < widgets.size(); i++) {
+        widgets[i]->onClose();
+    }
+}
+
+void StickerWidget::onHide()
+{
+    const QPixmap *pixmap = label_->pixmap();
+    QPoint pos = this->mapToGlobal(this->pos());
+    if (pixmap && !pixmap->isNull()) {
+        HidedStickerList.push_back(qMakePair(pos, *pixmap));
+    }
+    this->onClose();
+}
+
+void StickerWidget::onHideAll()
+{
+    hideAll();
 }
 
 //////////////////////////////////////////////////////////////////////////

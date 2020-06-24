@@ -34,7 +34,7 @@ void Settings::readData()
     ui.cbAutoStart->setCheckState(setting->autoStart() ? Qt::Checked : Qt::Unchecked);
     ui.cbPinNoBorder->setCheckState(setting->pinNoBorder() ? Qt::Checked : Qt::Unchecked);
     ui.leScreenshot->setText(setting->screenhotGlobalKey());
-    ui.lePin->setText(setting->pinKey());
+    ui.lePin->setText(setting->pinGlobalKey());
 }
 
 void Settings::writeData()
@@ -100,8 +100,8 @@ void Settings::updateScreenshotGlobalKey(const QString &key)
 
 void Settings::updatePinKey(const QString &key)
 {
-    if (!key.isEmpty()) {
-        WindowManager::instance()->setting()->setPinKey(key);
+    if (!key.isEmpty() && WindowManager::instance()->setPinGlobalKey(key)) {
+        WindowManager::instance()->setting()->setPinGlobalKey(key);
         ui.lePin->setText(key);
         ui.pbPinStatus->setIcon(QIcon(":/images/ok.png"));
     } else {
