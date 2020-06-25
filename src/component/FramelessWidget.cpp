@@ -210,6 +210,11 @@ void FramelessWidget::setEnableHighlight(bool enable)
 	enableHighlight_ = enable;
 }
 
+bool FramelessWidget::enableHightlight() const
+{
+    return enableHighlight_;
+}
+
 void FramelessWidget::setBackground(const QPixmap &pixmap)
 {
     backgroundPixmap_ = pixmap;

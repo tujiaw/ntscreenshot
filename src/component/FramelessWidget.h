@@ -16,6 +16,7 @@ public:
     void setEnableStretch(bool enable);
 	void setEnableEscClose(bool enable);
 	void setEnableHighlight(bool enable);
+	bool enableHightlight() const;
     void setBackground(const QPixmap &pixmap);
 
 protected:

@@ -181,7 +181,7 @@ void StickerWidget::onCloseAll()
 void StickerWidget::onHide()
 {
     const QPixmap *pixmap = label_->pixmap();
-    QPoint pos = this->mapToGlobal(this->pos());
+    QPoint pos = this->parentWidget()->pos();
     if (pixmap && !pixmap->isNull()) {
         HidedStickerList.push_back(qMakePair(pos, *pixmap));
     }
