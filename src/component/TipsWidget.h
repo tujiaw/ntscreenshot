@@ -12,6 +12,8 @@ public:
     void autoClose(int seconds);
     void setYOffset(int offset);
     void setClickedCopy(bool enable);
+    void setText(const QString& text);
+    QString text() const;
 
     static void popup(QWidget *parent, const QString &text, int seconds, int yOffset = 0, bool clickedCopy = false);
 
@@ -29,4 +31,5 @@ private:
     QTimer *timer_;
     int yOffset_;
     bool isClickedCopy_;
+    QString text_;
 };

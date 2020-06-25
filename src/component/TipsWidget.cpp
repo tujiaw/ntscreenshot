@@ -6,12 +6,24 @@
 #include <QClipboard>
 #include <QCursor>
 
+static const int PADDING = 8;
+static const int FONT_SIZE = 14;
+static const int HEIGHT = 20;
 TipsWidget::TipsWidget(QWidget *parent)
     : QLabel(parent), parent_(parent), timer_(nullptr), yOffset_(0), isClickedCopy_(false)
 {
+    this->setObjectName("TipsWidget");
     setAttribute(Qt::WA_DeleteOnClose, true);
     this->setAlignment(Qt::AlignCenter);
-    this->setStyleSheet("color:rgb(255, 255, 255); background:rgba(50, 50, 50, 220); border: 0px solid grey; border-radius: 5px;}");
+    this->setScaledContents(true);
+
+    QStringList styleList;
+    styleList << "QLabel#TipsWidget{";
+    styleList << QString("height:%1px; font-size:%2px;color:rgb(255, 255, 255);").arg(HEIGHT).arg(FONT_SIZE);
+    styleList << QString("padding-left:%1px; padding-right:%2px; background:rgba(50, 50, 50, 220);").arg(PADDING).arg(PADDING);
+    styleList << "border: 0px solid grey; border-radius: 5px;";
+    styleList << "}";
+    this->setStyleSheet(styleList.join(" "));
 }
 
 TipsWidget::~TipsWidget()
@@ -42,6 +54,28 @@ void TipsWidget::setClickedCopy(bool enable)
     }
 }
 
+void TipsWidget::setText(const QString& text)
+{
+    text_ = text;
+    QFont font = this->font();
+    font.setPixelSize(FONT_SIZE);
+    QFontMetrics fm(font);
+    int textWidth = fm.width(text);
+    if (textWidth < this->parentWidget()->width() - 4 * PADDING) {
+        QLabel::setText(text);
+    }
+    else {
+        textWidth = this->parentWidget()->width() - 4 * PADDING;
+        QLabel::setText(fm.elidedText(text, Qt::ElideMiddle, textWidth));
+    }
+    this->resize(textWidth + 2*PADDING, HEIGHT);
+}
+
+QString TipsWidget::text() const
+{
+    return text_;
+}
+
 void TipsWidget::popup(QWidget *parent, const QString &text, int seconds, int yOffset, bool clickedCopy)
 {
     if (text.isEmpty()) {
@@ -53,16 +87,6 @@ void TipsWidget::popup(QWidget *parent, const QString &text, int seconds, int yO
     widget->autoClose(seconds);
     widget->setYOffset(yOffset);
     widget->setClickedCopy(clickedCopy);
-    QFontMetrics fm = widget->fontMetrics();
-    int textWidth = fm.width(text);
-    const int PADDING = 5;
-    if (textWidth - 2 * PADDING < parent->width()) {
-        widget->setFixedWidth(textWidth + 2 * PADDING);
-    } else {
-        int maxWidth = parent->width() - 2 * PADDING;
-        widget->setText(fm.elidedText(text, Qt::ElideMiddle, maxWidth));
-        widget->setFixedWidth(maxWidth);
-    }
     widget->show();
 }
 

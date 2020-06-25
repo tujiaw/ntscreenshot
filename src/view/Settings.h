@@ -24,6 +24,7 @@ private:
     void onPinNoBorder(bool checked);
     void onRevertClicked();
     void onTablePathDoubleClicked(int row, int col);
+    void onUploadImageUrlChanged(const QString& text);
 
 private:
     Q_DISABLE_COPY(Settings)

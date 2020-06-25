@@ -20,6 +20,7 @@ Settings::Settings(QWidget *parent)
     connect(ui.cbAutoStart, &QCheckBox::clicked, this, &Settings::onAutoStartClicked);
     connect(ui.cbPinNoBorder, &QCheckBox::clicked, this, &Settings::onPinNoBorder);
     connect(ui.pbRevert, &QPushButton::clicked, this, &Settings::onRevertClicked);
+    connect(ui.leUploadImageUrl, &QLineEdit::textChanged, this, &Settings::onUploadImageUrlChanged);
 
     readData();
 }
@@ -35,6 +36,7 @@ void Settings::readData()
     ui.cbPinNoBorder->setCheckState(setting->pinNoBorder() ? Qt::Checked : Qt::Unchecked);
     ui.leScreenshot->setText(setting->screenhotGlobalKey());
     ui.lePin->setText(setting->pinGlobalKey());
+    ui.leUploadImageUrl->setText(setting->uploadImageUrl());
 }
 
 void Settings::writeData()
@@ -133,4 +135,9 @@ void Settings::onTablePathDoubleClicked(int row, int col)
     QString text = ui.tablePath->item(row, col)->text();
     QClipboard *clipboard = QApplication::clipboard();
     clipboard->setText(text);
+}
+
+void Settings::onUploadImageUrlChanged(const QString& text)
+{
+    WindowManager::instance()->setting()->setUploadImageUrl(text);
 }

@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'Settings.ui'
 **
-** Created by: Qt User Interface Compiler version 5.6.3
+** Created by: Qt User Interface Compiler version 5.9.9
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -39,14 +39,17 @@ public:
     QCheckBox *cbAutoStart;
     QSpacerItem *horizontalSpacer;
     QGridLayout *gridLayout;
-    QPushButton *pbPinStatus;
-    QLabel *label_2;
     QLineEdit *lePin;
-    QLabel *label;
-    QLineEdit *leScreenshot;
+    QLabel *label_2;
+    QPushButton *pbPinStatus;
     QPushButton *pbScreenshotStatus;
+    QLabel *label;
     QSpacerItem *horizontalSpacer_4;
     QSpacerItem *horizontalSpacer_5;
+    QLineEdit *leScreenshot;
+    QLabel *label_6;
+    QLineEdit *leUploadImageUrl;
+    QSpacerItem *horizontalSpacer_6;
     QCheckBox *cbPinNoBorder;
     QCheckBox *checkBox;
     QSpacerItem *horizontalSpacer_3;
@@ -69,8 +72,8 @@ public:
     {
         if (Settings->objectName().isEmpty())
             Settings->setObjectName(QStringLiteral("Settings"));
-        Settings->resize(450, 281);
-        Settings->setMaximumSize(QSize(450, 16777215));
+        Settings->resize(450, 279);
+        Settings->setMaximumSize(QSize(450, 279));
         verticalLayout = new QVBoxLayout(Settings);
         verticalLayout->setSpacing(6);
         verticalLayout->setContentsMargins(11, 11, 11, 11);
@@ -101,16 +104,7 @@ public:
         gridLayout = new QGridLayout();
         gridLayout->setSpacing(6);
         gridLayout->setObjectName(QStringLiteral("gridLayout"));
-        pbPinStatus = new QPushButton(tab);
-        pbPinStatus->setObjectName(QStringLiteral("pbPinStatus"));
-
-        gridLayout->addWidget(pbPinStatus, 1, 2, 1, 1);
-
-        label_2 = new QLabel(tab);
-        label_2->setObjectName(QStringLiteral("label_2"));
-
-        gridLayout->addWidget(label_2, 1, 0, 1, 1);
-
+        gridLayout->setContentsMargins(-1, -1, -1, 0);
         lePin = new QLineEdit(tab);
         lePin->setObjectName(QStringLiteral("lePin"));
         lePin->setMaximumSize(QSize(200, 16777215));
@@ -118,22 +112,25 @@ public:
 
         gridLayout->addWidget(lePin, 1, 1, 1, 1);
 
-        label = new QLabel(tab);
-        label->setObjectName(QStringLiteral("label"));
+        label_2 = new QLabel(tab);
+        label_2->setObjectName(QStringLiteral("label_2"));
 
-        gridLayout->addWidget(label, 0, 0, 1, 1);
+        gridLayout->addWidget(label_2, 1, 0, 1, 1);
 
-        leScreenshot = new QLineEdit(tab);
-        leScreenshot->setObjectName(QStringLiteral("leScreenshot"));
-        leScreenshot->setMaximumSize(QSize(200, 16777215));
-        leScreenshot->setReadOnly(true);
+        pbPinStatus = new QPushButton(tab);
+        pbPinStatus->setObjectName(QStringLiteral("pbPinStatus"));
 
-        gridLayout->addWidget(leScreenshot, 0, 1, 1, 1);
+        gridLayout->addWidget(pbPinStatus, 1, 2, 1, 1);
 
         pbScreenshotStatus = new QPushButton(tab);
         pbScreenshotStatus->setObjectName(QStringLiteral("pbScreenshotStatus"));
 
         gridLayout->addWidget(pbScreenshotStatus, 0, 2, 1, 1);
+
+        label = new QLabel(tab);
+        label->setObjectName(QStringLiteral("label"));
+
+        gridLayout->addWidget(label, 0, 0, 1, 1);
 
         horizontalSpacer_4 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
@@ -142,6 +139,27 @@ public:
         horizontalSpacer_5 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         gridLayout->addItem(horizontalSpacer_5, 1, 3, 1, 1);
+
+        leScreenshot = new QLineEdit(tab);
+        leScreenshot->setObjectName(QStringLiteral("leScreenshot"));
+        leScreenshot->setMaximumSize(QSize(200, 16777215));
+        leScreenshot->setReadOnly(true);
+
+        gridLayout->addWidget(leScreenshot, 0, 1, 1, 1);
+
+        label_6 = new QLabel(tab);
+        label_6->setObjectName(QStringLiteral("label_6"));
+
+        gridLayout->addWidget(label_6, 2, 0, 1, 1);
+
+        leUploadImageUrl = new QLineEdit(tab);
+        leUploadImageUrl->setObjectName(QStringLiteral("leUploadImageUrl"));
+
+        gridLayout->addWidget(leUploadImageUrl, 2, 1, 1, 1);
+
+        horizontalSpacer_6 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        gridLayout->addItem(horizontalSpacer_6, 2, 3, 1, 1);
 
         gridLayout->setColumnStretch(1, 1);
 
@@ -246,12 +264,13 @@ public:
     {
         Settings->setWindowTitle(QApplication::translate("Settings", "Settings", Q_NULLPTR));
         cbAutoStart->setText(QApplication::translate("Settings", "\345\274\200\346\234\272\350\207\252\345\220\257\345\212\250", Q_NULLPTR));
-        pbPinStatus->setText(QString());
-        label_2->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\345\277\253\346\215\267\351\224\256\357\274\232", Q_NULLPTR));
         lePin->setPlaceholderText(QApplication::translate("Settings", "\347\202\271\345\207\273\351\234\200\350\246\201\350\256\276\347\275\256\347\232\204\345\277\253\346\215\267\351\224\256", Q_NULLPTR));
+        label_2->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\345\277\253\346\215\267\351\224\256\357\274\232", Q_NULLPTR));
+        pbPinStatus->setText(QString());
+        pbScreenshotStatus->setText(QString());
         label->setText(QApplication::translate("Settings", "\346\210\252\345\233\276\345\277\253\346\215\267\351\224\256\357\274\232", Q_NULLPTR));
         leScreenshot->setPlaceholderText(QApplication::translate("Settings", "\347\202\271\345\207\273\351\234\200\350\246\201\350\256\276\347\275\256\347\232\204\345\277\253\346\215\267\351\224\256", Q_NULLPTR));
-        pbScreenshotStatus->setText(QString());
+        label_6->setText(QApplication::translate("Settings", "\345\233\276\345\272\212\345\234\260\345\235\200\357\274\232", Q_NULLPTR));
         cbPinNoBorder->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\346\227\240\350\276\271\346\241\206", Q_NULLPTR));
         checkBox->setText(QApplication::translate("Settings", "\351\223\276\346\216\245\345\244\215\345\210\266\346\210\220Markdown\346\240\274\345\274\217", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("Settings", "\345\270\270\350\247\204\350\256\276\347\275\256", Q_NULLPTR));

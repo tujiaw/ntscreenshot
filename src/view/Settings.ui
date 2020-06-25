@@ -7,13 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>450</width>
-    <height>281</height>
+    <height>279</height>
    </rect>
   </property>
   <property name="maximumSize">
    <size>
     <width>450</width>
-    <height>16777215</height>
+    <height>279</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -55,21 +55,10 @@
         </layout>
        </item>
        <item>
-        <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,0,0">
-         <item row="1" column="2">
-          <widget class="QPushButton" name="pbPinStatus">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>贴图快捷键：</string>
-           </property>
-          </widget>
-         </item>
+        <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,0,0" rowminimumheight="0,0,0">
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
          <item row="1" column="1">
           <widget class="QLineEdit" name="lePin">
            <property name="maximumSize">
@@ -86,26 +75,17 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label">
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_2">
            <property name="text">
-            <string>截图快捷键：</string>
+            <string>贴图快捷键：</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="leScreenshot">
-           <property name="maximumSize">
-            <size>
-             <width>200</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="readOnly">
-            <bool>true</bool>
-           </property>
-           <property name="placeholderText">
-            <string>点击需要设置的快捷键</string>
+         <item row="1" column="2">
+          <widget class="QPushButton" name="pbPinStatus">
+           <property name="text">
+            <string/>
            </property>
           </widget>
          </item>
@@ -113,6 +93,13 @@
           <widget class="QPushButton" name="pbScreenshotStatus">
            <property name="text">
             <string/>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>截图快捷键：</string>
            </property>
           </widget>
          </item>
@@ -131,6 +118,45 @@
          </item>
          <item row="1" column="3">
           <spacer name="horizontalSpacer_5">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="leScreenshot">
+           <property name="maximumSize">
+            <size>
+             <width>200</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+           <property name="placeholderText">
+            <string>点击需要设置的快捷键</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_6">
+           <property name="text">
+            <string>图床地址：</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLineEdit" name="leUploadImageUrl"/>
+         </item>
+         <item row="2" column="3">
+          <spacer name="horizontalSpacer_6">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
