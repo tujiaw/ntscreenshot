@@ -25,67 +25,42 @@
 #include "view/Stickers.h"
 #include "view/DrawPanel.h"
 
-/// 鼠标按钮图片的十六进制数据
-static const unsigned char uc_mouse_image[] = {
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52
-    ,0x00, 0x00, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x2D,  0x08, 0x06, 0x00, 0x00, 0x00, 0x52, 0xE9, 0x60
-    ,0xA2, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59,  0x73, 0x00, 0x00, 0x0B, 0x13, 0x00, 0x00, 0x0B
-    ,0x13, 0x01, 0x00, 0x9A, 0x9C, 0x18, 0x00, 0x00,  0x01, 0x40, 0x49, 0x44, 0x41, 0x54, 0x58, 0x85
-    ,0xED, 0xD5, 0x21, 0x6E, 0xC3, 0x30, 0x14, 0xC6,  0xF1, 0xFF, 0x9B, 0xC6, 0x36, 0x30, 0x38, 0xA9
-    ,0x05, 0x01, 0x05, 0x81, 0x05, 0x03, 0x39, 0xCA,  0x60, 0x8F, 0xD2, 0x03, 0xEC, 0x10, 0x3B, 0x46
-    ,0xC1, 0xC0, 0xC6, 0x0A, 0x3B, 0x96, 0xB1, 0x80,  0x82, 0xC1, 0x56, 0x2A, 0xFF, 0x06, 0xE2, 0x36
-    ,0x75, 0x9A, 0xB4, 0xCA, 0xEC, 0x4E, 0x9A, 0xE4,  0x2F, 0xB2, 0x42, 0x22, 0xFF, 0xF2, 0xFC, 0x9C
-    ,0x18, 0x52, 0x52, 0x52, 0x52, 0x52, 0x52, 0x52,  0x52, 0x52, 0x52, 0xFE, 0x55, 0xE4, 0xC6, 0xA0
-    ,0xDC, 0xC4, 0x71, 0x87, 0xC1, 0xC1, 0x68, 0x01,  0xCC, 0x06, 0xC2, 0x51, 0xD0, 0x29, 0xB0, 0x18
-    ,0x00, 0xDF, 0xC6, 0x40, 0x33, 0x37, 0x84, 0x30,  0x4C, 0x80, 0x85, 0xCE, 0x7B, 0x2E, 0x2A, 0x91
-    ,0x84, 0x24, 0xBE, 0x25, 0xDE, 0x25, 0x5E, 0x2F,  0x6E, 0xAE, 0xD0, 0x37, 0x92, 0x10, 0xF0, 0x09
-    ,0x54, 0x40, 0xE9, 0xEE, 0x15, 0xC6, 0xA2, 0x77,  0xFE, 0xE0, 0xE5, 0x85, 0x8F, 0x16, 0x58, 0xDF
-    ,0x35, 0x06, 0x5B, 0xD3, 0xB9, 0xD4, 0x11, 0xD0,  0xA5, 0x8F, 0xDE, 0x57, 0x75, 0x83, 0x73, 0x50
-    ,0x06, 0xF6, 0x72, 0x0A, 0x47, 0x40, 0x57, 0x0D,  0x38, 0xDE, 0xC0, 0x04, 0x6F, 0x68, 0x05, 0x36
-    ,0xF5, 0xE1, 0x08, 0x3D, 0xCD, 0xEA, 0xEA, 0x5A,  0xD8, 0xBE, 0x5A, 0x46, 0xB0, 0x05, 0x1E, 0xAC
-    ,0xF1, 0xC2, 0xD1, 0xCC, 0x01, 0x6D, 0x74, 0x02,  0xDB, 0x3B, 0xBF, 0xD3, 0x73, 0x07, 0x87, 0x2F
-    ,0xEF, 0x53, 0x07, 0x38, 0x82, 0x2F, 0xF6, 0xFB,  0xB8, 0x81, 0x73, 0x41, 0x69, 0x28, 0x3A, 0x7A
-    ,0x5C, 0xDD, 0x73, 0xCF, 0x3A, 0x86, 0xA3, 0x05,  0x87, 0xEA, 0xCC, 0x60, 0xA1, 0x06, 0x75, 0x89
-    ,0xFE, 0x77, 0x92, 0x76, 0x68, 0x23, 0xEF, 0x88,  0xD3, 0x4C, 0xA8, 0x10, 0x7A, 0xD4, 0xEF, 0x8E
-    ,0xBE, 0x8B, 0x68, 0x79, 0x3A, 0xB1, 0x72, 0xE1,  0xAE, 0xBC, 0x13, 0x0D, 0xDE, 0xBD, 0x3D, 0xF3
-    ,0x08, 0x15, 0xD4, 0xDF, 0x4C, 0x06, 0x36, 0xF7,  0x9E, 0x09, 0xED, 0xE9, 0x99, 0x97, 0x3E, 0x42
-    ,0xFF, 0x30, 0x42, 0x4B, 0xA1, 0x8D, 0xD8, 0xE9,  0x2A, 0xBD, 0xED, 0x41, 0x25, 0x2A, 0x89, 0x37
-    ,0x1F, 0xBD, 0xEA, 0x61, 0x8B, 0x5F, 0xDD, 0xC1,  0xFA, 0x01, 0xD8, 0xA3, 0x8F, 0xFB, 0xCA, 0x70
-    ,0x16, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,  0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
-};
-
+// 默认贴图快捷键
 static QString PIN_KEY = "F6";
+// 上传图片url
 static QString UPLOAD_IMAGE_URL = "";
-
-const int MARKERT_WIDTH = 4;
+// 标记宽度
+static const int MARKERT_WIDTH = 4;
+// 边框感知宽度
+static int BORDER_ESTHESIA_WIDTH = 6;
 
 ScreenshotWidget::ScreenshotWidget(QWidget *parent) 
     : QWidget(parent),
     isLeftPressed_ (false), 
-    backgroundScreen_(nullptr),
-    originPainting_(nullptr), 
+    darkScreen_(nullptr),
+    originScreen_(nullptr), 
     selectedScreen_(nullptr), 
     drawpanel_(nullptr)
 {
-    /// 初始化鼠标
+    // 初始化鼠标
     initCursor();
-    /// 初始化鼠标放大器
+    // 初始化鼠标放大器
     initAmplifier();
-    /// 初始化大小感知器
+    // 初始化大小感知器
     initMeasureWidget();
-    /// 全屏窗口
+    // 全屏窗口
     showFullScreen();
-    /// 窗口与显示屏对齐
+    // 窗口与显示屏对齐
     setGeometry(getDesktopRect());
-    /// 霸道置顶
+    // 置顶
     onTopMost();
-    /// 开启鼠标实时追踪
+    // 开启鼠标实时追踪
     setMouseTracking(true);
-    /// 更新鼠标的位置
-    emit cursorPosChange(cursor().pos().x(), cursor().pos().y());
-    /// 更新鼠标区域窗口
+    // 更新鼠标的位置
+    emit sigCursorPosChanged(cursor().pos().x(), cursor().pos().y());
+    // 更新鼠标区域窗口
     updateMouse();
-    /// 展示窗口
+    // 展示窗口
     show();
 }
 
@@ -110,22 +85,21 @@ void ScreenshotWidget::setUploadImageUrl(const QString &url)
     UPLOAD_IMAGE_URL = url;
 }
 
-void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *) {
-    emit doubleClick();
+void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *)
+{
+    emit sigDoubleClick();
 }
 
-
-/**
- * 初始化放大镜 (色彩采集器)
- */
-void ScreenshotWidget::initAmplifier(std::shared_ptr<QPixmap> originPainting) {
+// 初始化放大器
+void ScreenshotWidget::initAmplifier(std::shared_ptr<QPixmap> originPainting) 
+{
     std::shared_ptr<QPixmap>  pixmap = originPainting;
     if (!pixmap) {
         pixmap = getGlobalScreen();
     }
 
     amplifierTool_.reset(new AmplifierWidget(pixmap, this));
-    connect(this,SIGNAL(cursorPosChange(int,int)), amplifierTool_.get(), SLOT(onPostionChange(int,int)));
+    connect(this,SIGNAL(sigCursorPosChanged(int,int)), amplifierTool_.get(), SLOT(onPositionChanged(int,int)));
     amplifierTool_->show();
     amplifierTool_->raise();
 }
@@ -137,52 +111,47 @@ void ScreenshotWidget::initMeasureWidget(void)
     sizeTextPanel_->raise();
 }
 
-/**
- * 功能：获得当前屏幕的大小
- */
-const QRect &ScreenshotWidget::getDesktopRect(void) {
-    if (!desktopRect_.isEmpty()) {
-        return desktopRect_;
-    }
-    /// 兼容多个屏幕的问题
-    desktopRect_ = QRect(QApplication::desktop()->pos(), QApplication::desktop()->size());
-    return desktopRect_;
+// 获取当前屏幕区域
+QRect ScreenshotWidget::getDesktopRect(void) 
+{
+    return QRect(QApplication::desktop()->pos(), QApplication::desktop()->size());
 }
 
 const std::shared_ptr<QPixmap>& ScreenshotWidget::getBackgroundScreen(void) {
-    if (backgroundScreen_) {
-        return backgroundScreen_;
+    if (darkScreen_) {
+        return darkScreen_;
     }
 
-    /// 获得屏幕原画
+    // 获得屏幕原画
     std::shared_ptr<QPixmap> screen = getGlobalScreen();
 
-    /// 制作暗色屏幕背景
+    // 制作暗色屏幕背景
     QPixmap pixmap(screen->width(), screen->height());
     pixmap.fill((QColor(0, 0, 0, 160)));
-    backgroundScreen_.reset(new QPixmap(*screen));
-    QPainter p(backgroundScreen_.get());
+    darkScreen_.reset(new QPixmap(*screen));
+    QPainter p(darkScreen_.get());
     p.drawPixmap(0, 0, pixmap);
-    return backgroundScreen_;
+    return darkScreen_;
 }
 
 std::shared_ptr<QPixmap> ScreenshotWidget::getGlobalScreen(void) {
-    if (!originPainting_) {
-        /// 截取当前桌面，作为截屏的背景图
+    if (!originScreen_) {
+        // 截取当前桌面，作为截屏的背景图
         QScreen *screen = QGuiApplication::primaryScreen();
         const QRect& rect = getDesktopRect();
-        originPainting_.reset(new QPixmap(screen->grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())));
+        originScreen_.reset(new QPixmap(screen->grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())));
     }
-    return originPainting_;
+    return originScreen_;
 }
 
+// 设置感知区域
 void ScreenshotWidget::setEsthesiaRect(const QRect &rect)
 {
     if (rect != esthesiaRect_) {
         esthesiaRect_ = rect;
         if (!rect.isEmpty()) {
-            sizeTextPanel_->onPostionChange(rect.x(), rect.y());
-            sizeTextPanel_->onSizeChange(rect.width(), rect.height());
+            sizeTextPanel_->onPositionChanged(rect.x(), rect.y());
+            sizeTextPanel_->onSizeChanged(rect.width(), rect.height());
         }
     }
 }
@@ -203,15 +172,16 @@ void ScreenshotWidget::onTopMost(void)
 #endif
 }
 
-void ScreenshotWidget::onScreenBorderPressed()
+void ScreenshotWidget::onScreenBorderPressed(int x, int y)
 {
     if (amplifierTool_->isHidden()) {
+        amplifierTool_->move(x, y);
         amplifierTool_->show();
         amplifierTool_->raise();
     }
 }
 
-void ScreenshotWidget::onScreenBorderReleased()
+void ScreenshotWidget::onScreenBorderReleased(int x, int y)
 {
     if (amplifierTool_->isVisible()) {
         amplifierTool_->hide();
@@ -220,8 +190,8 @@ void ScreenshotWidget::onScreenBorderReleased()
 
 void ScreenshotWidget::onSelectedScreenSizeChanged(int w, int h)
 {
-    sizeTextPanel_->onSizeChange(w, h);
-    amplifierTool_->onSizeChange(w, h);
+    sizeTextPanel_->onSizeChanged(w, h);
+    amplifierTool_->onSizeChanged(w, h);
     if (drawpanel_) {
         drawpanel_->onReferRectChanged(QRect(selectedScreen_->pos(), selectedScreen_->size()));
     }
@@ -229,8 +199,8 @@ void ScreenshotWidget::onSelectedScreenSizeChanged(int w, int h)
 
 void ScreenshotWidget::onSelectedScreenPosChanged(int x, int y)
 {
-    sizeTextPanel_->onPostionChange(x, y);
-    amplifierTool_->onPostionChange(x, y);
+    sizeTextPanel_->onPositionChanged(x, y);
+    amplifierTool_->onPositionChanged(x, y);
     if (drawpanel_) {
         drawpanel_->onReferRectChanged(QRect(selectedScreen_->pos(), selectedScreen_->size()));
     }
@@ -250,20 +220,37 @@ void ScreenshotWidget::onDrawUndo()
     }
 }
 
-/*
- * 初始化鼠标
- * 参数：_ico 鼠标图片的资源文件
- */
-void ScreenshotWidget::initCursor(const QString& ico) {
-    QPixmap pixmap;
-    if (ico.isEmpty()) {
-        pixmap.loadFromData(uc_mouse_image, sizeof(uc_mouse_image));
-    } else {
-        pixmap.load(ico);
-    }
+void ScreenshotWidget::initCursor() 
+{
     QCursor cursor;
-    cursor = QCursor(pixmap, 15, 23);
+    cursor = QCursor(Util::multicolorCursorPixmap(), 15, 23);
     setCursor(cursor);
+}
+
+void ScreenshotWidget::initSelectedScreen(const QPoint &pos)
+{
+    // 初始化选区
+    if (!selectedScreen_) {
+        selectedScreen_.reset(new SelectedScreenWidget(getGlobalScreen(), pos, this));
+        connect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onCursorPosChanged(int, int)));
+        connect(this, SIGNAL(sigDoubleClick()), selectedScreen_.get(), SLOT(onSaveScreen()));
+
+        connect(selectedScreen_.get(), SIGNAL(sigSizeChanged(int, int)), this, SLOT(onSelectedScreenSizeChanged(int, int)));
+        connect(selectedScreen_.get(), SIGNAL(sigPositionChanged(int, int)), this, SLOT(onSelectedScreenPosChanged(int, int)));
+        connect(selectedScreen_.get(), SIGNAL(sigBorderPressed(int, int)), this, SLOT(onScreenBorderPressed(int, int)));
+        connect(selectedScreen_.get(), SIGNAL(sigBorderReleased(int, int)), this, SLOT(onScreenBorderReleased(int, int)));
+        connect(selectedScreen_.get(), SIGNAL(sigClose()), this, SIGNAL(sigClose()));
+    }
+
+    // 初始化绘制面板
+    if (!drawpanel_) {
+        drawpanel_.reset(new DrawPanel(this));
+        connect(drawpanel_.get(), SIGNAL(sigStart()), this, SLOT(onDraw()));
+        connect(drawpanel_.get(), SIGNAL(sigUndo()), this, SLOT(onDrawUndo()));
+        connect(drawpanel_.get(), SIGNAL(sigSticker()), selectedScreen_.get(), SLOT(onSticker()));
+        connect(drawpanel_.get(), SIGNAL(sigSave()), selectedScreen_.get(), SLOT(onSaveScreenOther()));
+        connect(drawpanel_.get(), SIGNAL(sigFinished()), selectedScreen_.get(), SLOT(onSaveScreen()));
+    }
 }
 
 void ScreenshotWidget::mousePressEvent(QMouseEvent *e) {
@@ -271,27 +258,7 @@ void ScreenshotWidget::mousePressEvent(QMouseEvent *e) {
         // 获得截图器当前起始位置
         startPoint_ = e->pos();
         isLeftPressed_ = true;
-
-        if (!selectedScreen_) {
-            selectedScreen_.reset(new SelectedScreenWidget(getGlobalScreen(), e->pos(), this));
-            connect(this, SIGNAL(cursorPosChange(int, int)), selectedScreen_.get(), SLOT(onMouseChange(int, int)));
-            connect(this, SIGNAL(doubleClick()), selectedScreen_.get(), SLOT(onSaveScreen()));
-
-            connect(selectedScreen_.get(), SIGNAL(sizeChange(int, int)), this, SLOT(onSelectedScreenSizeChanged(int, int)));
-            connect(selectedScreen_.get(), SIGNAL(postionChange(int, int)), this, SLOT(onSelectedScreenPosChanged(int, int)));
-            connect(selectedScreen_.get(), SIGNAL(sigBorderPressed()), this, SLOT(onScreenBorderPressed()));
-            connect(selectedScreen_.get(), SIGNAL(sigBorderReleased()), this, SLOT(onScreenBorderReleased()));
-            connect(selectedScreen_.get(), SIGNAL(sigClose()), this, SIGNAL(sigClose()));
-        }
-
-        if (!drawpanel_) {
-            drawpanel_.reset(new DrawPanel(this));
-            connect(drawpanel_.get(), SIGNAL(sigStart()), this, SLOT(onDraw()));
-            connect(drawpanel_.get(), SIGNAL(sigUndo()), this, SLOT(onDrawUndo()));
-            connect(drawpanel_.get(), SIGNAL(sigSticker()), selectedScreen_.get(), SLOT(onSticker()));
-            connect(drawpanel_.get(), SIGNAL(sigSave()), selectedScreen_.get(), SLOT(onSaveScreenOther()));
-            connect(drawpanel_.get(), SIGNAL(sigFinished()), selectedScreen_.get(), SLOT(onSaveScreen()));
-        }
+        initSelectedScreen(e->pos());
     }
     QWidget::mousePressEvent(e);
 }
@@ -324,7 +291,7 @@ void ScreenshotWidget::mouseReleaseEvent(QMouseEvent *e) {
         }
 
         // 断开鼠标移动的信号，否则鼠标选中区域还会随着鼠标的移动而改变大小
-        disconnect(this, SIGNAL(cursorPosChange(int, int)), selectedScreen_.get(), SLOT(onMouseChange(int, int)));
+        disconnect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onCursorPosChanged(int, int)));
         // 隐藏放大器
         amplifierTool_->hide();
         // 重置鼠标左键按下的状态
@@ -334,7 +301,7 @@ void ScreenshotWidget::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void ScreenshotWidget::mouseMoveEvent(QMouseEvent *e) {
-    emit cursorPosChange(e->x(), e->y());
+    emit sigCursorPosChanged(e->x(), e->y());
     if (isLeftPressed_) {
         amplifierTool_->raise();
         setEsthesiaRect(QRect());
@@ -428,7 +395,7 @@ void SelectedScreenSizeWidget::paintEvent(QPaintEvent *) {
     painter.drawText(rect(), Qt::AlignLeft | Qt::AlignBottom, info_);
 }
 
-void SelectedScreenSizeWidget::onPostionChange(int x, int y) {
+void SelectedScreenSizeWidget::onPositionChanged(int x, int y) {
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     const int& ry = y - height() - 1;
@@ -439,17 +406,17 @@ void SelectedScreenSizeWidget::onPostionChange(int x, int y) {
     show();
 }
 
-void SelectedScreenSizeWidget::onSizeChange(int w, int h) {
+void SelectedScreenSizeWidget::onSizeChanged(int w, int h) {
     info_ = QString("%1 x %2").arg(w).arg(h);
 }
 
 ///////////////////////////////////////////////////////////
 SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainting, QPoint pos, QWidget *parent) 
     : QWidget(parent), 
-    direction_(NONE), 
+    direction_(DIR_NONE), 
     originPoint_(pos),
     isPressed_(false), 
-    originPainting_(originPainting),
+    originScreen_(originPainting),
     isDrawMode_(false)
 {
     uploadImageUtil_ = new UploadImageUtil(this);
@@ -463,12 +430,12 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("退出"), this, SLOT(quitScreenshot()));
 
-    /// 双击即完成
-    connect(this, SIGNAL(doubleClick()), this, SLOT(onSaveScreen()));
+    // 双击即完成
+    connect(this, SIGNAL(sigDoubleClick()), this, SLOT(onSaveScreen()));
 
-    /// 开启鼠标实时追踪
+    // 开启鼠标实时追踪
     setMouseTracking(true);
-    /// 默认隐藏
+    // 默认隐藏
     hide();
 }
 
@@ -479,96 +446,94 @@ void SelectedScreenWidget::setDrawMode(const DrawMode &drawMode)
 
 QPixmap SelectedScreenWidget::getPixmap()
 {
-    if (originPainting_) {
-        QImage image = originPainting_->copy(currentRect_).toImage();
-        if (drawModeList_.isEmpty()) {
-            return QPixmap::fromImage(image);
-        } else {
-            QPixmap pixmap = QPixmap::fromImage(image);
-            QPainter painter(&pixmap);
-            for (int i = 0; i < drawModeList_.size(); i++) {
-                DrawMode &dm = drawModeList_[i];
-                dm.draw(painter);
-            }
-            return pixmap;
+    if (!originScreen_) {
+        return QPixmap();
+    }
+
+    // 获取绘制的选中区域的图片
+    QImage image = originScreen_->copy(currentRect_).toImage();
+    QPixmap pixmap = QPixmap::fromImage(image);
+    if (!drawModeCache_.isEmpty()) {
+        QPainter painter(&pixmap);
+        for (int i = 0; i < drawModeCache_.size(); i++) {
+            DrawMode &dm = drawModeCache_[i];
+            dm.draw(painter);
         }
     }
-    return QPixmap();
+    return pixmap;
 }
 
 void SelectedScreenWidget::drawUndo()
 {
     drawStartPos_ = QPoint(0, 0);
     drawEndPos_ = QPoint(0, 0);
-    if (!drawModeList_.isEmpty()) {
-        drawModeList_.pop_back();
+    if (!drawModeCache_.isEmpty()) {
+        drawModeCache_.pop_back();
         update();
     }
 }
 
 SelectedScreenWidget::DIRECTION SelectedScreenWidget::getRegion(const QPoint &cursor) {
-    SelectedScreenWidget::DIRECTION ret_dir = NONE;
-    // left upper
-    QPoint pt_lu = mapToParent(rect().topLeft());
-    // right lower
-    QPoint pt_rl = mapToParent(rect().bottomRight());
+    SelectedScreenWidget::DIRECTION dir = DIR_NONE;
+    QPoint ptTopLeft = mapToParent(rect().topLeft());
+    QPoint ptBottomRight = mapToParent(rect().bottomRight());
 
     int x = cursor.x();
     int y = cursor.y();
     isDrawMode_ = false;
 
     /// 获得鼠标当前所处窗口的边界方向
-    if(pt_lu.x() + PADDING_ >= x && pt_lu.x() <= x && pt_lu.y() + PADDING_ >= y && pt_lu.y() <= y) {
+    if(ptTopLeft.x() + BORDER_ESTHESIA_WIDTH >= x && ptTopLeft.x() <= x && ptTopLeft.y() + BORDER_ESTHESIA_WIDTH >= y && ptTopLeft.y() <= y) {
         // 左上角
-        ret_dir = LEFTUPPER;
+        dir = DIR_LEFT_TOP;
         this->setCursor(QCursor(Qt::SizeFDiagCursor));
-    } else if(x >= pt_rl.x() - PADDING_ && x <= pt_rl.x() && y >= pt_rl.y() - PADDING_ && y <= pt_rl.y()) {
+    } else if(x >= ptBottomRight.x() - BORDER_ESTHESIA_WIDTH && x <= ptBottomRight.x() && y >= ptBottomRight.y() - BORDER_ESTHESIA_WIDTH && y <= ptBottomRight.y()) {
         // 右下角
-        ret_dir = RIGHTLOWER;
+        dir = DIR_RIGHT_BOTTOM;
         this->setCursor(QCursor(Qt::SizeFDiagCursor));
-    } else if(x <= pt_lu.x() + PADDING_ && x >= pt_lu.x() && y >= pt_rl.y() - PADDING_ && y <= pt_rl.y()) {
+    } else if(x <= ptTopLeft.x() + BORDER_ESTHESIA_WIDTH && x >= ptTopLeft.x() && y >= ptBottomRight.y() - BORDER_ESTHESIA_WIDTH && y <= ptBottomRight.y()) {
         // 左下角
-        ret_dir = LEFTLOWER;
+        dir = DIR_LEFT_BOTTOM;
         this->setCursor(QCursor(Qt::SizeBDiagCursor));
-    } else if(x <= pt_rl.x() && x >= pt_rl.x() - PADDING_ && y >= pt_lu.y() && y <= pt_lu.y() + PADDING_) {
+    } else if(x <= ptBottomRight.x() && x >= ptBottomRight.x() - BORDER_ESTHESIA_WIDTH && y >= ptTopLeft.y() && y <= ptTopLeft.y() + BORDER_ESTHESIA_WIDTH) {
         // 右上角
-        ret_dir = RIGHTUPPER;
+        dir = DIR_RIGHT_TOP;
         this->setCursor(QCursor(Qt::SizeBDiagCursor));
-    } else if(x <= pt_lu.x() + PADDING_ && x >= pt_lu.x()) {
+    } else if(x <= ptTopLeft.x() + BORDER_ESTHESIA_WIDTH && x >= ptTopLeft.x()) {
         // 左边
-        ret_dir = LEFT;
+        dir = DIR_LEFT;
         this->setCursor(QCursor(Qt::SizeHorCursor));
-    } else if( x <= pt_rl.x() && x >= pt_rl.x() - PADDING_) {
+    } else if( x <= ptBottomRight.x() && x >= ptBottomRight.x() - BORDER_ESTHESIA_WIDTH) {
         // 右边
-        ret_dir = RIGHT;
+        dir = DIR_RIGHT;
         this->setCursor(QCursor(Qt::SizeHorCursor));
-    } else if(y >= pt_lu.y() && y <= pt_lu.y() + PADDING_){
+    } else if(y >= ptTopLeft.y() && y <= ptTopLeft.y() + BORDER_ESTHESIA_WIDTH){
         // 上边
-        ret_dir = UPPER;
+        dir = DIR_TOP;
         this->setCursor(QCursor(Qt::SizeVerCursor));
-    } else if(y <= pt_rl.y() && y >= pt_rl.y() - PADDING_) {
+    } else if(y <= ptBottomRight.y() && y >= ptBottomRight.y() - BORDER_ESTHESIA_WIDTH) {
         // 下边
-        ret_dir = LOWER;
+        dir = DIR_BOTTOM;
         this->setCursor(QCursor(Qt::SizeVerCursor));
     } else {
         // 默认
-        ret_dir = NONE;
-        if (!drawMode_.isNull()) {
+        dir = DIR_NONE;
+        if (!drawMode_.isNone()) {
             isDrawMode_ = true;
         }
         this->setCursor(isDrawMode_ ? Qt::CrossCursor : Qt::SizeAllCursor);
     }
-    return ret_dir;
+    return dir;
 }
 
 void SelectedScreenWidget::contextMenuEvent(QContextMenuEvent *) {
-    /// 在鼠标位置弹射出菜单栏
+    // 右键菜单
     menu_->exec(cursor().pos());
 }
 
 void SelectedScreenWidget::mouseDoubleClickEvent(QMouseEvent *e) {
     if (e->button() == Qt::LeftButton) {
-        emit doubleClick();
+        emit sigDoubleClick();
         e->accept();
     }
 }
@@ -576,11 +541,11 @@ void SelectedScreenWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 void SelectedScreenWidget::mousePressEvent(QMouseEvent *e) {
     if (e->button() == Qt::LeftButton) {
         isPressed_ = true;
-        if(direction_ != NONE) {
+        if (direction_ != DIR_NONE) {
             this->mouseGrabber();
-            emit sigBorderPressed();
+            emit sigBorderPressed(e->globalX(), e->globalY());
         }
-        /// @bug :这里可能存在问题, 不应当使用globalPos
+
         movePos_ = e->globalPos() - pos();
         drawStartPos_ = e->pos();
     }
@@ -588,17 +553,19 @@ void SelectedScreenWidget::mousePressEvent(QMouseEvent *e) {
 
 void SelectedScreenWidget::mouseReleaseEvent(QMouseEvent * e) {
     if (e->button() == Qt::LeftButton) {
-        if(direction_ != NONE) {
+        if (direction_ != DIR_NONE) {
             isDrawMode_ = false;
         }
 
+        // 当前绘制结束，存档、清理
         if (isPressed_ && isDrawMode_) {
-            if (e->pos() != drawStartPos_) {
-                drawMode_.setPos(drawStartPos_, e->pos());
-                drawModeList_.push_back(drawMode_);
+            drawMode_.setPos(drawStartPos_, e->pos());
+            if (drawMode_.isValid()) {
+                drawModeCache_.push_back(drawMode_);
             }
+            drawMode_.clear();
         }
-        emit sigBorderReleased();
+        emit sigBorderReleased(e->globalX(), e->globalY());
         drawStartPos_ = QPoint(0, 0);
         drawEndPos_ = QPoint(0, 0);
         isPressed_ = false;
@@ -606,72 +573,71 @@ void SelectedScreenWidget::mouseReleaseEvent(QMouseEvent * e) {
 }
 
 void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
-    QPoint gloPoint = mapToParent(e->pos());
-    // left upper
-    QPoint pt_lu = mapToParent(rect().topLeft());
-    // left lower
-    QPoint pt_ll = mapToParent(rect().bottomLeft());
-    // right lower
-    QPoint pt_rl = mapToParent(rect().bottomRight());
-    // right upper
-    QPoint pt_ru = mapToParent(rect().topRight());
+    QPoint ptTopLeft = mapToParent(rect().topLeft());
+    QPoint ptBottomLeft = mapToParent(rect().bottomLeft());
+    QPoint ptBottomRight = mapToParent(rect().bottomRight());
+    QPoint ptTopRight = mapToParent(rect().topRight());
     if(!isPressed_) {
-        /// 检查鼠标鼠标方向
-        direction_ = getRegion(gloPoint);
+        // 检查鼠标鼠标方向
+        direction_ = getRegion(e->globalPos());
 
-        /// 根据方位判断拖拉对应支点
+        // 根据方位判断拖拉对应支点
         switch(direction_) {
-        case NONE:
-        case RIGHT:
-        case RIGHTLOWER:
-            originPoint_ = pt_lu;
+        case DIR_NONE:
+        case DIR_RIGHT:
+        case DIR_RIGHT_BOTTOM:
+            originPoint_ = ptTopLeft;
             break;
-        case RIGHTUPPER:
-            originPoint_ = pt_ll;
+        case DIR_RIGHT_TOP:
+            originPoint_ = ptBottomLeft;
             break;
-        case LEFT:
-        case LEFTLOWER:
-            originPoint_ = pt_ru;
+        case DIR_LEFT:
+        case DIR_LEFT_BOTTOM:
+            originPoint_ = ptTopRight;
             break;
-        case LEFTUPPER:
-        case UPPER:
-            originPoint_ = pt_rl;
+        case DIR_LEFT_TOP:
+        case DIR_TOP:
+            originPoint_ = ptBottomRight;
             break;
-        case LOWER:
-            originPoint_ = pt_lu;
+        case DIR_BOTTOM:
+            originPoint_ = ptTopLeft;
             break;
         }
     }
     else {
+        // 进入绘制模式
         if (isDrawMode_) {
             drawEndPos_ = e->pos();
+            // 绘制折线保存鼠标移动的每一个点
+            if (drawMode_.shape() == DrawMode::PolyLine) {
+                drawMode_.addPos(e->pos());
+            }
             update();
             return;
         }
 
-        if(direction_ != NONE) {
-            const int& global_x = gloPoint.x();
-            /// 鼠标进行拖拉拽
+        if (direction_ != DIR_NONE) {
+            // 鼠标在边框上拖动
             switch(direction_) {
-            case LEFT:
-                return onMouseChange(global_x, pt_ll.y() + 1);
-            case RIGHT:
-                return onMouseChange(global_x, pt_rl.y() + 1);
-            case UPPER:
-                return onMouseChange(pt_lu.x(), gloPoint.y());
-            case LOWER:
-                return onMouseChange(pt_rl.x() + 1, gloPoint.y());
-            case LEFTUPPER:
-            case RIGHTUPPER:
-            case LEFTLOWER:
-            case RIGHTLOWER:
-                return onMouseChange(global_x, gloPoint.y());
+            case DIR_LEFT:
+                return onCursorPosChanged(e->globalX(), ptBottomLeft.y() + 1);
+            case DIR_RIGHT:
+                return onCursorPosChanged(e->globalX(), ptBottomRight.y() + 1);
+            case DIR_TOP:
+                return onCursorPosChanged(ptTopLeft.x(), e->globalY());
+            case DIR_BOTTOM:
+                return onCursorPosChanged(ptBottomRight.x() + 1, e->globalY());
+            case DIR_LEFT_TOP:
+            case DIR_RIGHT_TOP:
+            case DIR_LEFT_BOTTOM:
+            case DIR_RIGHT_BOTTOM:
+                return onCursorPosChanged(e->globalX(), e->globalY());
             default:
                 break;
             }
         }
         else {
-            // 移动选区
+            // 鼠标按下移动选区
             if ((e->globalPos() - movePos_).manhattanLength() > QApplication::startDragDistance()) {
                 QPoint newPos = e->globalPos() - movePos_;
                 if (newPos.x() < 0) {
@@ -694,7 +660,7 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
 
 void SelectedScreenWidget::moveEvent(QMoveEvent *) 
 {
-    emit postionChange(x(), y());
+    emit sigPositionChanged(x(), y());
 }
 
 void SelectedScreenWidget::resizeEvent(QResizeEvent *) 
@@ -714,7 +680,7 @@ void SelectedScreenWidget::resizeEvent(QResizeEvent *)
     listMarker_.push_back(QPoint(0, (height() >> 1)));
     listMarker_.push_back(QPoint(width() - MARKERT_WIDTH, (height() >> 1) - MARKERT_WIDTH));
 
-    emit sizeChange(width(), height());
+    emit sigSizeChanged(width(), height());
 }
 
 void SelectedScreenWidget::hideEvent(QHideEvent *) {
@@ -742,39 +708,42 @@ void SelectedScreenWidget::paintEvent(QPaintEvent *) {
     pixmapRect.setWidth(pixmapRect.width() - bw * 2);
     pixmapRect.setHeight(pixmapRect.height() - bw * 2);
     // 背景图往内缩bw像素，让给边线和点的绘制
-    painter.drawPixmap(QPoint(bw, bw), *originPainting_, pixmapRect);
+    painter.drawPixmap(QPoint(bw, bw), *originScreen_, pixmapRect);
     /// 绘制边框线
     QPen pen(QColor(0, 174, 255), bw);
     painter.setPen(pen);
     painter.drawRect(rect() - QMargins(bw, bw, bw, bw));
 
-    // 绘制八个点
-    //改变点的宽度
+    // 绘制边框上八个点
     QBrush brush(Qt::red);
     for (int i = 0; i < listMarker_.size(); i++) {
         QRect rect(listMarker_[i].x(), listMarker_[i].y(), MARKERT_WIDTH, MARKERT_WIDTH);
         painter.fillRect(rect, brush);
     }
 
-    if (isDrawMode_ && !drawMode_.isNull()) {
+    // 当前绘制
+    if (isDrawMode_ && !drawMode_.isNone()) {
         drawMode_.setPos(drawStartPos_, drawEndPos_);
         drawMode_.draw(painter);
     }
 
-    for (int i = 0; i < drawModeList_.size(); i++) {
-        DrawMode& dm = drawModeList_[i];
+    // 绘制缓存
+    for (int i = 0; i < drawModeCache_.size(); i++) {
+        DrawMode& dm = drawModeCache_[i];
         dm.draw(painter);
     }
 }
 
 void SelectedScreenWidget::onSaveScreenOther(void) {
-    QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("保存图片"), Util::screenshotDefaultName(), "JPEG Files (*.jpg)");
+    QPixmap pixmap = getPixmap();
+    if (pixmap.isNull()) {
+        return;
+    }
+
+    QString name = Util::pixmapUniqueName(pixmap);
+    QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("保存图片"), name, "PNG (*.png)");
     if (fileName.length() > 0) {
-        QPixmap pixmap = getPixmap();
-        if (pixmap.isNull()) {
-            return;
-        }
-        pixmap.save(fileName, "jpg");
+        pixmap.save(fileName, "png");
         quitScreenshot();
     }
 }
@@ -786,12 +755,10 @@ void SelectedScreenWidget::onKeyEvent(QKeyEvent *e)
         return;
     }
 
-    qDebug() << "key:" << key;
     QList<QAction*> actions = menu_->actions();
     for (int i = 0; i < actions.size(); i++) {
         QKeySequence seq = actions[i]->shortcut();
         if (!seq.isEmpty() && seq == key) {
-            qDebug() << "seq:" << seq;
             emit actions[i]->triggered();
             break;
         }
@@ -817,7 +784,8 @@ void SelectedScreenWidget::onUpload()
     uploadImageUtil_->upload(getPixmap());
 }
 
-void SelectedScreenWidget::onSaveScreen(void) {
+void SelectedScreenWidget::onSaveScreen(void) 
+{
     QPixmap pixmap = getPixmap();
     if (pixmap.isNull()) {
         return;
@@ -831,25 +799,30 @@ void SelectedScreenWidget::onSaveScreen(void) {
 }
 
 
-void SelectedScreenWidget::quitScreenshot(void) {
+void SelectedScreenWidget::quitScreenshot(void) 
+{
     emit sigClose();
 }
 
-void SelectedScreenWidget::onMouseChange(int x, int y) {
-    show();
+void SelectedScreenWidget::onCursorPosChanged(int x, int y) 
+{
+    if (isHidden()) {
+        show();
+    }
+
     if (x < 0 || y < 0) {
         return;
     }
 
-    const int& rx = (x >= originPoint_.x()) ? originPoint_.x() : x;
-    const int& ry = (y >= originPoint_.y()) ? originPoint_.y() : y;
-    const int& rw = abs(x - originPoint_.x());
-    const int& rh = abs(y - originPoint_.y());
+    int rx = (x >= originPoint_.x()) ? originPoint_.x() : x;
+    int ry = (y >= originPoint_.y()) ? originPoint_.y() : y;
+    int rw = abs(x - originPoint_.x());
+    int rh = abs(y - originPoint_.y());
 
-    /// 改变大小
+    // 改变大小
     currentRect_ = QRect(rx, ry, rw, rh);
     this->setGeometry(currentRect_);
-    /// 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
+    // 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
     parentWidget()->update();
 }
 

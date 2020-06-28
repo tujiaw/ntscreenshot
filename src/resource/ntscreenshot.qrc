@@ -20,5 +20,6 @@
         <file>images/color.png</file>
         <file>images/ok.png</file>
         <file>images/remove.png</file>
+        <file>images/polyline.png</file>
     </qresource>
 </RCC>

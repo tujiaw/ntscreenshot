@@ -10,8 +10,8 @@ public:
     QColor getCursorPointColor() const;
 
 public slots:
-    void onSizeChange(int w, int h);
-    void onPostionChange(int x, int y);
+    void onSizeChanged(int w, int h);
+    void onPositionChanged(int x, int y);
 
 protected:
     virtual void paintEvent(QPaintEvent *);

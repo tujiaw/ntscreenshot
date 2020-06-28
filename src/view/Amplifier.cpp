@@ -22,12 +22,14 @@ QColor AmplifierWidget::getCursorPointColor() const
     return cursorPointColor_;
 }
 
-void AmplifierWidget::onSizeChange(int w, int h) {
+void AmplifierWidget::onSizeChanged(int w, int h) 
+{
     QPoint p(QCursor::pos());
-    onPostionChange(p.x(), p.y());
+    onPositionChanged(p.x(), p.y());
 }
 
-void AmplifierWidget::onPostionChange(int x, int y) {
+void AmplifierWidget::onPositionChanged(int x, int y) 
+{
     cursorPoint_ = QPoint(x, y);
     int dest_x = x + 4;
     int dest_y = y + 26;
@@ -45,21 +47,21 @@ void AmplifierWidget::onPostionChange(int x, int y) {
 }
 
 /// 绘制鼠标拖拽时选区矩形的右下顶点的放大图;
-void AmplifierWidget::paintEvent(QPaintEvent *) {
+void AmplifierWidget::paintEvent(QPaintEvent *) 
+{
     QPainter painter(this);
-    /// 绘制背景
+    // 绘制背景
     painter.fillRect(rect(), QColor(0, 0, 0, 160));
     QPixmap endPointImage;
-    /// 绘制放大图;
+    // 绘制放大图;
     const QSize& parent_size = parentWidget()->size();
-    /**
-     * @bug   : 在屏幕边缘绘制放大图时会出现图片拉伸
-     *          这里暂时做了边缘检测，若是屏幕边缘则不进行放大图的绘制，和QQ截图的采取方式是一致的。
-     *
-     * @marker: 颜色还是照样识别，但是局部放大的效果暂时禁用
-     *
-     * @note  : 解决方法，可以发现边缘时，将不能放大的地方，不描绘，或填充黑色，以避免图片被非预期的拉伸问题。
-     */
+    
+    // 在屏幕边缘绘制放大图时会出现图片拉伸
+    // 这里暂时做了边缘检测，若是屏幕边缘则不进行放大图的绘制，和QQ截图的采取方式是一致的。
+    //
+    // 颜色还是照样识别，但是局部放大的效果暂时禁用
+    //
+    // 解决方法，可以发现边缘时，将不能放大的地方，不描绘，或填充黑色，以避免图片被非预期的拉伸问题。
     if ((cursorPoint_.x() + 15 < parent_size.width() && cursorPoint_.x() - 15 > 0)
       && (cursorPoint_.y() + 11 < parent_size.height() && cursorPoint_.y() - 11 > 0)) {
         endPointImage = originPainting_->copy(QRect(cursorPoint_.x() - 15, cursorPoint_.y() - 11, 30, 22)).scaled(width(), imageHeight_);
@@ -86,15 +88,15 @@ void AmplifierWidget::paintEvent(QPaintEvent *) {
     painter.setPen(QPen(Qt::black, 1));
     painter.drawRect((width() >> 1) - 3, (imageHeight_ >> 1) - 3, 7, 7);
 
-    /// 绘制大图内边框
+    // 绘制大图内边框
     painter.setPen(QPen(Qt::white, 2));
     painter.drawRect(2,2,width()-4, imageHeight_-4);
 
-    /// 绘制外边框
+    // 绘制外边框
     painter.setPen(QPen(Qt::black, 1));
     painter.drawRect(0,0,width()-1,height()-1);
 
-    /// 当前选中矩形的宽高信息;
+    // 当前选中矩形的宽高信息;
     QString posInfo = QStringLiteral("POS(%1 x %2)")
             .arg(QCursor::pos().x()).arg(QCursor::pos().y());
     QFontMetrics fm = painter.fontMetrics();
@@ -103,7 +105,7 @@ void AmplifierWidget::paintEvent(QPaintEvent *) {
     QString colorInfo = QString("RGB(%1, %2, %3)") .arg(cursorPointColor_.red()) .arg(cursorPointColor_.green()) .arg(cursorPointColor_.blue());
     const QSize COLOR_RECT_SIZE(15, 10);
     const int SPACING = 4;
-    /// 绘制坐标轴相关数据
+    // 绘制坐标轴相关数据
     painter.setPen(Qt::white);
     int x = SPACING;
     int y = imageHeight_ + fm.height();
