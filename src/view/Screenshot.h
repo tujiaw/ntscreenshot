@@ -145,7 +145,7 @@ protected:
     virtual void paintEvent(QPaintEvent *);
 
 public slots:
-    void onMouseChange(int x,int y);
+    void onCursorPosChanged(int x, int y);
     void onSticker();
     void onUpload();
     void onSaveScreen(void);

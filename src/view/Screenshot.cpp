@@ -232,7 +232,7 @@ void ScreenshotWidget::initSelectedScreen(const QPoint &pos)
     // 初始化选区
     if (!selectedScreen_) {
         selectedScreen_.reset(new SelectedScreenWidget(getGlobalScreen(), pos, this));
-        connect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onMouseChange(int, int)));
+        connect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onCursorPosChanged(int, int)));
         connect(this, SIGNAL(sigDoubleClick()), selectedScreen_.get(), SLOT(onSaveScreen()));
 
         connect(selectedScreen_.get(), SIGNAL(sigSizeChanged(int, int)), this, SLOT(onSelectedScreenSizeChanged(int, int)));
@@ -291,7 +291,7 @@ void ScreenshotWidget::mouseReleaseEvent(QMouseEvent *e) {
         }
 
         // 断开鼠标移动的信号，否则鼠标选中区域还会随着鼠标的移动而改变大小
-        disconnect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onMouseChange(int, int)));
+        disconnect(this, SIGNAL(sigCursorPosChanged(int, int)), selectedScreen_.get(), SLOT(onCursorPosChanged(int, int)));
         // 隐藏放大器
         amplifierTool_->hide();
         // 重置鼠标左键按下的状态
@@ -620,18 +620,18 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
             // 鼠标在边框上拖动
             switch(direction_) {
             case DIR_LEFT:
-                return onMouseChange(e->globalX(), ptBottomLeft.y() + 1);
+                return onCursorPosChanged(e->globalX(), ptBottomLeft.y() + 1);
             case DIR_RIGHT:
-                return onMouseChange(e->globalX(), ptBottomRight.y() + 1);
+                return onCursorPosChanged(e->globalX(), ptBottomRight.y() + 1);
             case DIR_TOP:
-                return onMouseChange(ptTopLeft.x(), e->globalY());
+                return onCursorPosChanged(ptTopLeft.x(), e->globalY());
             case DIR_BOTTOM:
-                return onMouseChange(ptBottomRight.x() + 1, e->globalY());
+                return onCursorPosChanged(ptBottomRight.x() + 1, e->globalY());
             case DIR_LEFT_TOP:
             case DIR_RIGHT_TOP:
             case DIR_LEFT_BOTTOM:
             case DIR_RIGHT_BOTTOM:
-                return onMouseChange(e->globalX(), e->globalY());
+                return onCursorPosChanged(e->globalX(), e->globalY());
             default:
                 break;
             }
@@ -784,7 +784,8 @@ void SelectedScreenWidget::onUpload()
     uploadImageUtil_->upload(getPixmap());
 }
 
-void SelectedScreenWidget::onSaveScreen(void) {
+void SelectedScreenWidget::onSaveScreen(void) 
+{
     QPixmap pixmap = getPixmap();
     if (pixmap.isNull()) {
         return;
@@ -798,11 +799,13 @@ void SelectedScreenWidget::onSaveScreen(void) {
 }
 
 
-void SelectedScreenWidget::quitScreenshot(void) {
+void SelectedScreenWidget::quitScreenshot(void) 
+{
     emit sigClose();
 }
 
-void SelectedScreenWidget::onMouseChange(int x, int y) {
+void SelectedScreenWidget::onCursorPosChanged(int x, int y) 
+{
     if (isHidden()) {
         show();
     }
