@@ -520,8 +520,10 @@ SelectedScreenWidget::DIRECTION SelectedScreenWidget::getRegion(const QPoint &cu
         dir = DIR_NONE;
         if (!drawMode_.isNone()) {
             isDrawMode_ = true;
+            this->setCursor(drawMode_.cursor());
+        } else {
+            this->setCursor(Qt::SizeAllCursor);
         }
-        this->setCursor(isDrawMode_ ? Qt::CrossCursor : Qt::SizeAllCursor);
     }
     return dir;
 }
@@ -688,17 +690,6 @@ void SelectedScreenWidget::hideEvent(QHideEvent *) {
     movePos_ = {};
     originPoint_ = {};
 }
-
-void SelectedScreenWidget::enterEvent(QEvent *e) {
-    setCursor(isDrawMode_ ? Qt::CrossCursor : Qt::SizeAllCursor);
-    QWidget::enterEvent(e);
-}
-
-void SelectedScreenWidget::leaveEvent(QEvent *e) {
-    setCursor(Qt::ArrowCursor);
-    QWidget::leaveEvent(e);
-}
-
 
 void SelectedScreenWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);

@@ -140,8 +140,6 @@ protected:
     virtual void moveEvent(QMoveEvent *);
     virtual void resizeEvent(QResizeEvent *);
     virtual void hideEvent(QHideEvent *);
-    virtual void enterEvent(QEvent *e);
-    virtual void leaveEvent(QEvent *e);
     virtual void paintEvent(QPaintEvent *);
 
 public slots:

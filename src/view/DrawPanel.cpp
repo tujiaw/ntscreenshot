@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QPoint>
 #include <QPolygon>
+#include <QStaticText>
 #include <QDebug>
 #include <QPushButton>
 #include <QButtonGroup>
@@ -61,6 +62,7 @@ DrawPanel::DrawPanel(QWidget *parent)
     QPushButton* pbArrow = createShapeBtn(shapeGroup, ":/images/arrow.png", QStringLiteral("箭头"));
     QPushButton* pbRectangle = createShapeBtn(shapeGroup, ":/images/rectangle.png", QStringLiteral("矩形"));
     QPushButton* pbEllipse = createShapeBtn(shapeGroup, ":/images/ellipse.png", QStringLiteral("椭圆"));
+    QPushButton* pbText = createShapeBtn(shapeGroup, ":/images/text.png", QStringLiteral("文本"));
     QPushButton* line2 = createLine();
     QPushButton* pbUndo = createActionBtn(":/images/undo.png", QStringLiteral("撤销"));
     QPushButton* pbSticker = createActionBtn(":/images/pin.png", QStringLiteral("贴图"));
@@ -78,11 +80,13 @@ DrawPanel::DrawPanel(QWidget *parent)
     arrowMode.brush().setStyle(Qt::SolidPattern);
     DrawMode rectangleMode(DrawMode::Rectangle);
     DrawMode ellipseMode(DrawMode::Ellipse);
+    DrawMode textMode(DrawMode::Text);
     btns_.push_back(qMakePair(pbPolyLine, polylineMode));
     btns_.push_back(qMakePair(pbLine, lineMode));
     btns_.push_back(qMakePair(pbArrow, arrowMode));
     btns_.push_back(qMakePair(pbRectangle, rectangleMode));
     btns_.push_back(qMakePair(pbEllipse, ellipseMode));
+    btns_.push_back(qMakePair(pbText, textMode));
 
     hLayout->addWidget(pbColor_);
     for (int i = 0; i < btns_.size(); i++) {
@@ -166,6 +170,7 @@ void DrawPanel::mouseReleaseEvent(QMouseEvent*event)
 //////////////////////////////////////////////////////////////////////////
 DrawMode::DrawMode() 
     : shape_(None)
+    , cursor_(Qt::CrossCursor)
 {
     init();
 }
@@ -182,6 +187,11 @@ void DrawMode::init()
     pen_.setWidth(2);
     brush_.setColor(Qt::red);
     brush_.setStyle(Qt::NoBrush);
+    if (shape_ == Text) {
+        cursor_ = Qt::IBeamCursor;
+    } else {
+        cursor_ = Qt::CrossCursor;
+    }
 }
 
 bool DrawMode::isNone() const
@@ -197,6 +207,8 @@ bool DrawMode::isValid() const
 
     if (shape_ == PolyLine) {
         return !points_.isEmpty();
+    } else if (shape_ == Text) {
+        return !text_.isEmpty();
     } else {
         // 起止距离太短认为是一个无效的绘制
         return (start_ - end_).manhattanLength() > QApplication::startDragDistance();
@@ -214,11 +226,17 @@ void DrawMode::addPos(const QPoint &pos)
     points_.push_back(pos);
 }
 
+void DrawMode::setText(const QString& text)
+{
+    text_ = text;
+}
+
 void DrawMode::clear()
 {
     start_ = QPoint(0, 0);
     end_ = QPoint(0, 0);
     points_.clear();
+    text_.clear();
 }
 
 void DrawMode::draw(QPainter &painter)
@@ -243,6 +261,9 @@ void DrawMode::draw(QPainter &painter)
         break;
     case Ellipse:
         drawEllipse(start_, end_, painter);
+        break;
+    case Text:
+        drawText(start_, text_, painter);
         break;
     }
 }
@@ -307,11 +328,19 @@ void DrawMode::drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPa
     painter.drawEllipse(QRect(startPoint, endPoint));
 }
 
-bool DrawMode::operator==(const DrawMode& other) const
+void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter& painter)
 {
-    return this->shape_ == other.shape_ &&
-        this->start_ == other.start_ &&
-        this->end_ == other.end_ &&
-        this->pen_ == other.pen_ &&
-        this->brush_ == other.brush_;
+    painter.drawStaticText(startPoint, QStaticText(text));
+}
+
+////////////////////////////////////////////////////////////////////////////
+Drawer::Drawer(QWidget* parent)
+    : QObject(parent), parent_(parent)
+{
+    
+}
+
+bool Drawer::eventFilter(QObject* watched, QEvent* event)
+{
+    return false;
 }

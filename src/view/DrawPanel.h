@@ -10,13 +10,14 @@ class QPushButton;
 class DrawMode
 {
 public:
-    enum Shape{
+    enum Shape {
         None = 0,
         PolyLine,
         Line,
         Arrow,
         Rectangle,
         Ellipse,
+        Text,
     };
 
     DrawMode();
@@ -29,9 +30,11 @@ public:
     QBrush& brush() { return brush_; }
     void setPos(const QPoint &start, const QPoint &end);
     void addPos(const QPoint &pos);
+    void setText(const QString& text);
     void clear();
     void draw(QPainter &painter);
     Shape shape() const { return shape_; }
+    const QCursor& cursor() const { return cursor_; }
 
     void initPainter(QPainter& painter);
     void drawPolyLine(const QVector<QPoint> &points, QPainter& painter);
@@ -39,9 +42,7 @@ public:
     void drawArrows(const QPoint& startPoint, const QPoint& endPoint, QPainter &painter);
     void drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
     void drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
-
-    bool operator==(const DrawMode& other) const;
-    inline bool operator!=(const DrawMode& other) const { return !(operator==(other)); }
+    void drawText(const QPoint& startPoint, const QString& text, QPainter& painter);
 
 private:
     Shape shape_;
@@ -50,6 +51,21 @@ private:
     QPen pen_;
     QBrush brush_;
     QVector<QPoint> points_;
+    QString text_;
+    QCursor cursor_;
+};
+
+//////////////////////////////////////////////////////////////////////////
+class Drawer : public QObject {
+    Q_OBJECT
+public:
+    Drawer(QWidget* parent);
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event);
+
+private:
+    QWidget* parent_;
 };
 
 //////////////////////////////////////////////////////////////////////////
