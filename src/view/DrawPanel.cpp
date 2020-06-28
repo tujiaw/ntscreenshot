@@ -3,6 +3,7 @@
 #include <QPen>
 #include <QPainter>
 #include <QPoint>
+#include <QPolygon>
 #include <QDebug>
 #include <QPushButton>
 #include <QButtonGroup>
@@ -13,10 +14,6 @@
 #include <QDesktopWidget>
 #include "common/Constants.h"
 #include "common/Util.h"
-
-/// @test : 测试变量
-QPoint startPoint_;
-QPoint endPoint_;
 
 static QColor s_currentColor = Qt::red;
 DrawPanel::DrawPanel(QWidget *parent)
@@ -58,7 +55,8 @@ DrawPanel::DrawPanel(QWidget *parent)
     connect(pbColor_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
     pbColor_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
     pbColor_->setFixedSize(25, 25);
-    //QPushButton* line1 = createLine();
+
+    QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("折线"));
     QPushButton* pbLine = createShapeBtn(shapeGroup, ":/images/line.png", QStringLiteral("直线"));
     QPushButton* pbArrow = createShapeBtn(shapeGroup, ":/images/arrow.png", QStringLiteral("箭头"));
     QPushButton* pbRectangle = createShapeBtn(shapeGroup, ":/images/rectangle.png", QStringLiteral("矩形"));
@@ -73,12 +71,14 @@ DrawPanel::DrawPanel(QWidget *parent)
     connect(pbSave, &QPushButton::clicked, this, &DrawPanel::sigSave);
     connect(pbFinished, &QPushButton::clicked, this, &DrawPanel::sigFinished);
     
+    DrawMode polylineMode(DrawMode::PolyLine);
     DrawMode lineMode(DrawMode::Line);
     DrawMode arrowMode(DrawMode::Arrow);
     arrowMode.pen().setStyle(Qt::NoPen);
     arrowMode.brush().setStyle(Qt::SolidPattern);
     DrawMode rectangleMode(DrawMode::Rectangle);
     DrawMode ellipseMode(DrawMode::Ellipse);
+    btns_.push_back(qMakePair(pbPolyLine, polylineMode));
     btns_.push_back(qMakePair(pbLine, lineMode));
     btns_.push_back(qMakePair(pbArrow, arrowMode));
     btns_.push_back(qMakePair(pbRectangle, rectangleMode));
@@ -99,7 +99,7 @@ DrawMode DrawPanel::getMode()
 {
     DrawMode mode;
     for (int i = 0; i < btns_.size(); i++) {
-        if (!btns_[i].second.isNull()) {
+        if (!btns_[i].second.isNone()) {
             if (btns_[i].first->isChecked()) {
                 mode = btns_[i].second;
             }
@@ -184,9 +184,22 @@ void DrawMode::init()
     brush_.setStyle(Qt::NoBrush);
 }
 
-bool DrawMode::isNull() const
+bool DrawMode::isNone() const
 {
     return shape_ == None;
+}
+
+bool DrawMode::isValid() const
+{
+    if (isNone()) {
+        return false;
+    }
+
+    if (shape_ == PolyLine) {
+        return !points_.isEmpty();
+    } else {
+        return (start_ - end_).manhattanLength() > QApplication::startDragDistance();
+    }
 }
 
 void DrawMode::setPos(const QPoint &start, const QPoint &end)
@@ -195,20 +208,29 @@ void DrawMode::setPos(const QPoint &start, const QPoint &end)
     end_ = end;
 }
 
-void DrawMode::clearPos()
+void DrawMode::addPos(const QPoint &pos)
+{
+    points_.push_back(pos);
+}
+
+void DrawMode::clear()
 {
     start_ = QPoint(0, 0);
     end_ = QPoint(0, 0);
+    points_.clear();
 }
 
 void DrawMode::draw(QPainter &painter)
 {
-    if (start_ == end_ && start_ == QPoint(0, 0)) {
+    if (!isValid()) {
         return;
     }
 
     initPainter(painter);
     switch (shape_) {
+    case PolyLine:
+        drawPolyLine(points_, painter);
+        break;
     case Line:
         drawLine(start_, end_, painter);
         break;
@@ -229,6 +251,15 @@ void DrawMode::initPainter(QPainter& painter)
     painter.setPen(pen_);
     painter.setBrush(brush_);
     painter.setRenderHint(QPainter::Antialiasing, true);
+}
+
+void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
+{
+    QPolygon polygon;
+    polygon.append(start_);
+    polygon.append(points);
+    polygon.append(end_);
+    painter.drawPolyline(polygon);
 }
 
 void DrawMode::drawLine(const QPoint& startPoint, const QPoint& endPoint, QPainter& painter)

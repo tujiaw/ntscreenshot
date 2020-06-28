@@ -16,6 +16,7 @@
 #include <QImageReader>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QCryptographicHash>
 #pragma warning(disable:4091)
 #include <ShlObj.h>
 #pragma comment(lib, "Shell32.lib")
@@ -324,10 +325,14 @@ namespace Util
         return keyCode;
     }
 
-	QString screenshotDefaultName()
-	{
-		return QString("ntscreenshot%1").arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss"));
-	}
+    QString pixmapUniqueName(const QPixmap &pixmap)
+    {
+        QStringList strList;
+        strList << "ntscreenshot_";
+        strList << md5Pixmap(pixmap);
+        strList << ".png";
+        return strList.join("");
+    }
 
     bool getSmallestWindowFromCursor(QRect &out_rect)
     {
@@ -418,10 +423,19 @@ namespace Util
 	{
 		QByteArray b;
 		QBuffer buffer(&b);
-		buffer.open(QIODevice::ReadWrite);
+		buffer.open(QIODevice::WriteOnly);
 		pixmap.save(&buffer, format);
 		return b;
 	}
+
+    QByteArray image2ByteArray(const QImage &image, const char *format)
+    {
+        QByteArray b;
+        QBuffer buffer(&b);
+        buffer.open(QIODevice::WriteOnly);
+        image.save(&buffer, format);
+        return b;
+    }
 
 	std::wstring ansi2unicode(const std::string& ansi)
 	{
@@ -559,6 +573,26 @@ namespace Util
 		}
 		return size;
 	}
+
+    QString md5Pixmap(const QPixmap &pixmap)
+    {
+        QByteArray b = pixmap2ByteArray(pixmap);
+        if (b.isEmpty()) {
+            return "";
+        }
+
+        return QString::fromUtf8(QCryptographicHash::hash(b, QCryptographicHash::Md5).toHex());
+    }
+
+    QString md5Image(const QImage &image)
+    {
+        QByteArray b = image2ByteArray(image);
+        if (b.isEmpty()) {
+            return "";
+        }
+        
+        return QString::fromUtf8(QCryptographicHash::hash(b, QCryptographicHash::Md5).toHex());
+    }
 
     void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func)
     {

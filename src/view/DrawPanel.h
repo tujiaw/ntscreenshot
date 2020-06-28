@@ -12,6 +12,7 @@ class DrawMode
 public:
     enum Shape{
         None = 0,
+        PolyLine,
         Line,
         Arrow,
         Rectangle,
@@ -22,14 +23,18 @@ public:
     explicit DrawMode(Shape shape);
 
     void init();
-    bool isNull() const;
+    bool isNone() const;
+    bool isValid() const;
     QPen& pen() { return pen_; }
     QBrush& brush() { return brush_; }
     void setPos(const QPoint &start, const QPoint &end);
-    void clearPos();
+    void addPos(const QPoint &pos);
+    void clear();
     void draw(QPainter &painter);
+    Shape shape() const { return shape_; }
 
     void initPainter(QPainter& painter);
+    void drawPolyLine(const QVector<QPoint> &points, QPainter& painter);
     void drawLine(const QPoint& startPoint, const QPoint& endPoint, QPainter& painter);
     void drawArrows(const QPoint& startPoint, const QPoint& endPoint, QPainter &painter);
     void drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
@@ -44,6 +49,7 @@ private:
     QPoint end_;
     QPen pen_;
     QBrush brush_;
+    QVector<QPoint> points_;
 };
 
 //////////////////////////////////////////////////////////////////////////

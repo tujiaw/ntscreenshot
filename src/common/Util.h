@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPixmap>
 #include <functional>
 #include "Constants.h"
 
@@ -28,12 +29,13 @@ namespace Util {
 	QVariantList json2list(const QByteArray &val);
 	QString list2json(const QVariantList &val);
     uint toKey(const QString& str);
-	QString screenshotDefaultName();
+    QString pixmapUniqueName(const QPixmap &pixmap);
     bool getSmallestWindowFromCursor(QRect &out_rect);
     QPoint fixPoint(const QPoint &point, const QSize &size);
     QString strKeyEvent(QKeyEvent *key);
     QString strKeySequence(const QKeySequence &key);
-	QByteArray pixmap2ByteArray(const QPixmap& pixmap, const char *format = "jpg");
+	QByteArray pixmap2ByteArray(const QPixmap& pixmap, const char *format = "png");
+    QByteArray image2ByteArray(const QImage &image, const char *format = "png");
 	std::wstring ansi2unicode(const std::string& ansi);
 	std::string unicode2ansi(const std::wstring& unicode);
 	std::string string_to_utf8(const std::string& srcStr);
@@ -41,6 +43,8 @@ namespace Util {
 	std::wstring utf8_to_wstring(const std::string& str);
 	std::string wstring_to_utf8(const std::wstring& str);
 	std::string getImageFormat(const char* data, int size);
+    QString md5Pixmap(const QPixmap &pixmap);
+    QString md5Image(const QImage &image);
     void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func);
 }
 

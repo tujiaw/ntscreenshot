@@ -152,9 +152,15 @@ void StickerWidget::onCopy()
 
 void StickerWidget::onSave()
 {
-	QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), Util::screenshotDefaultName(), "JPEG Files (*.jpg)");
+    const QPixmap *pixmap = label_->pixmap();
+    if (!pixmap || pixmap->isNull()) {
+        return;
+    }
+
+    QString name = Util::pixmapUniqueName(*pixmap);
+	QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), name, "PNG (*.png)");
 	if (fileName.length() > 0) {
-		label_->pixmap()->save(fileName, "jpg");
+		pixmap->save(fileName, "png");
 	}
 }
 
@@ -210,14 +216,13 @@ void UploadImageUtil::upload(const QPixmap &pixmap)
         connect(http_, &HttpRequest::sigHttpResponse, this, &UploadImageUtil::onHttpResponse);
     }
 
-    const QString FORMAT = "png";
-    QByteArray b = Util::pixmap2ByteArray(pixmap, FORMAT.toStdString().c_str());
+    QByteArray b = Util::pixmap2ByteArray(pixmap);
     if (b.isEmpty()) {
         qDebug() << "upload image data is empty";
         return;
     }
 
-    QString fileName = Util::screenshotDefaultName() + "." + FORMAT;
+    QString fileName = Util::pixmapUniqueName(pixmap);
     http_->postImage(WindowManager::instance()->setting()->uploadImageUrl(), fileName, b);
 }
 

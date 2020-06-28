@@ -553,7 +553,7 @@ SelectedScreenWidget::DIRECTION SelectedScreenWidget::getRegion(const QPoint &cu
     } else {
         // Ä¬ÈÏ
         ret_dir = NONE;
-        if (!drawMode_.isNull()) {
+        if (!drawMode_.isNone()) {
             isDrawMode_ = true;
         }
         this->setCursor(isDrawMode_ ? Qt::CrossCursor : Qt::SizeAllCursor);
@@ -593,10 +593,11 @@ void SelectedScreenWidget::mouseReleaseEvent(QMouseEvent * e) {
         }
 
         if (isPressed_ && isDrawMode_) {
-            if (e->pos() != drawStartPos_) {
-                drawMode_.setPos(drawStartPos_, e->pos());
+            drawMode_.setPos(drawStartPos_, e->pos());
+            if (drawMode_.isValid()) {
                 drawModeList_.push_back(drawMode_);
             }
+            drawMode_.clear();
         }
         emit sigBorderReleased();
         drawStartPos_ = QPoint(0, 0);
@@ -645,6 +646,9 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
     else {
         if (isDrawMode_) {
             drawEndPos_ = e->pos();
+            if (drawMode_.shape() == DrawMode::PolyLine) {
+                drawMode_.addPos(e->pos());
+            }
             update();
             return;
         }
@@ -756,7 +760,7 @@ void SelectedScreenWidget::paintEvent(QPaintEvent *) {
         painter.fillRect(rect, brush);
     }
 
-    if (isDrawMode_ && !drawMode_.isNull()) {
+    if (isDrawMode_ && !drawMode_.isNone()) {
         drawMode_.setPos(drawStartPos_, drawEndPos_);
         drawMode_.draw(painter);
     }
@@ -768,13 +772,15 @@ void SelectedScreenWidget::paintEvent(QPaintEvent *) {
 }
 
 void SelectedScreenWidget::onSaveScreenOther(void) {
-    QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), Util::screenshotDefaultName(), "JPEG Files (*.jpg)");
+    QPixmap pixmap = getPixmap();
+    if (pixmap.isNull()) {
+        return;
+    }
+
+    QString name = Util::pixmapUniqueName(pixmap);
+    QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), name, "PNG (*.png)");
     if (fileName.length() > 0) {
-        QPixmap pixmap = getPixmap();
-        if (pixmap.isNull()) {
-            return;
-        }
-        pixmap.save(fileName, "jpg");
+        pixmap.save(fileName, "png");
         quitScreenshot();
     }
 }
