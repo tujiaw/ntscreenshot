@@ -198,6 +198,7 @@ bool DrawMode::isValid() const
     if (shape_ == PolyLine) {
         return !points_.isEmpty();
     } else {
+        // 起止距离太短认为是一个无效的绘制
         return (start_ - end_).manhattanLength() > QApplication::startDragDistance();
     }
 }
@@ -255,6 +256,7 @@ void DrawMode::initPainter(QPainter& painter)
 
 void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
 {
+    // 绘制折线
     QPolygon polygon;
     polygon.append(start_);
     polygon.append(points);
@@ -264,45 +266,43 @@ void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
 
 void DrawMode::drawLine(const QPoint& startPoint, const QPoint& endPoint, QPainter& painter)
 {
+    // 绘制直线
     painter.drawLine(startPoint, endPoint);
 }
 
 void DrawMode::drawArrows(const QPoint& startPoint, const QPoint& endPoint, QPainter &painter)
 {
-    /// 箭头部分三角形的腰长
+    // 箭头部分三角形的腰长
     double par = 15.0;
-    double slopy = atan2((endPoint.y() - startPoint.y()),
-                         (endPoint.x() - startPoint.x()));
+    double slopy = atan2((endPoint.y() - startPoint.y()), (endPoint.x() - startPoint.x()));
     double cos_y = cos(slopy);
     double sin_y = sin(slopy);
-    QPoint head_point1 = QPoint(endPoint.x() + int(-par*cos_y - (par / 2.0 * sin_y)),
-                           endPoint.y() + int(-par*sin_y + (par / 2.0 * cos_y)));
-    QPoint head_point2 = QPoint(endPoint.x() + int(-par*cos_y + (par / 2.0 * sin_y)),
-                           endPoint.y() - int(par / 2.0*cos_y + par * sin_y));
+    QPoint head_point1 = QPoint(endPoint.x() + int(-par*cos_y - (par / 2.0 * sin_y)), endPoint.y() + int(-par*sin_y + (par / 2.0 * cos_y)));
+    QPoint head_point2 = QPoint(endPoint.x() + int(-par*cos_y + (par / 2.0 * sin_y)), endPoint.y() - int(par / 2.0*cos_y + par * sin_y));
     QPoint head_points[3] = { endPoint, head_point1, head_point2 };
-    /// 绘制箭头部分
+    // 绘制箭头部分
     painter.drawPolygon(head_points, 3);
-
-    /// 计算箭身部分
+    // 计算箭身部分
     int offset_x = int(par*sin_y / 3);
     int offset_y = int(par*cos_y / 3);
     QPoint body_point1, body_point2;
-    body_point1 = QPoint(endPoint.x() + int(-par*cos_y - (par / 2.0*sin_y)) +
-                    offset_x, endPoint.y() + int(-par*sin_y + (par / 2.0*cos_y)) - offset_y);
-    body_point2 = QPoint(endPoint.x() + int(-par*cos_y + (par / 2.0*sin_y) - offset_x),
-                    endPoint.y() - int(par / 2.0*cos_y + par*sin_y) + offset_y);
+    body_point1 = QPoint(endPoint.x() + int(-par*cos_y - (par / 2.0*sin_y)) + offset_x, endPoint.y() + int(-par*sin_y + (par / 2.0*cos_y)) - offset_y);
+    body_point2 = QPoint(endPoint.x() + int(-par*cos_y + (par / 2.0*sin_y) - offset_x), endPoint.y() - int(par / 2.0*cos_y + par*sin_y) + offset_y);
     QPoint body_points[3] = { startPoint, body_point1, body_point2 };
-    /// 绘制箭身部分
+    // 绘制箭身部分
     painter.drawPolygon(body_points, 3);
-
 }
 
-void DrawMode::drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter &painter) {
+void DrawMode::drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter &painter) 
+{
+    // 绘制矩形
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(QRect(startPoint, endPoint));
 }
 
-void DrawMode::drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPainter &painter) {
+void DrawMode::drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPainter &painter) 
+{
+    // 绘制椭圆
     painter.setBrush(Qt::NoBrush);
     painter.drawEllipse(QRect(startPoint, endPoint));
 }

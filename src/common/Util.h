@@ -45,6 +45,7 @@ namespace Util {
 	std::string getImageFormat(const char* data, int size);
     QString md5Pixmap(const QPixmap &pixmap);
     QString md5Image(const QImage &image);
+    const QPixmap& multicolorCursorPixmap(); // ²ÊÉ«¹â±ê
     void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func);
 }
 
