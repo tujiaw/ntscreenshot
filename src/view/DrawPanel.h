@@ -7,6 +7,7 @@
 #include <QBrush>
 
 class QPushButton;
+class QAbstractButton;
 class DrawMode
 {
 public:
@@ -94,7 +95,7 @@ private:
 class DrawPanel : public QWidget {
 Q_OBJECT
 public:
-    DrawPanel(QWidget *widget, QWidget *drawWidget);
+    DrawPanel(QWidget *parent, QWidget *drawWidget);
     DrawMode getMode();
     void adjustPos();
     Drawer* drawer();
@@ -107,7 +108,7 @@ signals:
 
 public slots:
     void onReferRectChanged(const QRect &rect);
-    void onShapeBtnClicked();
+    void onShapeBtnClicked(QAbstractButton*, bool);
     void onColorBtnClicked();
 
 protected:

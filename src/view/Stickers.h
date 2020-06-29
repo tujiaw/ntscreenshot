@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <QWidget>
 #include <QVariantMap>
 
@@ -7,6 +8,8 @@ class QLabel;
 class QContextMenuEvent;
 class QMenu;
 class HttpRequest;
+class DrawPanel;
+class UploadImageUtil;
 
 class StickerWidget : public QWidget
 {
@@ -24,8 +27,12 @@ public:
 protected:
     virtual void keyPressEvent(QKeyEvent *event);
 	virtual void contextMenuEvent(QContextMenuEvent*);
+    virtual void mousePressEvent(QMouseEvent *event);
+    virtual void mouseReleaseEvent(QMouseEvent *event);
+    virtual void paintEvent(QPaintEvent *event);
 
 private slots:
+    void onDraw();
 	void onCopy();
 	void onSave();
     void onUpload();
@@ -35,9 +42,10 @@ private slots:
     void onHideAll();
 
 private:
-	QLabel* label_;
+    QPixmap pixmap_;
 	QMenu* menu_;
-    class UploadImageUtil *uploadImageUtil_;
+    std::unique_ptr<DrawPanel> draw_;
+    UploadImageUtil *uploadImageUtil_;
 };
 
 class UploadImageUtil : public QObject

@@ -255,11 +255,11 @@ void FramelessWidget::transRegion(const QPoint &cursorGlobalPoint)
     }
 }
 
-void FramelessWidget::paintEvent(QPaintEvent *event)
-{
-    if (!backgroundPixmap_.isNull()) {
-        QPainter painter(this);
-        painter.drawPixmap(0, 0, this->width(), this->height(), backgroundPixmap_);
-    }
-    QFrame::paintEvent(event);
-}
+//void FramelessWidget::paintEvent(QPaintEvent *event)
+//{
+//    if (!backgroundPixmap_.isNull()) {
+//        QPainter painter(this);
+//        painter.drawPixmap(0, 0, this->width(), this->height(), backgroundPixmap_);
+//    }
+//    QFrame::paintEvent(event);
+//}

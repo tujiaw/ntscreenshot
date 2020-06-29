@@ -18,14 +18,15 @@
 #include "common/HttpRequest.h"
 #include "controller/WindowManager.h"
 #include "component/TipsWidget.h"
+#include "view/DrawPanel.h"
 
 static QList<QPair<QPoint, QPixmap>> HidedStickerList;
 StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
-    : QWidget(parent)
+    : QWidget(parent), pixmap_(pixmap)
 {
     uploadImageUtil_ = new UploadImageUtil(this);
-
 	menu_ = new QMenu(this);
+    menu_->addAction(QStringLiteral("绘制"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
 	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
     menu_->addSeparator();
@@ -39,15 +40,7 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
 
-	label_ = new QLabel(this);
-	label_->setPixmap(pixmap);
-
-	QVBoxLayout* vLayout = new QVBoxLayout(this);
-	vLayout->setContentsMargins(0, 0, 0, 0);
-	vLayout->setSpacing(0);
-	vLayout->addWidget(label_);
     this->setFocusPolicy(Qt::StrongFocus);
-
     interval_handle_once(100, [this]() {
         emit WindowManager::instance()->sigStickerCountChanged();
     });
@@ -144,29 +137,57 @@ void StickerWidget::contextMenuEvent(QContextMenuEvent*)
 	menu_->exec(cursor().pos());
 }
 
+void StickerWidget::mousePressEvent(QMouseEvent *event)
+{
+    QWidget::mousePressEvent(event);
+}
+
+void StickerWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    QWidget::mouseReleaseEvent(event);
+}
+
+void StickerWidget::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.drawPixmap(QPoint(0, 0), pixmap_, pixmap_.rect());
+    if (draw_) {
+        draw_->drawer()->onPaint(painter);
+    }
+}
+
+void StickerWidget::onDraw()
+{
+    if (draw_) {
+        draw_->drawer()->drawPixmap(pixmap_);
+        draw_.reset();
+    } else {
+        draw_.reset(new DrawPanel(nullptr, this));
+        draw_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
+        draw_->show();
+        draw_->raise();
+        draw_->drawer()->setEnable(true);
+    }
+}
+
 void StickerWidget::onCopy()
 {
 	QClipboard* clipboard = QApplication::clipboard();
-	clipboard->setPixmap(*label_->pixmap());
+    clipboard->setPixmap(pixmap_);
 }
 
 void StickerWidget::onSave()
 {
-    const QPixmap *pixmap = label_->pixmap();
-    if (!pixmap || pixmap->isNull()) {
-        return;
-    }
-
-    QString name = Util::pixmapUniqueName(*pixmap);
+    QString name = Util::pixmapUniqueName(pixmap_);
 	QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("保存图片"), name, "PNG (*.png)");
 	if (fileName.length() > 0) {
-		pixmap->save(fileName, "png");
+		pixmap_.save(fileName, "png");
 	}
 }
 
 void StickerWidget::onUpload()
 {
-    uploadImageUtil_->upload(*label_->pixmap());
+    uploadImageUtil_->upload(pixmap_);
 }
 
 void StickerWidget::onClose()
@@ -186,10 +207,9 @@ void StickerWidget::onCloseAll()
 
 void StickerWidget::onHide()
 {
-    const QPixmap *pixmap = label_->pixmap();
     QPoint pos = this->parentWidget()->pos();
-    if (pixmap && !pixmap->isNull()) {
-        HidedStickerList.push_back(qMakePair(pos, *pixmap));
+    if (!pixmap_.isNull()) {
+        HidedStickerList.push_back(qMakePair(pos, pixmap_));
     }
     this->onClose();
 }

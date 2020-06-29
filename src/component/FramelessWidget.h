@@ -29,7 +29,7 @@ protected:
 	bool nativeEvent(const QByteArray & eventType, void * message, long * result);
 	bool eventFilter(QObject* watched, QEvent* event);
     void transRegion(const QPoint &cursorGlobalPoint);
-    void paintEvent(QPaintEvent *event);
+    //void paintEvent(QPaintEvent *event);
 
 private:
 	QPoint movePoint_;

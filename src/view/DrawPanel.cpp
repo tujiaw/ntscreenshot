@@ -17,16 +17,21 @@
 #include "common/Util.h"
 
 static QColor s_currentColor = Qt::red;
-DrawPanel::DrawPanel(QWidget *widget, QWidget *drawWidget)
-    : QWidget(widget), drawer_(drawWidget)
+DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
+    : QWidget(parent), drawer_(drawWidget)
 {
+    if (!parent) {
+        setWindowFlags(Qt::ToolTip);
+    }
+    
     this->setObjectName("DrawPanel");
     QHBoxLayout *hLayout = new QHBoxLayout(this);
     hLayout->setContentsMargins(0, 0, 0, 0);
     hLayout->setSpacing(0);
     
     QButtonGroup* shapeGroup = new QButtonGroup(this);
-    shapeGroup->setExclusive(true);
+    //shapeGroup->setExclusive(true);
+    connect(shapeGroup, SIGNAL(buttonToggled(QAbstractButton*, bool)), this, SLOT(onShapeBtnClicked(QAbstractButton*, bool)));
 
     auto createLine = [this]() -> QPushButton * {
         QPushButton* pb = new QPushButton("|", this);
@@ -40,7 +45,6 @@ DrawPanel::DrawPanel(QWidget *widget, QWidget *drawWidget)
         pb->setToolTip(tooltip);
         pb->setCheckable(true);
         pb->setFixedSize(25, 25);
-        connect(pb, &QPushButton::clicked, this, &DrawPanel::onShapeBtnClicked);
         shapeGroup->addButton(pb);
         return pb;
     };
@@ -145,9 +149,16 @@ void DrawPanel::onReferRectChanged(const QRect &rect)
     adjustPos();
 }
 
-void DrawPanel::onShapeBtnClicked()
+void DrawPanel::onShapeBtnClicked(QAbstractButton* btn, bool checked)
 {
-    drawer_.setDrawMode(getMode());
+    QButtonGroup *btnGroup = qobject_cast<QButtonGroup*>(sender());
+    if (btnGroup) {
+        if (checked) {
+            drawer_.setDrawMode(getMode());
+        } else {
+            drawer_.setDrawMode(DrawMode(DrawMode::None));
+        }
+    }
 }
 
 void DrawPanel::onColorBtnClicked()
@@ -463,7 +474,6 @@ bool Drawer::onMouseMoveEvent(QMouseEvent *e)
         }
         parent_->update();
         return true;
-        
     }
     return false;
 }
