@@ -139,7 +139,7 @@ void StickerWidget::contextMenuEvent(QContextMenuEvent*)
 
 void StickerWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (draw_ && !draw_->drawer()->isDraw()) {
+    if (event->button() == Qt::LeftButton && draw_ && !draw_->drawer()->isDraw()) {
         draw_->hide();
     }
     QWidget::mousePressEvent(event);
