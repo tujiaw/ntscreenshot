@@ -19,11 +19,7 @@
 static QColor s_currentColor = Qt::red;
 DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     : QWidget(parent), drawer_(drawWidget)
-{
-    if (!parent) {
-        setWindowFlags(Qt::ToolTip);
-    }
-    
+{    
     this->setObjectName("DrawPanel");
     QHBoxLayout *hLayout = new QHBoxLayout(this);
     hLayout->setContentsMargins(0, 0, 0, 0);
@@ -101,6 +97,11 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     hLayout->addWidget(pbSticker);
     hLayout->addWidget(pbSave);
     hLayout->addWidget(pbFinished);
+
+    if (!parent) {
+        setWindowFlags(Qt::ToolTip);
+        pbSticker->hide();
+    }
 }
 
 DrawMode DrawPanel::getMode()
@@ -190,7 +191,7 @@ void DrawPanel::mouseReleaseEvent(QMouseEvent*event)
 //////////////////////////////////////////////////////////////////////////
 DrawMode::DrawMode() 
     : shape_(None)
-    , cursor_(Qt::CrossCursor)
+    , cursor_(Qt::ArrowCursor)
 {
     init();
 }
@@ -207,10 +208,14 @@ void DrawMode::init()
     pen_.setWidth(2);
     brush_.setColor(Qt::red);
     brush_.setStyle(Qt::NoBrush);
-    if (shape_ == Text) {
-        cursor_ = Qt::IBeamCursor;
+    if (shape_ == None) {
+        cursor_ = Qt::SizeAllCursor;
     } else {
-        cursor_ = Qt::CrossCursor;
+        if (shape_ == Text) {
+            cursor_ = Qt::IBeamCursor;
+        } else {
+            cursor_ = Qt::CrossCursor;
+        }
     }
 }
 
@@ -360,6 +365,17 @@ Drawer::Drawer(QWidget* parent)
     parent_->installEventFilter(this);
 }
 
+Drawer::~Drawer()
+{
+    // 防止drawer销毁后cursor没有重置
+    setDrawMode(DrawMode(DrawMode::None));
+}
+
+QWidget* Drawer::parentWidget()
+{
+    return parent_;
+}
+
 void Drawer::setEnable(bool enable)
 {
     isEnabled_ = enable;
@@ -372,6 +388,7 @@ bool Drawer::enable() const
 
 void Drawer::setDrawMode(const DrawMode &drawMode)
 {
+    parent_->setCursor(drawMode.cursor());
     drawMode_ = drawMode;
 }
 

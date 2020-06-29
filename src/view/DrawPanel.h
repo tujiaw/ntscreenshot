@@ -61,6 +61,8 @@ class Drawer : public QObject {
     Q_OBJECT
 public:
     Drawer(QWidget* parent);
+    ~Drawer();
+    QWidget* parentWidget();
     void setEnable(bool enable);
     bool enable() const;
     void setDrawMode(const DrawMode &drawMode);
@@ -118,7 +120,6 @@ protected:
 
 private:
     QRect referRect_;
-    QPushButton* selectedBtn_;
     QPushButton* pbColor_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
     Drawer drawer_;
