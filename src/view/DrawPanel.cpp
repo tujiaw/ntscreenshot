@@ -17,8 +17,8 @@
 #include "common/Util.h"
 
 static QColor s_currentColor = Qt::red;
-DrawPanel::DrawPanel(QWidget *parent)
-    : QWidget(parent)
+DrawPanel::DrawPanel(QWidget *widget, QWidget *drawWidget)
+    : QWidget(widget), drawer_(drawWidget)
 {
     this->setObjectName("DrawPanel");
     QHBoxLayout *hLayout = new QHBoxLayout(this);
@@ -68,7 +68,7 @@ DrawPanel::DrawPanel(QWidget *parent)
     QPushButton* pbSticker = createActionBtn(":/images/pin.png", QStringLiteral("贴图"));
     QPushButton* pbSave = createActionBtn(":/images/save.png", QStringLiteral("保存"));
     QPushButton* pbFinished = createActionBtn(":/images/clipboard.png", QStringLiteral("剪切板"));
-    connect(pbUndo, &QPushButton::clicked, this, &DrawPanel::sigUndo);
+    connect(pbUndo, &QPushButton::clicked, &drawer_, &Drawer::drawUndo);
     connect(pbSticker, &QPushButton::clicked, this, &DrawPanel::sigSticker);
     connect(pbSave, &QPushButton::clicked, this, &DrawPanel::sigSave);
     connect(pbFinished, &QPushButton::clicked, this, &DrawPanel::sigFinished);
@@ -129,6 +129,11 @@ void DrawPanel::adjustPos()
     this->move(x, y);
 }
 
+Drawer* DrawPanel::drawer()
+{
+    return &drawer_;
+}
+
 QColor DrawPanel::currentColor()
 {
     return s_currentColor;
@@ -142,7 +147,7 @@ void DrawPanel::onReferRectChanged(const QRect &rect)
 
 void DrawPanel::onShapeBtnClicked()
 {
-    emit sigStart();
+    drawer_.setDrawMode(getMode());
 }
 
 void DrawPanel::onColorBtnClicked()
@@ -152,7 +157,7 @@ void DrawPanel::onColorBtnClicked()
     if (QDialog::Accepted == dlg.exec()) {
         s_currentColor = dlg.selectedColor();
         pbColor_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
-        emit sigStart();
+        drawer_.setDrawMode(getMode());
     }
 }
 
@@ -335,12 +340,130 @@ void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter&
 
 ////////////////////////////////////////////////////////////////////////////
 Drawer::Drawer(QWidget* parent)
-    : QObject(parent), parent_(parent)
+    : QObject(parent), parent_(parent), isPressed_(false),isEnabled_(false)
 {
-    
+    parent_->installEventFilter(this);
+}
+
+void Drawer::setEnable(bool enable)
+{
+    isEnabled_ = enable;
+}
+
+bool Drawer::enable() const
+{
+    return isEnabled_;
+}
+
+void Drawer::setDrawMode(const DrawMode &drawMode)
+{
+    drawMode_ = drawMode;
+}
+
+const DrawMode& Drawer::drawMode() const
+{
+    return drawMode_;
+}
+
+void Drawer::drawUndo()
+{
+    drawStartPos_ = QPoint(0, 0);
+    drawEndPos_ = QPoint(0, 0);
+    if (!drawModeCache_.isEmpty()) {
+        drawModeCache_.pop_back();
+        parent_->update();
+    }
+}
+
+void Drawer::onPaint(QPainter &painter)
+{
+    // 当前绘制
+    if (isEnabled_ && !drawMode_.isNone()) {
+        drawMode_.setPos(drawStartPos_, drawEndPos_);
+        drawMode_.draw(painter);
+    }
+
+    // 绘制缓存
+    for (int i = 0; i < drawModeCache_.size(); i++) {
+        DrawMode& dm = drawModeCache_[i];
+        dm.draw(painter);
+    }
+}
+
+void Drawer::drawPixmap(QPixmap &pixmap)
+{
+    if (!drawModeCache_.isEmpty()) {
+        QPainter painter(&pixmap);
+        for (int i = 0; i < drawModeCache_.size(); i++) {
+            DrawMode &dm = drawModeCache_[i];
+            dm.draw(painter);
+        }
+    }
 }
 
 bool Drawer::eventFilter(QObject* watched, QEvent* event)
 {
+    if (parent_ == watched) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            return onMousePressEvent(mouseEvent);
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            return onMouseReleaseEvent(mouseEvent);
+        } else if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            return onMouseMoveEvent(mouseEvent);
+        }
+    }
+    return false;
+}
+
+bool Drawer::onMousePressEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton) {
+        isPressed_ = true;
+        drawStartPos_ = e->pos();
+        drawEndPos_ = e->pos();
+    }
+    return false;
+}
+
+bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton) {
+        // 当前绘制结束，存档、清理
+        if (isPressed_) {
+            drawMode_.setPos(drawStartPos_, e->pos());
+            if (isEnabled_ && drawMode_.isValid()) {
+                drawModeCache_.push_back(drawMode_);
+            }
+            drawMode_.clear();
+        }
+        drawStartPos_ = QPoint(0, 0);
+        drawEndPos_ = QPoint(0, 0);
+        isPressed_ = false;
+    }
+    return false;
+}
+
+bool Drawer::onMouseMoveEvent(QMouseEvent *e)
+{
+    bool isDrawMode = (isEnabled_ && !drawMode_.isNone());
+    QCursor newCursor = isDrawMode ? drawMode_.cursor() : Qt::SizeAllCursor;
+    if (parent_->cursor().shape() != newCursor.shape()) {
+        parent_->setCursor(newCursor);
+    }
+    
+    if (isPressed_ && isDrawMode) {
+        // 进入绘制模式
+        drawEndPos_ = e->pos();
+        // 绘制折线保存鼠标移动的每一个点
+        if (drawMode_.shape() == DrawMode::PolyLine) {
+            drawMode_.addPos(e->pos());
+        }
+        parent_->update();
+        return true;
+        
+    }
     return false;
 }

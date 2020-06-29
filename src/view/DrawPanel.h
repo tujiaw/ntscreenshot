@@ -60,26 +60,47 @@ class Drawer : public QObject {
     Q_OBJECT
 public:
     Drawer(QWidget* parent);
+    void setEnable(bool enable);
+    bool enable() const;
+    void setDrawMode(const DrawMode &drawMode);
+    const DrawMode& drawMode() const;
+    void drawUndo();
+    
+    void drawPixmap(QPixmap &pixmap);
+    void onPaint(QPainter &painter);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
+    bool onMousePressEvent(QMouseEvent *e);
+    bool onMouseReleaseEvent(QMouseEvent *e);
+    bool onMouseMoveEvent(QMouseEvent *e);
 
 private:
     QWidget* parent_;
+    bool isEnabled_;
+    // 绘制开始位置
+    QPoint drawStartPos_;
+    // 绘制结束位置
+    QPoint drawEndPos_;
+    // 鼠标是否按下
+    bool isPressed_;
+    // 绘制模式
+    DrawMode drawMode_;
+    // 历史绘制模式缓存
+    QList<DrawMode> drawModeCache_;
 };
 
 //////////////////////////////////////////////////////////////////////////
 class DrawPanel : public QWidget {
 Q_OBJECT
 public:
-    DrawPanel(QWidget *parent);
+    DrawPanel(QWidget *widget, QWidget *drawWidget);
     DrawMode getMode();
     void adjustPos();
+    Drawer* drawer();
     static QColor currentColor();
 
 signals:
-    void sigStart();
-    void sigUndo();
     void sigSticker();
     void sigSave();
     void sigFinished();
@@ -98,5 +119,6 @@ private:
     QPushButton* selectedBtn_;
     QPushButton* pbColor_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
+    Drawer drawer_;
 };
 

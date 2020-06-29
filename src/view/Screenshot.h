@@ -61,8 +61,6 @@ private:
     std::shared_ptr<QPixmap> originScreen_;
     // 截图屏幕
     std::shared_ptr<SelectedScreenWidget> selectedScreen_;
-    // 绘制面板
-    std::unique_ptr<DrawPanel> drawpanel_;
     // 截图器大小感知器
     std::shared_ptr<SelectedScreenSizeWidget> sizeTextPanel_;
     // 放大取色器
@@ -76,8 +74,6 @@ private slots:
     void onScreenBorderReleased(int, int);
     void onSelectedScreenSizeChanged(int, int);
     void onSelectedScreenPosChanged(int, int);
-    void onDraw();
-    void onDrawUndo();
 };
 
 // 显示选中区域大小
@@ -126,12 +122,13 @@ public:
     };
 
     explicit SelectedScreenWidget(std::shared_ptr<QPixmap> originPainting, QPoint pos, QWidget *parent = 0);
-    void setDrawMode(const DrawMode &drawMode);
     QPixmap getPixmap();
     void drawUndo();
+    void showDrawPanel();
+    void moveDrawPanel();
 
 protected:
-    DIRECTION getRegion(const QPoint &cursor);
+    void updateCursorDir(const QPoint &cursor);
     virtual void contextMenuEvent(QContextMenuEvent *);
     virtual void mouseDoubleClickEvent(QMouseEvent *e);
     virtual void mousePressEvent(QMouseEvent *e);
@@ -156,10 +153,6 @@ private:
     DIRECTION direction_;
     // 起点
     QPoint originPoint_;
-    // 绘制开始位置
-    QPoint drawStartPos_;
-    // 绘制结束位置
-    QPoint drawEndPos_;
     // 鼠标是否按下
     bool isPressed_;
     /// 拖动的距离
@@ -172,12 +165,7 @@ private:
     QRect currentRect_;
     // 右键菜单对象
     QMenu *menu_;
-    // 绘制模式
-    DrawMode drawMode_;
-    // 历史绘制模式缓存
-    QList<DrawMode> drawModeCache_;
-    // 是否是绘制模式
-    bool isDrawMode_;
+    DrawPanel draw_;
     // 上传图片工具
     class UploadImageUtil *uploadImageUtil_;
 };
