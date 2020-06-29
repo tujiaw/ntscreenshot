@@ -65,6 +65,7 @@ public:
     bool enable() const;
     void setDrawMode(const DrawMode &drawMode);
     const DrawMode& drawMode() const;
+    bool isDraw() const;
     void drawUndo();
     
     void drawPixmap(QPixmap &pixmap);
@@ -108,7 +109,7 @@ signals:
 
 public slots:
     void onReferRectChanged(const QRect &rect);
-    void onShapeBtnClicked(QAbstractButton*, bool);
+    void onShapeBtnClicked(QAbstractButton*);
     void onColorBtnClicked();
 
 protected:

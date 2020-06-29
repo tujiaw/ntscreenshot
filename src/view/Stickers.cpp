@@ -139,11 +139,18 @@ void StickerWidget::contextMenuEvent(QContextMenuEvent*)
 
 void StickerWidget::mousePressEvent(QMouseEvent *event)
 {
+    if (draw_ && !draw_->drawer()->isDraw()) {
+        draw_->hide();
+    }
     QWidget::mousePressEvent(event);
 }
 
 void StickerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (draw_ && !draw_->drawer()->isDraw()) {
+        draw_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
+        draw_->show();
+    }
     QWidget::mouseReleaseEvent(event);
 }
 

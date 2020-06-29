@@ -30,8 +30,8 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     hLayout->setSpacing(0);
     
     QButtonGroup* shapeGroup = new QButtonGroup(this);
-    //shapeGroup->setExclusive(true);
-    connect(shapeGroup, SIGNAL(buttonToggled(QAbstractButton*, bool)), this, SLOT(onShapeBtnClicked(QAbstractButton*, bool)));
+    shapeGroup->setExclusive(false);
+    connect(shapeGroup, SIGNAL(buttonClicked(QAbstractButton*)), this, SLOT(onShapeBtnClicked(QAbstractButton*)));
 
     auto createLine = [this]() -> QPushButton * {
         QPushButton* pb = new QPushButton("|", this);
@@ -110,6 +110,7 @@ DrawMode DrawPanel::getMode()
         if (!btns_[i].second.isNone()) {
             if (btns_[i].first->isChecked()) {
                 mode = btns_[i].second;
+                break;
             }
         }
     }
@@ -149,15 +150,18 @@ void DrawPanel::onReferRectChanged(const QRect &rect)
     adjustPos();
 }
 
-void DrawPanel::onShapeBtnClicked(QAbstractButton* btn, bool checked)
+void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
 {
-    QButtonGroup *btnGroup = qobject_cast<QButtonGroup*>(sender());
-    if (btnGroup) {
-        if (checked) {
-            drawer_.setDrawMode(getMode());
-        } else {
-            drawer_.setDrawMode(DrawMode(DrawMode::None));
+    for (int i = 0; i < btns_.size(); i++) {
+        if (btns_[i].first != btn && btns_[i].first->isChecked()) {
+            btns_[i].first->setChecked(false);
         }
+    }
+
+    if (btn->isChecked()) {
+        drawer_.setDrawMode(getMode());
+    } else {
+        drawer_.setDrawMode(DrawMode(DrawMode::None));
     }
 }
 
@@ -376,6 +380,11 @@ const DrawMode& Drawer::drawMode() const
     return drawMode_;
 }
 
+bool Drawer::isDraw() const
+{
+    return isEnabled_ && !drawMode_.isNone();
+}
+
 void Drawer::drawUndo()
 {
     drawStartPos_ = QPoint(0, 0);
@@ -459,13 +468,12 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
 
 bool Drawer::onMouseMoveEvent(QMouseEvent *e)
 {
-    bool isDrawMode = (isEnabled_ && !drawMode_.isNone());
-    QCursor newCursor = isDrawMode ? drawMode_.cursor() : Qt::SizeAllCursor;
+    QCursor newCursor = isDraw() ? drawMode_.cursor() : Qt::SizeAllCursor;
     if (parent_->cursor().shape() != newCursor.shape()) {
         parent_->setCursor(newCursor);
     }
     
-    if (isPressed_ && isDrawMode) {
+    if (isPressed_ && isDraw()) {
         // 进入绘制模式
         drawEndPos_ = e->pos();
         // 绘制折线保存鼠标移动的每一个点
