@@ -65,10 +65,10 @@ public:
     QWidget* parentWidget();
     void setEnable(bool enable);
     bool enable() const;
-    void setDrawMode(const DrawMode &drawMode);
-    const DrawMode& drawMode() const;
+    void setMode(const DrawMode &drawMode);
+    const DrawMode& mode() const;
     bool isDraw() const;
-    void drawUndo();
+    void undo();
     
     void drawPixmap(QPixmap &pixmap);
     void onPaint(QPainter &painter);
@@ -98,6 +98,7 @@ private:
 class DrawPanel : public QWidget {
 Q_OBJECT
 public:
+    // 父窗口、需要绘制的窗口
     DrawPanel(QWidget *parent, QWidget *drawWidget);
     DrawMode getMode();
     void adjustPos();
@@ -119,6 +120,7 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent* event);
 
 private:
+    Q_DISABLE_COPY(DrawPanel)
     QRect referRect_;
     QPushButton* pbColor_;
     QList<QPair<QPushButton*, DrawMode>> btns_;

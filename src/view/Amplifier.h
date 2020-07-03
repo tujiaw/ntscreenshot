@@ -17,6 +17,7 @@ protected:
     virtual void paintEvent(QPaintEvent *);
 
 private:
+    Q_DISABLE_COPY(AmplifierWidget)
     QSize screenSize_;
     QPoint cursorPoint_;
     int imageHeight_;

@@ -302,7 +302,7 @@ void ScreenshotWidget::paintEvent(QPaintEvent *) {
 void ScreenshotWidget::updateMouse(void) {
     /// 获取当前鼠标选中的窗口
     ::EnableWindow((HWND)winId(), FALSE);
-    /// @marker: 只更新一次,可以修复用户误操作导致的查找窗口与识别界面窗口不一致.
+    /// 只更新一次,可以修复用户误操作导致的查找窗口与识别界面窗口不一致.
     QRect tmpRect;
     Util::getSmallestWindowFromCursor(tmpRect);
     QPoint p = mapFromGlobal(QPoint(tmpRect.x(), tmpRect.y()));
@@ -330,19 +330,6 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
     }
 
     e->ignore();
-}
-
-void ScreenshotWidget::keyReleaseEvent(QKeyEvent* e)
-{
-    if (e->modifiers() & Qt::ControlModifier) {
-        if (e->key() == Qt::Key_Z) {
-            if (selectedScreen_) {
-                selectedScreen_->drawUndo();
-            }
-            return;
-        }
-    }
-    QWidget::keyReleaseEvent(e);
 }
 
 ///////////////////////////////////////////////////////////
@@ -383,18 +370,19 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     originPoint_(pos),
     isPressed_(false), 
     originScreen_(originPainting),
-    draw_(parent, this)
+    drawPanel_(parent, this)
 {
-    draw_.hide();
-    connect(&draw_, SIGNAL(sigSticker()), this, SLOT(onSticker()));
-    connect(&draw_, SIGNAL(sigSave()), this, SLOT(onSaveScreenOther()));
-    connect(&draw_, SIGNAL(sigFinished()), this, SLOT(onSaveScreen()));
+    drawPanel_.hide();
+    connect(&drawPanel_, SIGNAL(sigSticker()), this, SLOT(onSticker()));
+    connect(&drawPanel_, SIGNAL(sigSave()), this, SLOT(onSaveScreenOther()));
+    connect(&drawPanel_, SIGNAL(sigFinished()), this, SLOT(onSaveScreen()));
 
     uploadImageUtil_ = new UploadImageUtil(this);
     menu_ = new QMenu(this);
     menu_->addAction(QStringLiteral("完成"), this, SLOT(onSaveScreen()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSaveScreenOther()), QKeySequence("Ctrl+S"));
     menu_->addAction(QStringLiteral("贴图"), this, SLOT(onSticker()), QKeySequence(PIN_KEY));
+    menu_->addAction(QStringLiteral("撤销"), drawPanel_.drawer(), &Drawer::undo, QKeySequence("Ctrl+Z"));
     if (!UPLOAD_IMAGE_URL.isEmpty()) {
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
@@ -403,9 +391,10 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
 
     // 双击即完成
     connect(this, SIGNAL(sigDoubleClick()), this, SLOT(onSaveScreen()));
-
     // 开启鼠标实时追踪
     setMouseTracking(true);
+    // 强制焦点，为了捕获键盘事件
+    setFocusPolicy(Qt::StrongFocus);
     // 默认隐藏
     hide();
 }
@@ -419,25 +408,20 @@ QPixmap SelectedScreenWidget::getPixmap()
     // 获取绘制的选中区域的图片
     QImage image = originScreen_->copy(currentRect_).toImage();
     QPixmap pixmap = QPixmap::fromImage(image);
-    draw_.drawer()->drawPixmap(pixmap);
+    drawPanel_.drawer()->drawPixmap(pixmap);
     return pixmap;
-}
-
-void SelectedScreenWidget::drawUndo()
-{
-    draw_.drawer()->drawUndo();
 }
 
 void SelectedScreenWidget::showDrawPanel()
 {
     moveDrawPanel();
-    draw_.show();
-    draw_.raise();
+    drawPanel_.show();
+    drawPanel_.raise();
 }
 
 void SelectedScreenWidget::moveDrawPanel()
 {
-    draw_.onReferRectChanged(QRect(this->pos(), this->size()));
+    drawPanel_.onReferRectChanged(QRect(this->pos(), this->size()));
 }
 
 void SelectedScreenWidget::updateCursorDir(const QPoint &cursor) {
@@ -485,7 +469,7 @@ void SelectedScreenWidget::updateCursorDir(const QPoint &cursor) {
         dir = DIR_NONE;
     }
     direction_ = dir;
-    draw_.drawer()->setEnable(direction_ == DIR_NONE);
+    drawPanel_.drawer()->setEnable(direction_ == DIR_NONE);
 }
 
 void SelectedScreenWidget::contextMenuEvent(QContextMenuEvent *) {
@@ -645,7 +629,7 @@ void SelectedScreenWidget::paintEvent(QPaintEvent *) {
         painter.fillRect(rect, brush);
     }
 
-    draw_.drawer()->onPaint(painter);
+    drawPanel_.drawer()->onPaint(painter);
 }
 
 void SelectedScreenWidget::onSaveScreenOther(void) {

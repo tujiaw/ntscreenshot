@@ -12,6 +12,7 @@ class DrawPanel;
 class QTimer;
 class QMenu;
 
+
 class ScreenshotWidget : public QWidget {
     Q_OBJECT
 public:
@@ -34,7 +35,6 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent *e);
     virtual void mouseMoveEvent(QMouseEvent *e);
     virtual void keyPressEvent(QKeyEvent *e);
-    virtual void keyReleaseEvent(QKeyEvent* e);
     virtual void paintEvent(QPaintEvent *);
     void updateMouse(void);
 
@@ -50,7 +50,15 @@ private:
     void setEsthesiaRect(const QRect &rect);
     const QRect& getEsthesiaRect() const;
 
+private slots:
+    void onTopMost(void);
+    void onScreenBorderPressed(int, int);
+    void onScreenBorderReleased(int, int);
+    void onSelectedScreenSizeChanged(int, int);
+    void onSelectedScreenPosChanged(int, int);
+
 private:
+    Q_DISABLE_COPY(ScreenshotWidget)
     // 截屏窗口是否已经展示
     bool isLeftPressed_;
     // 用于检测误操作
@@ -67,15 +75,9 @@ private:
     std::shared_ptr<AmplifierWidget> amplifierTool_;
     // 鼠标光标位置感知区域
     QRect esthesiaRect_;
-
-private slots:
-    void onTopMost(void);
-    void onScreenBorderPressed(int, int);
-    void onScreenBorderReleased(int, int);
-    void onSelectedScreenSizeChanged(int, int);
-    void onSelectedScreenPosChanged(int, int);
 };
 
+//////////////////////////////////////////////////////////////////////////
 // 显示选中区域大小
 class SelectedScreenSizeWidget : public QWidget {
     Q_OBJECT
@@ -90,10 +92,12 @@ public slots:
     void onSizeChanged(int w, int h);
 
 private:
+    Q_DISABLE_COPY(SelectedScreenSizeWidget)
     std::unique_ptr<QPixmap> backgroundPixmap_;
     QString info_;
 };
 
+//////////////////////////////////////////////////////////////////////////
 // 选中区域
 class SelectedScreenWidget : public QWidget {
 
@@ -123,7 +127,6 @@ public:
 
     explicit SelectedScreenWidget(std::shared_ptr<QPixmap> originPainting, QPoint pos, QWidget *parent = 0);
     QPixmap getPixmap();
-    void drawUndo();
     void showDrawPanel();
     void moveDrawPanel();
 
@@ -149,13 +152,14 @@ public slots:
     void quitScreenshot(void);
 
 private:
+    Q_DISABLE_COPY(SelectedScreenWidget)
     // 窗口大小改变时，记录改变方向
     DIRECTION direction_;
     // 起点
     QPoint originPoint_;
     // 鼠标是否按下
     bool isPressed_;
-    /// 拖动的距离
+    // 拖动的距离
     QPoint movePos_;
     // 标记锚点
     QPolygon listMarker_;
@@ -165,7 +169,8 @@ private:
     QRect currentRect_;
     // 右键菜单对象
     QMenu *menu_;
-    DrawPanel draw_;
+    // 绘图面板
+    DrawPanel drawPanel_;
     // 上传图片工具
     class UploadImageUtil *uploadImageUtil_;
 };

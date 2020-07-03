@@ -25,6 +25,7 @@ private slots:
     void slotExit();
 
 private:
+    Q_DISABLE_COPY(MainWidget)
 	SystemTray *tray_;
 	QxtGlobalShortcut *mainShortcut_;
     QxtGlobalShortcut *pinShortcut_;

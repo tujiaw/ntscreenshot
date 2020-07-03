@@ -68,7 +68,7 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     QPushButton* pbSticker = createActionBtn(":/images/pin.png", QStringLiteral("ÌùÍ¼"));
     QPushButton* pbSave = createActionBtn(":/images/save.png", QStringLiteral("±£´æ"));
     QPushButton* pbFinished = createActionBtn(":/images/clipboard.png", QStringLiteral("¼ôÇÐ°å"));
-    connect(pbUndo, &QPushButton::clicked, &drawer_, &Drawer::drawUndo);
+    connect(pbUndo, &QPushButton::clicked, &drawer_, &Drawer::undo);
     connect(pbSticker, &QPushButton::clicked, this, &DrawPanel::sigSticker);
     connect(pbSave, &QPushButton::clicked, this, &DrawPanel::sigSave);
     connect(pbFinished, &QPushButton::clicked, this, &DrawPanel::sigFinished);
@@ -160,9 +160,9 @@ void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
     }
 
     if (btn->isChecked()) {
-        drawer_.setDrawMode(getMode());
+        drawer_.setMode(getMode());
     } else {
-        drawer_.setDrawMode(DrawMode(DrawMode::None));
+        drawer_.setMode(DrawMode(DrawMode::None));
     }
 }
 
@@ -173,7 +173,7 @@ void DrawPanel::onColorBtnClicked()
     if (QDialog::Accepted == dlg.exec()) {
         s_currentColor = dlg.selectedColor();
         pbColor_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
-        drawer_.setDrawMode(getMode());
+        drawer_.setMode(getMode());
     }
 }
 
@@ -368,7 +368,7 @@ Drawer::Drawer(QWidget* parent)
 Drawer::~Drawer()
 {
     // ·ÀÖ¹drawerÏú»ÙºócursorÃ»ÓÐÖØÖÃ
-    setDrawMode(DrawMode(DrawMode::None));
+    setMode(DrawMode(DrawMode::None));
 }
 
 QWidget* Drawer::parentWidget()
@@ -386,13 +386,13 @@ bool Drawer::enable() const
     return isEnabled_;
 }
 
-void Drawer::setDrawMode(const DrawMode &drawMode)
+void Drawer::setMode(const DrawMode &drawMode)
 {
     parent_->setCursor(drawMode.cursor());
     drawMode_ = drawMode;
 }
 
-const DrawMode& Drawer::drawMode() const
+const DrawMode& Drawer::mode() const
 {
     return drawMode_;
 }
@@ -402,7 +402,7 @@ bool Drawer::isDraw() const
     return isEnabled_ && !drawMode_.isNone();
 }
 
-void Drawer::drawUndo()
+void Drawer::undo()
 {
     drawStartPos_ = QPoint(0, 0);
     drawEndPos_ = QPoint(0, 0);

@@ -27,6 +27,7 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     uploadImageUtil_ = new UploadImageUtil(this);
 	menu_ = new QMenu(this);
     menu_->addAction(QStringLiteral("绘制"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
+    menu_->addAction(QStringLiteral("撤销"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
 	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
     menu_->addSeparator();
@@ -139,17 +140,17 @@ void StickerWidget::contextMenuEvent(QContextMenuEvent*)
 
 void StickerWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton && draw_ && !draw_->drawer()->isDraw()) {
-        draw_->hide();
+    if (event->button() == Qt::LeftButton && drawPanel_ && !drawPanel_->drawer()->isDraw()) {
+        drawPanel_->hide();
     }
     QWidget::mousePressEvent(event);
 }
 
 void StickerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (draw_ && !draw_->drawer()->isDraw()) {
-        draw_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
-        draw_->show();
+    if (drawPanel_ && !drawPanel_->drawer()->isDraw()) {
+        drawPanel_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
+        drawPanel_->show();
     }
     QWidget::mouseReleaseEvent(event);
 }
@@ -158,22 +159,29 @@ void StickerWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
     painter.drawPixmap(QPoint(0, 0), pixmap_, pixmap_.rect());
-    if (draw_) {
-        draw_->drawer()->onPaint(painter);
+    if (drawPanel_) {
+        drawPanel_->drawer()->onPaint(painter);
     }
 }
 
 void StickerWidget::onDraw()
 {
-    if (draw_) {
-        draw_->drawer()->drawPixmap(pixmap_);
-        draw_.reset();
+    if (drawPanel_) {
+        drawPanel_->drawer()->drawPixmap(pixmap_);
+        drawPanel_.reset();
     } else {
-        draw_.reset(new DrawPanel(nullptr, this));
-        draw_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
-        draw_->show();
-        draw_->raise();
-        draw_->drawer()->setEnable(true);
+        drawPanel_.reset(new DrawPanel(nullptr, this));
+        drawPanel_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
+        drawPanel_->show();
+        drawPanel_->raise();
+        drawPanel_->drawer()->setEnable(true);
+    }
+}
+
+void StickerWidget::onUndo()
+{
+    if (drawPanel_) {
+        drawPanel_->drawer()->undo();
     }
 }
 

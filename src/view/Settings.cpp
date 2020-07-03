@@ -15,6 +15,9 @@ Settings::Settings(QWidget *parent)
 	ui.pbPinStatus->setFixedSize(25, 25);
     ui.pbScreenshotStatus->setIcon(QIcon(":/images/ok.png"));
     ui.pbPinStatus->setIcon(QIcon(":/images/ok.png"));
+    QPixmap tipsPixmap(QString(":/images/tips.png"));
+    ui.labelTips->setPixmap(tipsPixmap);
+    ui.labelTips->setToolTip(QStringLiteral("在输入框上按下要设置的快捷键"));
     initTablePath();
 
     connect(ui.cbAutoStart, &QCheckBox::clicked, this, &Settings::onAutoStartClicked);
@@ -23,6 +26,7 @@ Settings::Settings(QWidget *parent)
     connect(ui.leUploadImageUrl, &QLineEdit::textChanged, this, &Settings::onUploadImageUrlChanged);
 
     readData();
+    setFixedSize(400, 280);
 }
 
 Settings::~Settings()
@@ -60,6 +64,7 @@ void Settings::keyPressEvent(QKeyEvent* keyEvent)
 void Settings::initTablePath()
 {
     QList<QStringList> data;
+    data.push_back(QStringList() << QStringLiteral("程序") << Util::getRunDir());
     data.push_back(QStringList() << QStringLiteral("配置") << Util::getConfigDir());
     data.push_back(QStringList() << QStringLiteral("日志") << Util::getLogsDir());
 

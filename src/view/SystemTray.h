@@ -22,6 +22,7 @@ private slots:
     void onUpdate();
 
 private:
+    Q_DISABLE_COPY(SystemTray)
 	QWidget *parent_;
     QAction *screenshotAction_;
     QAction *pinAction_;

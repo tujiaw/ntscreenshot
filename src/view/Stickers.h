@@ -33,6 +33,7 @@ protected:
 
 private slots:
     void onDraw();
+    void onUndo();
 	void onCopy();
 	void onSave();
     void onUpload();
@@ -42,9 +43,10 @@ private slots:
     void onHideAll();
 
 private:
+    Q_DISABLE_COPY(StickerWidget)
     QPixmap pixmap_;
 	QMenu* menu_;
-    std::unique_ptr<DrawPanel> draw_;
+    std::unique_ptr<DrawPanel> drawPanel_;
     UploadImageUtil *uploadImageUtil_;
 };
 
@@ -59,6 +61,7 @@ private slots:
     void onHttpResponse(int err, const QByteArray& data);
 
 private:
+    Q_DISABLE_COPY(UploadImageUtil)
     QWidget *parentWidget_;
     HttpRequest* http_;
 };
