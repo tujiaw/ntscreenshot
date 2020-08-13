@@ -169,6 +169,15 @@
     <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
+    <ClCompile Include="view\DrawSettings.cpp">
+      <Filter>view</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_DrawSettings.cpp">
+      <Filter>Generated Files\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_DrawSettings.cpp">
+      <Filter>Generated Files\Release</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\Constants.h">
@@ -256,6 +265,9 @@
     </CustomBuild>
     <CustomBuild Include="component\TextEdit.h">
       <Filter>component</Filter>
+    </CustomBuild>
+    <CustomBuild Include="view\DrawSettings.h">
+      <Filter>view</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

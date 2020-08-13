@@ -16,10 +16,11 @@
 #include "component/TextEdit.h"
 #include "common/Constants.h"
 #include "common/Util.h"
+#include "DrawSettings.h"
 
 static QColor s_currentColor = Qt::red;
 DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
-    : QWidget(parent), drawer_(drawWidget)
+    : QWidget(parent), drawer_(drawWidget), drawSettings_(nullptr)
 {    
     this->setObjectName("DrawPanel");
     QHBoxLayout *hLayout = new QHBoxLayout(this);
@@ -53,10 +54,10 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
         return pb;
     };
 
-    pbColor_ = new QPushButton(QStringLiteral("¦¡"), this);
-    connect(pbColor_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
-    pbColor_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
-    pbColor_->setFixedSize(25, 25);
+    pbFont_ = new QPushButton(QStringLiteral("¦¡"), this);
+    connect(pbFont_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
+    pbFont_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
+    pbFont_->setFixedSize(25, 25);
 
     QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("ÕÛÏß"));
     QPushButton* pbLine = createShapeBtn(shapeGroup, ":/images/line.png", QStringLiteral("Ö±Ïß"));
@@ -89,7 +90,7 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     btns_.push_back(qMakePair(pbEllipse, ellipseMode));
     btns_.push_back(qMakePair(pbText, textMode));
 
-    hLayout->addWidget(pbColor_);
+    hLayout->addWidget(pbFont_);
     for (int i = 0; i < btns_.size(); i++) {
         hLayout->addWidget(btns_[i].first);
     }
@@ -169,13 +170,29 @@ void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
 
 void DrawPanel::onColorBtnClicked()
 {
-    QColorDialog dlg(s_currentColor, this);
-    dlg.setStyleSheet("QPushButton{ width: 80px; height: 25px;};");
-    if (QDialog::Accepted == dlg.exec()) {
-        s_currentColor = dlg.selectedColor();
-        pbColor_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
-        drawer_.setMode(getMode());
+    //QColorDialog dlg(s_currentColor, this);
+    //dlg.setStyleSheet("QPushButton{ width: 80px; height: 25px;};");
+    //if (QDialog::Accepted == dlg.exec()) {
+    //    s_currentColor = dlg.selectedColor();
+    //    pbFont_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
+    //    drawer_.setMode(getMode());
+    //}
+
+    if (drawSettings_ && drawSettings_->isVisible()) {
+        delete drawSettings_;
+        drawSettings_ = nullptr;
+        return;
     }
+
+    if (!drawSettings_) {
+        drawSettings_ = new DrawSettings();
+        drawSettings_->setWindowFlags(Qt::ToolTip);
+    }
+
+    QPoint pos = pbFont_->mapToGlobal(pbFont_->pos());
+    pos.setY(pos.y() + pbFont_->height());
+    drawSettings_->move(pos);
+    drawSettings_->show();
 }
 
 void DrawPanel::showEvent(QShowEvent *event)
@@ -193,14 +210,12 @@ void DrawPanel::mouseReleaseEvent(QMouseEvent*event)
 DrawMode::DrawMode() 
     : shape_(None)
     , cursor_(Qt::ArrowCursor)
-    , painter_(nullptr)
 {
     init();
 }
 
 DrawMode::DrawMode(Shape shape)
     : shape_(shape)
-    , painter_(nullptr)
 {
     init();
 }
@@ -300,8 +315,8 @@ void DrawMode::initPainter(QPainter& painter)
 {
     painter.setPen(pen_);
     painter.setBrush(brush_);
+    painter.setFont(font_);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter_ = &painter;
 }
 
 void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
@@ -443,10 +458,7 @@ void Drawer::showTextEdit(const QPoint &pos)
         textEdit_ = new TextEdit(parent_);
     }
 
-    if (drawMode_.painter()) {
-        textEdit_->setFont(drawMode_.painter()->font());
-    }
-
+    textEdit_->setFont(drawMode_.font());
     textEdit_->setStyle(drawMode_.pen().color());
     textEdit_->move(pos - QPoint(2, 12));
     textEdit_->setFocus();

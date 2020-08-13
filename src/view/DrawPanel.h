@@ -9,6 +9,8 @@
 class QPushButton;
 class QAbstractButton;
 class TextEdit;
+class DrawSettings;
+
 class DrawMode
 {
 public:
@@ -30,12 +32,12 @@ public:
     bool isValid() const;
     QPen& pen() { return pen_; }
     QBrush& brush() { return brush_; }
+    QFont& font() { return font_; }
     void setPos(const QPoint &start, const QPoint &end);
     void addPos(const QPoint &pos);
     void setText(const QRectF &rect, const QString& text);
     void clear();
     void draw(QPainter &painter);
-    QPainter* painter() { return painter_; }
     Shape shape() const { return shape_; }
     const QCursor& cursor() const { return cursor_; }
 
@@ -54,11 +56,11 @@ private:
     QPoint end_;
     QPen pen_;
     QBrush brush_;
+    QFont font_;
     QVector<QPoint> points_;
     QRectF textRect_;
     QString text_;
     QCursor cursor_;
-    QPainter *painter_;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -130,7 +132,8 @@ protected:
 private:
     Q_DISABLE_COPY(DrawPanel)
     QRect referRect_;
-    QPushButton* pbColor_;
+    QPushButton *pbFont_;
+    DrawSettings *drawSettings_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
     Drawer drawer_;
 };
