@@ -166,6 +166,12 @@ void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
     } else {
         drawer_.setMode(DrawMode(DrawMode::None));
     }
+
+    if (drawSettings_ && drawSettings_->isVisible()) {
+        delete drawSettings_;
+        drawSettings_ = nullptr;
+        return;
+    }
 }
 
 void DrawPanel::onColorBtnClicked()
@@ -473,8 +479,8 @@ void Drawer::saveText()
             QPoint start = textEdit_->startCursorPoint();
             drawMode_.setText(QRectF(start.x(), start.y(), textEdit_->width(), textEdit_->height()), text);
             drawModeCache_.push_back(drawMode_);
-            drawMode_.clear();
         }
+        drawMode_.clear();
         textEdit_->clear();
         textEdit_->setVisible(false);
     }
@@ -527,7 +533,6 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
             saveText();
             if (drawMode_.shape() == DrawMode::Text) {
                 showTextEdit(e->pos());
-                return false;
             }
         }
 
@@ -539,6 +544,7 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
             }
             drawMode_.clear();
         }
+
         drawStartPos_ = QPoint(0, 0);
         drawEndPos_ = QPoint(0, 0);
         isPressed_ = false;
