@@ -160,6 +160,15 @@
     <ClCompile Include="GeneratedFiles\Release\moc_WindowManager.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
+    <ClCompile Include="component\TextEdit.cpp">
+      <Filter>component</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_TextEdit.cpp">
+      <Filter>Generated Files\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp">
+      <Filter>Generated Files\Release</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\Constants.h">
@@ -243,6 +252,9 @@
       <Filter>common</Filter>
     </CustomBuild>
     <CustomBuild Include="component\TipsWidget.h">
+      <Filter>component</Filter>
+    </CustomBuild>
+    <CustomBuild Include="component\TextEdit.h">
       <Filter>component</Filter>
     </CustomBuild>
   </ItemGroup>

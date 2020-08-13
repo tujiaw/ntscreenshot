@@ -8,6 +8,7 @@
 
 class QPushButton;
 class QAbstractButton;
+class TextEdit;
 class DrawMode
 {
 public:
@@ -31,9 +32,10 @@ public:
     QBrush& brush() { return brush_; }
     void setPos(const QPoint &start, const QPoint &end);
     void addPos(const QPoint &pos);
-    void setText(const QString& text);
+    void setText(const QRectF &rect, const QString& text);
     void clear();
     void draw(QPainter &painter);
+    QPainter* painter() { return painter_; }
     Shape shape() const { return shape_; }
     const QCursor& cursor() const { return cursor_; }
 
@@ -44,6 +46,7 @@ public:
     void drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
     void drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
     void drawText(const QPoint& startPoint, const QString& text, QPainter& painter);
+    void drawText(const QRectF &rectangle, const QString& text, QPainter& painter);
 
 private:
     Shape shape_;
@@ -52,8 +55,10 @@ private:
     QPen pen_;
     QBrush brush_;
     QVector<QPoint> points_;
+    QRectF textRect_;
     QString text_;
     QCursor cursor_;
+    QPainter *painter_;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -72,6 +77,8 @@ public:
     
     void drawPixmap(QPixmap &pixmap);
     void onPaint(QPainter &painter);
+    void showTextEdit(const QPoint &pos);
+    void saveText();
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
@@ -92,6 +99,7 @@ private:
     DrawMode drawMode_;
     // 历史绘制模式缓存
     QList<DrawMode> drawModeCache_;
+    TextEdit *textEdit_;
 };
 
 //////////////////////////////////////////////////////////////////////////

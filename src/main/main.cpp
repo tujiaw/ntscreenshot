@@ -7,7 +7,7 @@
 
 int main(int argc, char *argv[])
 {	
-	RunGuard guard("69619FA7-4944-4CCA-BF69-83323F34D32F");
+	RunGuard guard("54CAFB48-4DD8-41CF-8AC5-735BE51EA0D1");
 	if (!guard.tryToRun()) {
 		return 0;
 	}

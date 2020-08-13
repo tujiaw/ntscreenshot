@@ -41,6 +41,7 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
         menu_->addAction(QStringLiteral("ÉÏ´«Í¼´²"), this, SLOT(onUpload()));
     }
 
+
     this->setFocusPolicy(Qt::StrongFocus);
     interval_handle_once(100, [this]() {
         emit WindowManager::instance()->sigStickerCountChanged();
@@ -52,6 +53,13 @@ StickerWidget::~StickerWidget()
     interval_handle_once(100, [this]() {
         emit WindowManager::instance()->sigStickerCountChanged();
     });
+}
+
+void StickerWidget::flush()
+{
+    if (drawPanel_) {
+        drawPanel_->drawer()->drawPixmap(pixmap_);
+    }
 }
 
 void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
@@ -171,6 +179,8 @@ void StickerWidget::onDraw()
         drawPanel_.reset();
     } else {
         drawPanel_.reset(new DrawPanel(nullptr, this));
+        connect(drawPanel_.get(), SIGNAL(sigSave()), this, SLOT(onSave()));
+        connect(drawPanel_.get(), SIGNAL(sigFinished()), this, SLOT(onCopy()));
         drawPanel_->onReferRectChanged(QRect(this->mapToGlobal(this->pos()), this->size()));
         drawPanel_->show();
         drawPanel_->raise();
@@ -187,12 +197,15 @@ void StickerWidget::onUndo()
 
 void StickerWidget::onCopy()
 {
+    flush();
 	QClipboard* clipboard = QApplication::clipboard();
     clipboard->setPixmap(pixmap_);
+    this->onClose();
 }
 
 void StickerWidget::onSave()
 {
+    flush();
     QString name = Util::pixmapUniqueName(pixmap_);
 	QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), name, "PNG (*.png)");
 	if (fileName.length() > 0) {
@@ -202,6 +215,7 @@ void StickerWidget::onSave()
 
 void StickerWidget::onUpload()
 {
+    flush();
     uploadImageUtil_->upload(pixmap_);
 }
 
@@ -224,6 +238,7 @@ void StickerWidget::onHide()
 {
     QPoint pos = this->parentWidget()->pos();
     if (!pixmap_.isNull()) {
+        flush();
         HidedStickerList.push_back(qMakePair(pos, pixmap_));
     }
     this->onClose();

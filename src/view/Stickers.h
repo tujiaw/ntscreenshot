@@ -17,6 +17,7 @@ class StickerWidget : public QWidget
 public:
 	StickerWidget(const QPixmap& pixmap, QWidget* parent);
     ~StickerWidget();
+    void flush();
     static void popup(const QPixmap &pixmap, const QPoint &pos);
     static void showAll();
     static void hideAll();

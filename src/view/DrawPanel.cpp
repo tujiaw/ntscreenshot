@@ -13,6 +13,7 @@
 #include <QColorDialog>
 #include <QApplication>
 #include <QDesktopWidget>
+#include "component/TextEdit.h"
 #include "common/Constants.h"
 #include "common/Util.h"
 
@@ -192,12 +193,14 @@ void DrawPanel::mouseReleaseEvent(QMouseEvent*event)
 DrawMode::DrawMode() 
     : shape_(None)
     , cursor_(Qt::ArrowCursor)
+    , painter_(nullptr)
 {
     init();
 }
 
 DrawMode::DrawMode(Shape shape)
     : shape_(shape)
+    , painter_(nullptr)
 {
     init();
 }
@@ -251,8 +254,9 @@ void DrawMode::addPos(const QPoint &pos)
     points_.push_back(pos);
 }
 
-void DrawMode::setText(const QString& text)
+void DrawMode::setText(const QRectF &rect, const QString& text)
 {
+    textRect_ = rect;
     text_ = text;
 }
 
@@ -269,7 +273,6 @@ void DrawMode::draw(QPainter &painter)
     if (!isValid()) {
         return;
     }
-
     initPainter(painter);
     switch (shape_) {
     case PolyLine:
@@ -288,7 +291,7 @@ void DrawMode::draw(QPainter &painter)
         drawEllipse(start_, end_, painter);
         break;
     case Text:
-        drawText(start_, text_, painter);
+        drawText(textRect_, text_, painter);
         break;
     }
 }
@@ -298,6 +301,7 @@ void DrawMode::initPainter(QPainter& painter)
     painter.setPen(pen_);
     painter.setBrush(brush_);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter_ = &painter;
 }
 
 void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
@@ -358,9 +362,14 @@ void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter&
     painter.drawStaticText(startPoint, QStaticText(text));
 }
 
+void DrawMode::drawText(const QRectF &rectangle, const QString& text, QPainter& painter)
+{
+    painter.drawText(rectangle, Qt::AlignLeft, text);
+}
+
 ////////////////////////////////////////////////////////////////////////////
 Drawer::Drawer(QWidget* parent)
-    : QObject(parent), parent_(parent), isPressed_(false),isEnabled_(false)
+    : QObject(parent), parent_(parent), isPressed_(false), isEnabled_(false), textEdit_(nullptr)
 {
     parent_->installEventFilter(this);
 }
@@ -388,6 +397,7 @@ bool Drawer::enable() const
 
 void Drawer::setMode(const DrawMode &drawMode)
 {
+    saveText();
     parent_->setCursor(drawMode.cursor());
     drawMode_ = drawMode;
 }
@@ -415,7 +425,7 @@ void Drawer::undo()
 void Drawer::onPaint(QPainter &painter)
 {
     // 当前绘制
-    if (isEnabled_ && !drawMode_.isNone()) {
+    if (isDraw()) {
         drawMode_.setPos(drawStartPos_, drawEndPos_);
         drawMode_.draw(painter);
     }
@@ -427,8 +437,40 @@ void Drawer::onPaint(QPainter &painter)
     }
 }
 
+void Drawer::showTextEdit(const QPoint &pos)
+{
+    if (!textEdit_) {
+        textEdit_ = new TextEdit(parent_);
+    }
+
+    if (drawMode_.painter()) {
+        textEdit_->setFont(drawMode_.painter()->font());
+    }
+
+    textEdit_->setStyle(drawMode_.pen().color());
+    textEdit_->move(pos - QPoint(2, 12));
+    textEdit_->setFocus();
+    textEdit_->show();
+}
+
+void Drawer::saveText()
+{
+    if (textEdit_ && textEdit_->isVisible()) {
+        QString text = textEdit_->toPlainText().trimmed();
+        if (!text.isEmpty()) {
+            QPoint start = textEdit_->startCursorPoint();
+            drawMode_.setText(QRectF(start.x(), start.y(), textEdit_->width(), textEdit_->height()), text);
+            drawModeCache_.push_back(drawMode_);
+            drawMode_.clear();
+        }
+        textEdit_->clear();
+        textEdit_->setVisible(false);
+    }
+}
+
 void Drawer::drawPixmap(QPixmap &pixmap)
 {
+    saveText();
     if (!drawModeCache_.isEmpty()) {
         QPainter painter(&pixmap);
         for (int i = 0; i < drawModeCache_.size(); i++) {
@@ -468,6 +510,15 @@ bool Drawer::onMousePressEvent(QMouseEvent *e)
 bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton) {
+        // 绘制文本
+        if (isDraw()) {
+            saveText();
+            if (drawMode_.shape() == DrawMode::Text) {
+                showTextEdit(e->pos());
+                return false;
+            }
+        }
+
         // 当前绘制结束，存档、清理
         if (isPressed_) {
             drawMode_.setPos(drawStartPos_, e->pos());
