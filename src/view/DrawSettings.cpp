@@ -11,16 +11,33 @@ QColor DrawSettings::s_currentColor = QColor("#FF0000");
 DrawSettings::DrawSettings(QWidget *parent)
     : QWidget(parent)
 {
+    this->setAutoFillBackground(true);
+
+    // draw pen width
+    QStringList penWidthList = QStringList() << "8" << "12" << "16";
+    QList<QPushButton*> penWidthBtns;
+    for (int i = 0; i < penWidthList.size(); i++){
+        int w = penWidthList.at(i).toInt();
+        QPushButton *btn = new QPushButton(this);
+        btn->setFixedSize(w, w);
+        btn->setStyleSheet(QString("QPushButton{background-color:%1; border:1px solid #808080;margin:1px;}\
+            QPushButton::hover{margin:0px;}").arg(s_currentColor.name()).arg(w / 2).arg(w / 2));
+        penWidthBtns.push_back(btn);
+    }
+
+    // font size
     sizeList_ = new QComboBox(this);
     sizeList_->addItems(QStringList() << "8" << "9" << "10" << "11" << "12" << "14" << "16" << "18" << "20" << "22");
     sizeList_->setCurrentText(QString::number(s_fontSize));
     connect(sizeList_, &QComboBox::currentTextChanged, this, &DrawSettings::onFontSizeChanged);
     
+    // current color
     pbCurrentColor_ = new QPushButton(this);
     pbCurrentColor_->setFixedSize(26, 26);
     pbCurrentColor_->setStyleSheet(QString("background-color:%1").arg(s_currentColor.name()));
     connect(pbCurrentColor_, &QPushButton::clicked, this, &DrawSettings::onCurrentColor);
 
+    // color select
     const QStringList colorList = QStringList() << "#000000" << "#808080" << "#800000" << "#F7883A" << "#308430" << "#385AD3" << "#800080" << "#009999"
         << "#FFFFFF" << "#C0C0C0" << "#FB3838" << "#FFFF00" << "#99CC00" << "#3894E4" << "#F31BF3" << "#16DCDC";
     QList<QPushButton*> colorBtns;
@@ -36,6 +53,9 @@ DrawSettings::DrawSettings(QWidget *parent)
     QHBoxLayout *mLayout = new QHBoxLayout(this);
     mLayout->setContentsMargins(6, 6, 6, 6);
     mLayout->setSpacing(6);
+    for (int i = 0; i < penWidthBtns.size(); i++) {
+        mLayout->addWidget(penWidthBtns[i]);
+    }
     mLayout->addWidget(sizeList_);
 
     QHBoxLayout *firstLineLayout = new QHBoxLayout(this);
@@ -61,7 +81,7 @@ DrawSettings::DrawSettings(QWidget *parent)
 
     mLayout->addLayout(colorLayout);
 
-    this->setFixedSize(226, 38);
+    this->setFixedSize(250, 38);
 }
 
 int DrawSettings::fontSize()
@@ -104,12 +124,4 @@ void DrawSettings::onColor()
         pbCurrentColor_->setStyleSheet(QString("background-color:%1").arg(s_currentColor.name()));
         emit sigChanged(s_fontSize, s_currentColor);
     }
-}
-
-void DrawSettings::keyPressEvent(QKeyEvent *event)
-{
-    if (event->key() == Qt::Key_Escape) {
-        hide();
-    }
-    QWidget::keyPressEvent(event);
 }

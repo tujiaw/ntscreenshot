@@ -137,7 +137,7 @@ private:
     Q_DISABLE_COPY(DrawPanel)
     QRect referRect_;
     QPushButton *pbFont_;
-    std::unique_ptr<DrawSettings> drawSettings_;
+    DrawSettings *drawSettings_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
     Drawer drawer_;
 };

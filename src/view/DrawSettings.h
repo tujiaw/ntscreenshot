@@ -20,9 +20,6 @@ public slots:
     void onCurrentColor();
     void onColor();
 
-protected:
-    virtual void keyPressEvent(QKeyEvent *event);
-
 private:
     QComboBox *sizeList_;
     QPushButton *pbCurrentColor_;

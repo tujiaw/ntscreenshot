@@ -20,10 +20,6 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     : QWidget(parent), drawer_(drawWidget)
 {    
     this->setObjectName("DrawPanel");
-    QHBoxLayout *hLayout = new QHBoxLayout(this);
-    hLayout->setContentsMargins(0, 0, 0, 0);
-    hLayout->setSpacing(0);
-    
     QButtonGroup* shapeGroup = new QButtonGroup(this);
     shapeGroup->setExclusive(false);
     connect(shapeGroup, SIGNAL(buttonClicked(QAbstractButton*)), this, SLOT(onShapeBtnClicked(QAbstractButton*)));
@@ -56,6 +52,10 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     pbFont_->setStyleSheet("font-size:18px;");
     pbFont_->setFixedSize(25, 25);
 
+    drawSettings_ = new DrawSettings(this);
+    connect(drawSettings_, &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
+    drawSettings_->setVisible(false);
+
     QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("折线"));
     QPushButton* pbLine = createShapeBtn(shapeGroup, ":/images/line.png", QStringLiteral("直线"));
     QPushButton* pbArrow = createShapeBtn(shapeGroup, ":/images/arrow.png", QStringLiteral("箭头"));
@@ -87,6 +87,9 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     btns_.push_back(qMakePair(pbEllipse, ellipseMode));
     btns_.push_back(qMakePair(pbText, textMode));
 
+    QHBoxLayout *hLayout = new QHBoxLayout();
+    hLayout->setContentsMargins(0, 0, 0, 0);
+    hLayout->setSpacing(0);
     hLayout->addWidget(pbFont_);
     for (int i = 0; i < btns_.size(); i++) {
         hLayout->addWidget(btns_[i].first);
@@ -96,6 +99,12 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     hLayout->addWidget(pbSticker);
     hLayout->addWidget(pbSave);
     hLayout->addWidget(pbFinished);
+
+    QVBoxLayout *mLayout = new QVBoxLayout(this);
+    mLayout->setContentsMargins(0, 0, 0, 0);
+    mLayout->setSpacing(0);
+    mLayout->addLayout(hLayout);
+    mLayout->addWidget(drawSettings_);
 
     if (!parent) {
         setWindowFlags(Qt::ToolTip);
@@ -170,26 +179,17 @@ void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
     } else {
         drawer_.setMode(DrawMode(DrawMode::None));
     }
-
-    if (drawSettings_ && drawSettings_->isVisible()) {
-        drawSettings_.reset();
-    }
 }
 
 void DrawPanel::onColorBtnClicked()
 {
-    if (drawSettings_ && drawSettings_->isVisible()) {
-        drawSettings_.reset();
-        return;
+    if (drawSettings_->isVisible()) {
+        drawSettings_->setVisible(false);
+        this->setFixedHeight(this->height() - drawSettings_->height());
+    } else {
+        drawSettings_->setVisible(true);
+        this->setFixedHeight(this->height() + drawSettings_->height());
     }
-
-    drawSettings_.reset(new DrawSettings());
-    connect(drawSettings_.get(), &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
-    drawSettings_->setWindowFlags(Qt::ToolTip);
-    QPoint pos = pbFont_->mapToGlobal(pbFont_->pos());
-    pos.setY(pos.y() + pbFont_->height());
-    drawSettings_->move(pos);
-    drawSettings_->show();
 }
 
 void DrawPanel::onSettingChanged(int fontSize, QColor color)
@@ -205,9 +205,6 @@ void DrawPanel::showEvent(QShowEvent *event)
 
 void DrawPanel::hideEvent(QHideEvent *event)
 {
-    if (drawSettings_) {
-        drawSettings_.reset();
-    }
     QWidget::hideEvent(event);
 }
 
