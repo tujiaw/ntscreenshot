@@ -7,6 +7,7 @@ static const QString SCREENSHOT_GLOBAL_KEY = "SCREENSHOT_GLOBAL_KEY";
 static const QString PIN_GLOBAL_KEY = "PIN_GLOBAL_KEY";
 static const QString UPLOAD_IMAGE_URL_KEY = "UPLOAD_IMAGE_URL_KEY";
 static const QString PIN_NO_BORDER = "PIN_NO_BORDER";
+static const QString RGB_COLOR = "RGB_COLOR";
 
 static bool defaultAutoStart = false;
 static QString defaultScreenshotGlobalKey = "F5";
@@ -92,4 +93,14 @@ void SettingModel::setPinNoBorder(bool enable)
 bool SettingModel::pinNoBorder() const
 {
     return settings_.value(PIN_NO_BORDER, false).toBool();
+}
+
+void SettingModel::setRgbColor(bool enable)
+{
+    settings_.setValue(RGB_COLOR, enable);
+}
+
+bool SettingModel::rgbColor() const
+{
+    return settings_.value(RGB_COLOR, true).toBool();
 }

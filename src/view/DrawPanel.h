@@ -5,11 +5,12 @@
 #include <QPoint>
 #include <QPen>
 #include <QBrush>
+#include <memory>
+#include "DrawSettings.h"
 
 class QPushButton;
 class QAbstractButton;
 class TextEdit;
-class DrawSettings;
 
 class DrawMode
 {
@@ -113,6 +114,7 @@ public:
     DrawMode getMode();
     void adjustPos();
     Drawer* drawer();
+    static int fontSize();
     static QColor currentColor();
 
 signals:
@@ -124,16 +126,18 @@ public slots:
     void onReferRectChanged(const QRect &rect);
     void onShapeBtnClicked(QAbstractButton*);
     void onColorBtnClicked();
+    void onSettingChanged(int fontSize, QColor color);
 
 protected:
     virtual void showEvent(QShowEvent *event);
+    virtual void hideEvent(QHideEvent *event);
     virtual void mouseReleaseEvent(QMouseEvent* event);
 
 private:
     Q_DISABLE_COPY(DrawPanel)
     QRect referRect_;
     QPushButton *pbFont_;
-    DrawSettings *drawSettings_;
+    std::unique_ptr<DrawSettings> drawSettings_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
     Drawer drawer_;
 };

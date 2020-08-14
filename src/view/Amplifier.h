@@ -7,7 +7,9 @@ class AmplifierWidget : public QWidget
     Q_OBJECT
 public:
     explicit AmplifierWidget(const std::shared_ptr<QPixmap> &originPainting, QWidget *parent = 0);
-    QColor getCursorPointColor() const;
+    QString getCursorPointColor() const;
+    void setRgbColor(bool yes) { isRgbColor_ = yes; }
+    bool rgbColor() const { return isRgbColor_; }
 
 public slots:
     void onSizeChanged(int w, int h);
@@ -22,6 +24,7 @@ private:
     QPoint cursorPoint_;
     int imageHeight_;
     QColor cursorPointColor_;
+    bool isRgbColor_;
     std::shared_ptr<QPixmap> originPainting_;
 };
 

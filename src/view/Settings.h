@@ -25,6 +25,7 @@ private:
     void onRevertClicked();
     void onTablePathDoubleClicked(int row, int col);
     void onUploadImageUrlChanged(const QString& text);
+    void onColorShowChanged();
 
 private:
     Q_DISABLE_COPY(Settings)

@@ -10,17 +10,14 @@
 #include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QMouseEvent>
-#include <QColorDialog>
 #include <QApplication>
 #include <QDesktopWidget>
 #include "component/TextEdit.h"
 #include "common/Constants.h"
 #include "common/Util.h"
-#include "DrawSettings.h"
 
-static QColor s_currentColor = Qt::red;
 DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
-    : QWidget(parent), drawer_(drawWidget), drawSettings_(nullptr)
+    : QWidget(parent), drawer_(drawWidget)
 {    
     this->setObjectName("DrawPanel");
     QHBoxLayout *hLayout = new QHBoxLayout(this);
@@ -56,7 +53,7 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
 
     pbFont_ = new QPushButton(QStringLiteral("¦¡"), this);
     connect(pbFont_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
-    pbFont_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
+    pbFont_->setStyleSheet("font-size:18px;");
     pbFont_->setFixedSize(25, 25);
 
     QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("ÕÛÏß"));
@@ -117,8 +114,10 @@ DrawMode DrawPanel::getMode()
             }
         }
     }
-    mode.pen().setColor(s_currentColor);
-    mode.brush().setColor(s_currentColor);
+    
+    mode.pen().setColor(DrawSettings::currentColor());
+    mode.brush().setColor(DrawSettings::currentColor());
+    mode.font().setPointSize(DrawSettings::fontSize());
     return mode;
 }
 
@@ -142,9 +141,14 @@ Drawer* DrawPanel::drawer()
     return &drawer_;
 }
 
+int DrawPanel::fontSize()
+{
+    return DrawSettings::fontSize();
+}
+
 QColor DrawPanel::currentColor()
 {
-    return s_currentColor;
+    return DrawSettings::currentColor();
 }
 
 void DrawPanel::onReferRectChanged(const QRect &rect)
@@ -168,43 +172,43 @@ void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
     }
 
     if (drawSettings_ && drawSettings_->isVisible()) {
-        delete drawSettings_;
-        drawSettings_ = nullptr;
-        return;
+        drawSettings_.reset();
     }
 }
 
 void DrawPanel::onColorBtnClicked()
 {
-    //QColorDialog dlg(s_currentColor, this);
-    //dlg.setStyleSheet("QPushButton{ width: 80px; height: 25px;};");
-    //if (QDialog::Accepted == dlg.exec()) {
-    //    s_currentColor = dlg.selectedColor();
-    //    pbFont_->setStyleSheet(QString("color:%1;font-size:18px;").arg(s_currentColor.name()));
-    //    drawer_.setMode(getMode());
-    //}
-
     if (drawSettings_ && drawSettings_->isVisible()) {
-        delete drawSettings_;
-        drawSettings_ = nullptr;
+        drawSettings_.reset();
         return;
     }
 
-    if (!drawSettings_) {
-        drawSettings_ = new DrawSettings();
-        drawSettings_->setWindowFlags(Qt::ToolTip);
-    }
-
+    drawSettings_.reset(new DrawSettings());
+    connect(drawSettings_.get(), &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
+    drawSettings_->setWindowFlags(Qt::ToolTip);
     QPoint pos = pbFont_->mapToGlobal(pbFont_->pos());
     pos.setY(pos.y() + pbFont_->height());
     drawSettings_->move(pos);
     drawSettings_->show();
 }
 
+void DrawPanel::onSettingChanged(int fontSize, QColor color)
+{
+    drawer_.setMode(getMode());
+}
+
 void DrawPanel::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     adjustPos();
+}
+
+void DrawPanel::hideEvent(QHideEvent *event)
+{
+    if (drawSettings_) {
+        drawSettings_.reset();
+    }
+    QWidget::hideEvent(event);
 }
 
 void DrawPanel::mouseReleaseEvent(QMouseEvent*event)

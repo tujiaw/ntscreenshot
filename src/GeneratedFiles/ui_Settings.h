@@ -20,6 +20,7 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
+#include <QtWidgets/QRadioButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
@@ -53,6 +54,12 @@ public:
     QLineEdit *leUploadImageUrl;
     QCheckBox *cbPinNoBorder;
     QCheckBox *checkBox;
+    QWidget *widget;
+    QHBoxLayout *horizontalLayout_8;
+    QLabel *label_8;
+    QRadioButton *rbRGB;
+    QRadioButton *rbHexadecimal;
+    QSpacerItem *horizontalSpacer_4;
     QSpacerItem *horizontalSpacer_3;
     QSpacerItem *verticalSpacer;
     QWidget *tab_3;
@@ -74,7 +81,7 @@ public:
     {
         if (Settings->objectName().isEmpty())
             Settings->setObjectName(QStringLiteral("Settings"));
-        Settings->resize(407, 254);
+        Settings->resize(408, 254);
         Settings->setMaximumSize(QSize(450, 279));
         verticalLayout = new QVBoxLayout(Settings);
         verticalLayout->setSpacing(6);
@@ -186,6 +193,35 @@ public:
 
         verticalLayout_2->addWidget(checkBox);
 
+        widget = new QWidget(tab);
+        widget->setObjectName(QStringLiteral("widget"));
+        horizontalLayout_8 = new QHBoxLayout(widget);
+        horizontalLayout_8->setSpacing(6);
+        horizontalLayout_8->setContentsMargins(11, 11, 11, 11);
+        horizontalLayout_8->setObjectName(QStringLiteral("horizontalLayout_8"));
+        horizontalLayout_8->setContentsMargins(0, 0, 20, 0);
+        label_8 = new QLabel(widget);
+        label_8->setObjectName(QStringLiteral("label_8"));
+
+        horizontalLayout_8->addWidget(label_8);
+
+        rbRGB = new QRadioButton(widget);
+        rbRGB->setObjectName(QStringLiteral("rbRGB"));
+
+        horizontalLayout_8->addWidget(rbRGB);
+
+        rbHexadecimal = new QRadioButton(widget);
+        rbHexadecimal->setObjectName(QStringLiteral("rbHexadecimal"));
+
+        horizontalLayout_8->addWidget(rbHexadecimal);
+
+        horizontalSpacer_4 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayout_8->addItem(horizontalSpacer_4);
+
+
+        verticalLayout_2->addWidget(widget);
+
         horizontalSpacer_3 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         verticalLayout_2->addItem(horizontalSpacer_3);
@@ -290,6 +326,9 @@ public:
         label_6->setText(QApplication::translate("Settings", "\345\233\276\345\272\212\345\234\260\345\235\200\357\274\232", Q_NULLPTR));
         cbPinNoBorder->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\346\227\240\350\276\271\346\241\206", Q_NULLPTR));
         checkBox->setText(QApplication::translate("Settings", "\351\223\276\346\216\245\345\244\215\345\210\266\346\210\220Markdown\346\240\274\345\274\217", Q_NULLPTR));
+        label_8->setText(QApplication::translate("Settings", "\351\242\234\350\211\262\346\240\274\345\274\217\346\230\276\347\244\272\357\274\232", Q_NULLPTR));
+        rbRGB->setText(QApplication::translate("Settings", "RGB", Q_NULLPTR));
+        rbHexadecimal->setText(QApplication::translate("Settings", "\345\215\201\345\205\255\350\277\233\345\210\266", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("Settings", "\345\270\270\350\247\204\350\256\276\347\275\256", Q_NULLPTR));
         label_7->setText(QApplication::translate("Settings", "\346\217\220\347\244\272\357\274\232\351\274\240\346\240\207\345\267\246\351\224\256\345\217\214\345\207\273\345\217\257\345\244\215\345\210\266\350\267\257\345\276\204\345\210\260\345\211\252\345\210\207\346\235\277\343\200\202", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("Settings", "\350\267\257\345\276\204", Q_NULLPTR));

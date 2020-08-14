@@ -24,6 +24,8 @@ Settings::Settings(QWidget *parent)
     connect(ui.cbPinNoBorder, &QCheckBox::clicked, this, &Settings::onPinNoBorder);
     connect(ui.pbRevert, &QPushButton::clicked, this, &Settings::onRevertClicked);
     connect(ui.leUploadImageUrl, &QLineEdit::textChanged, this, &Settings::onUploadImageUrlChanged);
+    connect(ui.rbRGB, &QPushButton::clicked, this, &Settings::onColorShowChanged);
+    connect(ui.rbHexadecimal, &QPushButton::clicked, this, &Settings::onColorShowChanged);
 
     readData();
     setFixedSize(400, 280);
@@ -41,6 +43,8 @@ void Settings::readData()
     ui.leScreenshot->setText(setting->screenhotGlobalKey());
     ui.lePin->setText(setting->pinGlobalKey());
     ui.leUploadImageUrl->setText(setting->uploadImageUrl());
+    ui.rbRGB->setChecked(setting->rgbColor());
+    ui.rbHexadecimal->setChecked(!setting->rgbColor());
 }
 
 void Settings::writeData()
@@ -145,4 +149,13 @@ void Settings::onTablePathDoubleClicked(int row, int col)
 void Settings::onUploadImageUrlChanged(const QString& text)
 {
     WindowManager::instance()->setting()->setUploadImageUrl(text);
+}
+
+void Settings::onColorShowChanged()
+{
+    if (ui.rbRGB->isChecked()) {
+        WindowManager::instance()->setting()->setRgbColor(true);
+    } else {
+        WindowManager::instance()->setting()->setRgbColor(false);
+    }
 }

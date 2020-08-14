@@ -28,6 +28,9 @@ public:
     void setPinNoBorder(bool enable);
     bool pinNoBorder() const;
 
+    void setRgbColor(bool enable);
+    bool rgbColor() const;
+
 private:
     Q_DISABLE_COPY(SettingModel)
     QSettings settings_;

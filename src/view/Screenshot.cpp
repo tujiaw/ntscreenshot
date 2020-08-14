@@ -32,6 +32,8 @@ static QString UPLOAD_IMAGE_URL = "";
 static const int MARKERT_WIDTH = 4;
 // 边框感知宽度
 static int BORDER_ESTHESIA_WIDTH = 6;
+// 颜色显示RGB格式
+static bool IS_RGB_COLOR = true;
 
 ScreenshotWidget::ScreenshotWidget(QWidget *parent) 
     : QWidget(parent),
@@ -83,6 +85,11 @@ void ScreenshotWidget::setUploadImageUrl(const QString &url)
     UPLOAD_IMAGE_URL = url;
 }
 
+void ScreenshotWidget::setRgbColor(bool yes)
+{
+    IS_RGB_COLOR = yes;
+}
+
 void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *)
 {
     emit sigDoubleClick();
@@ -98,6 +105,7 @@ void ScreenshotWidget::initAmplifier(std::shared_ptr<QPixmap> originPainting)
 
     amplifierTool_.reset(new AmplifierWidget(pixmap, this));
     connect(this,SIGNAL(sigCursorPosChanged(int,int)), amplifierTool_.get(), SLOT(onPositionChanged(int,int)));
+    amplifierTool_->setRgbColor(IS_RGB_COLOR);
     amplifierTool_->show();
     amplifierTool_->raise();
 }
@@ -318,9 +326,7 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
     } else if (e->key() == Qt::Key_C) {
         if (amplifierTool_ && amplifierTool_->isVisible()) {
             QClipboard *clipboard = QApplication::clipboard();
-            QColor color = amplifierTool_->getCursorPointColor();
-            QString text = QString("RGB(%1, %2, %3)").arg(color.red()).arg(color.green()).arg(color.blue());
-            clipboard->setText(text);
+            clipboard->setText(amplifierTool_->getCursorPointColor());
             return;
         }
     }
@@ -695,7 +701,6 @@ void SelectedScreenWidget::onSaveScreen(void)
     /// 退出当前截图工具
     quitScreenshot();
 }
-
 
 void SelectedScreenWidget::quitScreenshot(void) 
 {

@@ -17,9 +17,15 @@ AmplifierWidget::AmplifierWidget(const std::shared_ptr<QPixmap> &originPainting,
     hide();
 }
 
-QColor AmplifierWidget::getCursorPointColor() const
+QString AmplifierWidget::getCursorPointColor() const
 {
-    return cursorPointColor_;
+    QString colorInfo;
+    if (isRgbColor_) {
+        colorInfo = QString("RGB(%1, %2, %3)").arg(cursorPointColor_.red()).arg(cursorPointColor_.green()).arg(cursorPointColor_.blue());
+    } else {
+        colorInfo = cursorPointColor_.name().toUpper();
+    }
+    return colorInfo;
 }
 
 void AmplifierWidget::onSizeChanged(int w, int h) 
@@ -101,8 +107,7 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
             .arg(QCursor::pos().x()).arg(QCursor::pos().y());
     QFontMetrics fm = painter.fontMetrics();
     int posInfoWidth = fm.width(posInfo);
-
-    QString colorInfo = QString("RGB(%1, %2, %3)") .arg(cursorPointColor_.red()) .arg(cursorPointColor_.green()) .arg(cursorPointColor_.blue());
+    
     const QSize COLOR_RECT_SIZE(15, 10);
     const int SPACING = 4;
     // 绘制坐标轴相关数据
@@ -111,5 +116,5 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     int y = imageHeight_ + fm.height();
     painter.drawText(QPoint(x, y), posInfo);
     y += fm.height();
-    painter.drawText(QPoint(x, y), colorInfo);
+    painter.drawText(QPoint(x, y), getCursorPointColor());
 }

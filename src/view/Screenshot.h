@@ -21,6 +21,7 @@ public:
     void pin();
     static void setPinGlobalKey(const QString &key);
     static void setUploadImageUrl(const QString &url);
+    static void setRgbColor(bool yes);
 
 signals:
     void sigReopen();
