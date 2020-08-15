@@ -6,24 +6,33 @@
 #include <QColorDialog>
 #include <QKeyEvent>
 
-int DrawSettings::s_fontSize = 12;
-QColor DrawSettings::s_currentColor = QColor("#FF0000");
+const QList<int> s_penWidthList = { 1, 3, 6 };
+static int s_penWidth = s_penWidthList[1];
+static int s_fontSize = 12;
+static QColor s_currentColor = QColor("#FF0000");
+
 DrawSettings::DrawSettings(QWidget *parent)
     : QWidget(parent)
 {
     this->setAutoFillBackground(true);
 
     // draw pen width
-    QStringList penWidthList = QStringList() << "8" << "12" << "16";
-    QList<QPushButton*> penWidthBtns;
-    for (int i = 0; i < penWidthList.size(); i++){
-        int w = penWidthList.at(i).toInt();
+    for (int i = 0; i < s_penWidthList.size(); i++){
+        int w = s_penWidthList.at(i);
         QPushButton *btn = new QPushButton(this);
-        btn->setFixedSize(w, w);
-        btn->setStyleSheet(QString("QPushButton{background-color:%1; border:1px solid #808080;margin:1px;}\
-            QPushButton::hover{margin:0px;}").arg(s_currentColor.name()).arg(w / 2).arg(w / 2));
-        penWidthBtns.push_back(btn);
+        connect(btn, &QPushButton::clicked, this, &DrawSettings::onPenWidthSelected);
+        btn->setFixedSize(w*2 + 5, w*2 + 5);
+        btn->setCheckable(true);
+        btn->setProperty("value", w);
+        QStringList styleList;
+        styleList << QString("QPushButton{background-color:#fff;margin:1px;}");
+        styleList << QString("QPushButton::hover{margin: 0px;}");
+        styleList << QString("QPushButton::checked{margin: 0px; border:2px solid #808080;}");
+        btn->setStyleSheet(styleList.join(""));
+        btn->setChecked(w == s_penWidth);
+        penWidthBtns_.push_back(btn);
     }
+    onPenWidthSelected();
 
     // font size
     sizeList_ = new QComboBox(this);
@@ -53,8 +62,8 @@ DrawSettings::DrawSettings(QWidget *parent)
     QHBoxLayout *mLayout = new QHBoxLayout(this);
     mLayout->setContentsMargins(6, 6, 6, 6);
     mLayout->setSpacing(6);
-    for (int i = 0; i < penWidthBtns.size(); i++) {
-        mLayout->addWidget(penWidthBtns[i]);
+    for (int i = 0; i < penWidthBtns_.size(); i++) {
+        mLayout->addWidget(penWidthBtns_[i]);
     }
     mLayout->addWidget(sizeList_);
 
@@ -84,6 +93,11 @@ DrawSettings::DrawSettings(QWidget *parent)
     this->setFixedSize(250, 38);
 }
 
+int DrawSettings::penWidth()
+{
+    return s_penWidth;
+}
+
 int DrawSettings::fontSize()
 {
     return s_fontSize;
@@ -100,7 +114,7 @@ void DrawSettings::onFontSizeChanged(const QString &text)
     int size = text.toInt(&ok);
     if (ok) {
         s_fontSize = size;
-        emit sigChanged(s_fontSize, s_currentColor);
+        emit sigChanged(s_penWidth, s_fontSize, s_currentColor);
     }
 }
 
@@ -111,7 +125,7 @@ void DrawSettings::onCurrentColor()
     if (QDialog::Accepted == dlg.exec()) {
         s_currentColor = dlg.selectedColor();
         pbCurrentColor_->setStyleSheet(QString("background-color:%1").arg(s_currentColor.name()));
-        emit sigChanged(s_fontSize, s_currentColor);
+        emit sigChanged(s_penWidth, s_fontSize, s_currentColor);
     }
 }
 
@@ -122,6 +136,23 @@ void DrawSettings::onColor()
         QString color = btn->property("color").toString();
         s_currentColor = QColor(color);
         pbCurrentColor_->setStyleSheet(QString("background-color:%1").arg(s_currentColor.name()));
-        emit sigChanged(s_fontSize, s_currentColor);
+        emit sigChanged(s_penWidth, s_fontSize, s_currentColor);
     }
+}
+
+void DrawSettings::onPenWidthSelected()
+{
+    QPushButton* btn = qobject_cast<QPushButton*>(sender());
+    if (!btn) {
+        return;
+    }
+
+    btn->setChecked(true);
+    s_penWidth = btn->property("value").toInt();
+    for (int i = 0; i < penWidthBtns_.size(); i++) {
+        if (penWidthBtns_[i] != btn) {
+            penWidthBtns_[i]->setChecked(false);
+        }
+    }
+    emit sigChanged(s_penWidth, s_fontSize, s_currentColor);
 }

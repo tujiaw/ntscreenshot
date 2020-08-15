@@ -43,16 +43,12 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
 
 
     this->setFocusPolicy(Qt::StrongFocus);
-    interval_handle_once(100, [this]() {
-        emit WindowManager::instance()->sigStickerCountChanged();
-    });
+    emit WindowManager::instance()->sigStickerCountChanged();
 }
 
 StickerWidget::~StickerWidget()
 {
-    interval_handle_once(100, [this]() {
-        emit WindowManager::instance()->sigStickerCountChanged();
-    });
+    emit WindowManager::instance()->sigStickerCountChanged();
 }
 
 void StickerWidget::flush()

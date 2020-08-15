@@ -105,11 +105,14 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     mLayout->setSpacing(0);
     mLayout->addLayout(hLayout);
     mLayout->addWidget(drawSettings_);
+    mLayout->addStretch();
 
     if (!parent) {
         setWindowFlags(Qt::ToolTip);
         pbSticker->hide();
     }
+
+    this->setFixedHeight(25);
 }
 
 DrawMode DrawPanel::getMode()
@@ -125,6 +128,7 @@ DrawMode DrawPanel::getMode()
     }
     
     mode.pen().setColor(DrawSettings::currentColor());
+    mode.pen().setWidth(DrawSettings::penWidth());
     mode.brush().setColor(DrawSettings::currentColor());
     mode.font().setPointSize(DrawSettings::fontSize());
     return mode;
@@ -230,7 +234,7 @@ DrawMode::DrawMode(Shape shape)
 void DrawMode::init()
 {
     pen_.setColor(Qt::red);
-    pen_.setWidth(2);
+    pen_.setWidth(3);
     brush_.setColor(Qt::red);
     brush_.setStyle(Qt::NoBrush);
     if (shape_ == None) {
@@ -345,7 +349,7 @@ void DrawMode::drawLine(const QPoint& startPoint, const QPoint& endPoint, QPaint
 void DrawMode::drawArrows(const QPoint& startPoint, const QPoint& endPoint, QPainter &painter)
 {
     // 箭头部分三角形的腰长
-    double par = 15.0;
+    double par = pen_.width() * 6;
     double slopy = atan2((endPoint.y() - startPoint.y()), (endPoint.x() - startPoint.x()));
     double cos_y = cos(slopy);
     double sin_y = sin(slopy);
