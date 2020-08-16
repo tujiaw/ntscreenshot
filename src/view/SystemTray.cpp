@@ -24,8 +24,8 @@ SystemTray::SystemTray(QWidget *parent)
 	this->setContextMenu(menu_);
 
     onUpdate();
-    connect(WindowManager::instance(), &WindowManager::sigSettingChanged, this, &SystemTray::onUpdate);
-    connect(WindowManager::instance(), &WindowManager::sigStickerCountChanged, this, &SystemTray::onUpdate);
+    connect(WindowManager::instance(), &WindowManager::sigSettingChanged, this, &SystemTray::onUpdate, Qt::QueuedConnection);
+    connect(WindowManager::instance(), &WindowManager::sigStickerCountChanged, this, &SystemTray::onUpdate, Qt::QueuedConnection);
 }
 
 SystemTray::~SystemTray()

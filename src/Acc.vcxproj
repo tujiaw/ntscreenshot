@@ -661,14 +661,37 @@
     <ClCompile Include="GeneratedFiles\Debug\moc_Screenshot.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_SettingModel.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_Settings.cpp" />
-    <ClCompile Include="GeneratedFiles\Debug\moc_Stickers.cpp" />
-    <ClCompile Include="GeneratedFiles\Debug\moc_SystemTray.cpp" />
+    <ClCompile Include="GeneratedFiles\Debug\moc_Stickers.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_SystemTray.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_TextEdit.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_TipsWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_TitleWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_WindowManager.cpp" />
     <ClCompile Include="GeneratedFiles\qrc_darkstyle.cpp" />
     <ClCompile Include="GeneratedFiles\qrc_ntscreenshot.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Amplifier.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_DrawPanel.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_DrawSettings.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_FramelessWidget.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_HttpRequest.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_ImageButton.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_MainWidget.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_qxtglobalshortcut.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Screenshot.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_SettingModel.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Settings.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Stickers.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_SystemTray.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_TipsWidget.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_TitleWidget.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_WindowManager.cpp" />
     <ClCompile Include="main\main.cpp" />
     <ClCompile Include="model\SettingModel.cpp" />
     <ClCompile Include="view\Amplifier.cpp" />
