@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>408</width>
-    <height>254</height>
+    <height>279</height>
    </rect>
   </property>
   <property name="maximumSize">
@@ -188,7 +188,7 @@
           <item>
            <widget class="QLabel" name="label_8">
             <property name="text">
-             <string>颜色格式显示：</string>
+             <string>颜色格式显示(C键复制颜色)：</string>
             </property>
            </widget>
           </item>

@@ -81,7 +81,7 @@ public:
     {
         if (Settings->objectName().isEmpty())
             Settings->setObjectName(QStringLiteral("Settings"));
-        Settings->resize(408, 254);
+        Settings->resize(408, 279);
         Settings->setMaximumSize(QSize(450, 279));
         verticalLayout = new QVBoxLayout(Settings);
         verticalLayout->setSpacing(6);
@@ -326,7 +326,7 @@ public:
         label_6->setText(QApplication::translate("Settings", "\345\233\276\345\272\212\345\234\260\345\235\200\357\274\232", Q_NULLPTR));
         cbPinNoBorder->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\346\227\240\350\276\271\346\241\206", Q_NULLPTR));
         checkBox->setText(QApplication::translate("Settings", "\351\223\276\346\216\245\345\244\215\345\210\266\346\210\220Markdown\346\240\274\345\274\217", Q_NULLPTR));
-        label_8->setText(QApplication::translate("Settings", "\351\242\234\350\211\262\346\240\274\345\274\217\346\230\276\347\244\272\357\274\232", Q_NULLPTR));
+        label_8->setText(QApplication::translate("Settings", "\351\242\234\350\211\262\346\240\274\345\274\217\346\230\276\347\244\272(C\351\224\256\345\244\215\345\210\266\351\242\234\350\211\262)\357\274\232", Q_NULLPTR));
         rbRGB->setText(QApplication::translate("Settings", "RGB", Q_NULLPTR));
         rbHexadecimal->setText(QApplication::translate("Settings", "\345\215\201\345\205\255\350\277\233\345\210\266", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("Settings", "\345\270\270\350\247\204\350\256\276\347\275\256", Q_NULLPTR));

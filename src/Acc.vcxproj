@@ -651,7 +651,10 @@
     <ClCompile Include="component\TipsWidget.cpp" />
     <ClCompile Include="component\TitleWidget.cpp" />
     <ClCompile Include="controller\WindowManager.cpp" />
-    <ClCompile Include="GeneratedFiles\Debug\moc_Amplifier.cpp" />
+    <ClCompile Include="GeneratedFiles\Debug\moc_Amplifier.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_DrawPanel.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -679,7 +682,10 @@
     <ClCompile Include="GeneratedFiles\Debug\moc_WindowManager.cpp" />
     <ClCompile Include="GeneratedFiles\qrc_darkstyle.cpp" />
     <ClCompile Include="GeneratedFiles\qrc_ntscreenshot.cpp" />
-    <ClCompile Include="GeneratedFiles\Release\moc_Amplifier.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Amplifier.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_DrawPanel.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

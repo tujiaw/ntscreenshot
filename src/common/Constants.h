@@ -19,8 +19,6 @@ namespace Style {
 	const int STICKER_BORDER_WIDTH = 2;
     const QSize OERECT_FIXED_SIZE(95, 25);
     const QColor OERECT_BACKGROUND(0, 0, 0, 0);
-    const QSize OEAMPLIFIER_SIZE(150, 150);
-    const int OEAMPLIFIER_IMAGE_HEIGHT = 110;
 }
 
 #endif // CONSTANTS_H_

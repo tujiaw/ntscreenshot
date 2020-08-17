@@ -7,13 +7,15 @@
 #include <QDebug>
 #include "common/Constants.h"
 
+const QSize IMAGE_SIZE(30, 22);
+const int MULTIPLE = 4;
 AmplifierWidget::AmplifierWidget(const std::shared_ptr<QPixmap> &originPainting, QWidget *parent) 
     : QWidget(parent), originPainting_(originPainting)
 {
     setWindowFlags(Qt::FramelessWindowHint|Qt::WindowSystemMenuHint);
     setMouseTracking(true);
-    imageHeight_ = Style::OEAMPLIFIER_IMAGE_HEIGHT;
-    setFixedSize(Style::OEAMPLIFIER_SIZE);
+    imageHeight_ = IMAGE_SIZE.height() * MULTIPLE;
+    setFixedSize(IMAGE_SIZE.width() * MULTIPLE, imageHeight_ + 34);
     hide();
 }
 
@@ -57,22 +59,21 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     // 绘制背景
-    painter.fillRect(rect(), QColor(0, 0, 0, 160));
+    painter.fillRect(rect(), QColor(0, 0, 0, 200));
     QPixmap endPointImage;
     // 绘制放大图;
     const QSize& parent_size = parentWidget()->size();
     
-    // 在屏幕边缘绘制放大图时会出现图片拉伸
-    // 这里暂时做了边缘检测，若是屏幕边缘则不进行放大图的绘制，和QQ截图的采取方式是一致的。
-    //
-    // 颜色还是照样识别，但是局部放大的效果暂时禁用
-    //
-    // 解决方法，可以发现边缘时，将不能放大的地方，不描绘，或填充黑色，以避免图片被非预期的拉伸问题。
-    if ((cursorPoint_.x() + 15 < parent_size.width() && cursorPoint_.x() - 15 > 0)
-      && (cursorPoint_.y() + 11 < parent_size.height() && cursorPoint_.y() - 11 > 0)) {
-        endPointImage = originPainting_->copy(QRect(cursorPoint_.x() - 15, cursorPoint_.y() - 11, 30, 22)).scaled(width(), imageHeight_);
+    int mx = IMAGE_SIZE.width() / 2;
+    int my = IMAGE_SIZE.height() / 2;
+    if ((cursorPoint_.x() + mx < parent_size.width() && cursorPoint_.x() - mx > 0)
+        && (cursorPoint_.y() + my < parent_size.height() && cursorPoint_.y() - my > 0)) {
+        endPointImage = originPainting_->copy(QRect(cursorPoint_.x() - mx, cursorPoint_.y() - my, IMAGE_SIZE.width(), IMAGE_SIZE.height()))
+            .scaled(width() - 2, imageHeight_ - 2);
     } else {
-        endPointImage = originPainting_->copy(QRect(cursorPoint_.x() - 15, cursorPoint_.y() - 11, 30, 22));
+        // 光标在屏幕边缘
+        endPointImage = originPainting_->copy(QRect(cursorPoint_.x(), cursorPoint_.y(), IMAGE_SIZE.width(), IMAGE_SIZE.height()))
+        .scaled(width() - 2, imageHeight_ - 2);
     }
     painter.drawPixmap(0, 0, endPointImage);
 
@@ -81,10 +82,10 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     cursorPointColor_ = image.pixel(cursorPoint_);
 
     /// 绘制十字
-    const int PEN_WIDTH = 4;
+    const int PEN_WIDTH = MULTIPLE;
     painter.setPen(QPen(QColor(0, 180, 255, 180), PEN_WIDTH));
     // 竖线;
-    painter.drawLine(QPoint((width() >> 1) + 1, 0), QPoint((width() >> 1) + 1, imageHeight_ - 4));
+    painter.drawLine(QPoint((width() >> 1) + 1, 0), QPoint((width() >> 1) + 1, imageHeight_ - MULTIPLE));
     // 横线;
     painter.drawLine(QPoint(0, (imageHeight_ >> 1) + 1), QPoint(height(), (imageHeight_ >> 1) + 1));
 
@@ -103,18 +104,14 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     painter.drawRect(0,0,width()-1,height()-1);
 
     // 当前选中矩形的宽高信息;
-    QString posInfo = QStringLiteral("POS(%1 x %2)")
-            .arg(QCursor::pos().x()).arg(QCursor::pos().y());
-    QFontMetrics fm = painter.fontMetrics();
-    int posInfoWidth = fm.width(posInfo);
+    QString posInfo = QStringLiteral("%1 x %2").arg(QCursor::pos().x()).arg(QCursor::pos().y());
     
-    const QSize COLOR_RECT_SIZE(15, 10);
     const int SPACING = 4;
     // 绘制坐标轴相关数据
     painter.setPen(Qt::white);
     int x = SPACING;
-    int y = imageHeight_ + fm.height();
+    int y = imageHeight_ + painter.font().pointSize() + SPACING;
     painter.drawText(QPoint(x, y), posInfo);
-    y += fm.height();
+    y += painter.font().pointSize() + SPACING;
     painter.drawText(QPoint(x, y), getCursorPointColor());
 }
