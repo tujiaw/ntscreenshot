@@ -47,14 +47,13 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
         return pb;
     };
 
-    pbFont_ = new QPushButton(QStringLiteral("¶°"), this);
-    connect(pbFont_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
-    pbFont_->setStyleSheet("font-size:18px;");
+    pbFont_ = new QPushButton(QIcon(":/images/setting.png"), "", this);
     pbFont_->setFixedSize(25, 25);
+    connect(pbFont_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
 
     drawSettings_ = new DrawSettings(this);
-    connect(drawSettings_, &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
     drawSettings_->setVisible(false);
+    connect(drawSettings_, &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
 
     QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("’€œﬂ"));
     QPushButton* pbLine = createShapeBtn(shapeGroup, ":/images/line.png", QStringLiteral("÷±œﬂ"));

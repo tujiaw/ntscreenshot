@@ -23,5 +23,6 @@
         <file>images/polyline.png</file>
         <file>images/text.png</file>
         <file>images/tips.png</file>
+        <file>images/setting.png</file>
     </qresource>
 </RCC>

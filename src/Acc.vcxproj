@@ -306,6 +306,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </Image>
+    <Image Include="resource\images\setting.png" />
     <Image Include="resource\images\shield.png">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -651,7 +652,10 @@
     <ClCompile Include="component\TitleWidget.cpp" />
     <ClCompile Include="controller\WindowManager.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_Amplifier.cpp" />
-    <ClCompile Include="GeneratedFiles\Debug\moc_DrawPanel.cpp" />
+    <ClCompile Include="GeneratedFiles\Debug\moc_DrawPanel.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_DrawSettings.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_FramelessWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_HttpRequest.cpp" />
@@ -676,8 +680,10 @@
     <ClCompile Include="GeneratedFiles\qrc_darkstyle.cpp" />
     <ClCompile Include="GeneratedFiles\qrc_ntscreenshot.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_Amplifier.cpp" />
-    <ClCompile Include="GeneratedFiles\Release\moc_DrawPanel.cpp" />
-    <ClCompile Include="GeneratedFiles\Release\moc_DrawSettings.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_DrawPanel.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_FramelessWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_HttpRequest.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_ImageButton.cpp" />
@@ -688,7 +694,6 @@
     <ClCompile Include="GeneratedFiles\Release\moc_Settings.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_Stickers.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_SystemTray.cpp" />
-    <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_TipsWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_TitleWidget.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_WindowManager.cpp" />
@@ -777,7 +782,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties lreleaseOptions="" lupdateOnBuild="0" lupdateOptions="" MocDir=".\GeneratedFiles\$(ConfigurationName)" MocOptions="" Qt5Version_x0020_Win32="msvc2013" Qt5Version_x0020_x64="msvc2013_64" RccDir=".\GeneratedFiles" UicDir=".\GeneratedFiles" />
+      <UserProperties MocDir=".\GeneratedFiles\$(ConfigurationName)" UicDir=".\GeneratedFiles" RccDir=".\GeneratedFiles" lupdateOptions="" lupdateOnBuild="0" lreleaseOptions="" Qt5Version_x0020_Win32="Qt5.6.3" Qt5Version_x0020_x64="msvc2013_64" MocOptions="" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

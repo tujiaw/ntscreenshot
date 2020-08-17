@@ -133,9 +133,6 @@
     <ClCompile Include="GeneratedFiles\Release\moc_DrawPanel.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\Release\moc_DrawSettings.cpp">
-      <Filter>Generated Files\Release</Filter>
-    </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_FramelessWidget.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
@@ -164,9 +161,6 @@
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_SystemTray.cpp">
-      <Filter>Generated Files\Release</Filter>
-    </ClCompile>
-    <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_TipsWidget.cpp">
@@ -363,6 +357,9 @@
     </Image>
     <Image Include="resource\images\shield_hover.png">
       <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\images\setting.png">
+      <Filter>Resource Files\images</Filter>
     </Image>
   </ItemGroup>
   <ItemGroup>
