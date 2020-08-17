@@ -58,10 +58,15 @@ void StickerWidget::flush()
     }
 }
 
+bool StickerWidget::hasBorder()
+{
+    return !WindowManager::instance()->setting()->pinNoBorder();
+}
+
 void StickerWidget::popup(const QPixmap &pixmap, const QPoint &pos)
 {
     FramelessWidget* widget = new FramelessWidget();
-	widget->setEnableHighlight(!WindowManager::instance()->setting()->pinNoBorder());
+	widget->setEnableHighlight(hasBorder());
     StickerWidget* content = new StickerWidget(pixmap, widget);
     widget->setContent(content);
     widget->resize(pixmap.size());

@@ -18,6 +18,8 @@ public:
 	void setEnableHighlight(bool enable);
 	bool enableHightlight() const;
     void setBackground(const QPixmap &pixmap);
+    void setActiveStyle();
+    void setDeactiveStyle();
 
 protected:
 	void mousePressEvent(QMouseEvent *event);

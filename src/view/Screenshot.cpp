@@ -320,6 +320,7 @@ void ScreenshotWidget::updateMouse(void) {
 }
     
 void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
+    int left = 0, top = 0, right = 0, bottom = 0;
     if (e->key() == Qt::Key_Escape) {
         emit sigClose();
         return;
@@ -329,10 +330,39 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
             clipboard->setText(amplifierTool_->getCursorPointColor());
             return;
         }
+    } else if (e->key() == Qt::Key_Left || e->key() == Qt::Key_A) {
+        left = -1;
+        right = e->modifiers() & Qt::ShiftModifier ? 0 : -1;
+    } else if (e->key() == Qt::Key_Right || e->key() == Qt::Key_D) {
+        right = 1;
+        left = e->modifiers() & Qt::ShiftModifier ? 0 : 1;
+    } else if (e->key() == Qt::Key_Up || e->key() == Qt::Key_W) {
+        top = -1;
+        bottom = e->modifiers() & Qt::ShiftModifier ? 0 : -1;
+    } else if (e->key() == Qt::Key_Down || e->key() == Qt::Key_S) {
+        bottom = 1;
+        top = e->modifiers() & Qt::ShiftModifier ? 0 : 1;
     }
 
     if (selectedScreen_) {
         selectedScreen_->onKeyEvent(e);
+        selectedScreen_->onSelectRectChanged(left, top, right, bottom);
+        selectedScreen_->moveDrawPanel();
+    } else {
+        QPoint p(0, 0);
+        if (left != 0) {
+            p.setX(left);
+        } else if (right != 0) {
+            p.setX(right);
+        } else if (top != 0) {
+            p.setY(top);
+        } else if (bottom != 0) {
+            p.setY(bottom);
+        }
+        if (!p.isNull()) {
+            QCursor cursor;
+            cursor.setPos(cursor.pos() + p);
+        }
     }
 
     e->ignore();
@@ -428,6 +458,21 @@ void SelectedScreenWidget::showDrawPanel()
 void SelectedScreenWidget::moveDrawPanel()
 {
     drawPanel_.onReferRectChanged(QRect(this->pos(), this->size()));
+}
+
+QPoint SelectedScreenWidget::fixPos(QPoint p)
+{
+    if (p.x() < 0) {
+        p.setX(0);
+    } else if (p.x() + this->width() > QApplication::desktop()->rect().width()) {
+        p.setX(QApplication::desktop()->rect().width() - this->width());
+    }
+    if (p.y() < 0) {
+        p.setY(0);
+    } else if (p.y() + this->height() > QApplication::desktop()->rect().height()) {
+        p.setY(QApplication::desktop()->rect().height() - this->height());
+    }
+    return p;
 }
 
 void SelectedScreenWidget::updateCursorDir(const QPoint &cursor) {
@@ -563,17 +608,7 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
             // 鼠标按下移动选区
             if ((e->globalPos() - movePos_).manhattanLength() > QApplication::startDragDistance()) {
                 QPoint newPos = e->globalPos() - movePos_;
-                if (newPos.x() < 0) {
-                    newPos.setX(0);
-                } else if (newPos.x() + this->width() > QApplication::desktop()->rect().width()) {
-                    newPos.setX(QApplication::desktop()->rect().width() - this->width());
-                }
-                if (newPos.y() < 0) {
-                    newPos.setY(0);
-                } else if (newPos.y() + this->height() > QApplication::desktop()->rect().height()) {
-                    newPos.setY(QApplication::desktop()->rect().height() - this->height());
-                }
-                move(newPos);
+                move(fixPos(newPos));
                 movePos_ = e->globalPos() - pos();
                 moveDrawPanel();
             }
@@ -677,6 +712,10 @@ void SelectedScreenWidget::onSticker()
     }
 
     QPoint pos(currentRect_.x(), currentRect_.y());
+    if (StickerWidget::hasBorder()) {
+        pos -= QPoint(1, 1);
+    }
+    
     quitScreenshot();
     // 使用QTimer在主屏幕退出后再弹出贴图，否则在任务栏时贴图会显示在任务栏下面
     // 等待quitScreenshot的事件完成，放弃当前环境执行，等待下一个QTimer事件再执行
@@ -705,6 +744,22 @@ void SelectedScreenWidget::onSaveScreen(void)
 void SelectedScreenWidget::quitScreenshot(void) 
 {
     emit sigClose();
+}
+
+void SelectedScreenWidget::onSelectRectChanged(int left, int top, int right, int bottom)
+{
+    QRect newRect;
+    newRect.setLeft(currentRect_.left() + left);
+    newRect.setRight(currentRect_.right() + right);
+    newRect.setTop(currentRect_.top() + top);
+    newRect.setBottom(currentRect_.bottom() + bottom);
+    if (QPoint(currentRect_.left(), currentRect_.top()) != fixPos(QPoint(newRect.left(), newRect.top())) ||
+        QPoint(currentRect_.right(), currentRect_.bottom()) != fixPos(QPoint(newRect.right(), newRect.bottom()))) {
+        currentRect_ = newRect;
+        this->setGeometry(currentRect_);
+        // 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
+        parentWidget()->update();
+    }
 }
 
 void SelectedScreenWidget::onCursorPosChanged(int x, int y) 

@@ -130,6 +130,7 @@ public:
     QPixmap getPixmap();
     void showDrawPanel();
     void moveDrawPanel();
+    QPoint fixPos(QPoint p);
 
 protected:
     void updateCursorDir(const QPoint &cursor);
@@ -144,6 +145,7 @@ protected:
     virtual void paintEvent(QPaintEvent *);
 
 public slots:
+    void onSelectRectChanged(int left, int top, int right ,int bottom);
     void onCursorPosChanged(int x, int y);
     void onSticker();
     void onUpload();

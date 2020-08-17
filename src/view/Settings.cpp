@@ -86,10 +86,9 @@ void Settings::initTablePath()
     ui.tablePath->horizontalHeader()->setStretchLastSection(true);
     ui.tablePath->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui.tablePath->setRowCount(data.size());
-    ui.tablePath->setColumnCount(data[0].size());
+    ui.tablePath->setColumnCount(data.first().size());
 
     connect(ui.tablePath, &QTableWidget::cellDoubleClicked, this, &Settings::onTablePathDoubleClicked);
-
     for (int row = 0; row < data.size(); row++) {
         for (int col = 0; col < data[row].size(); col++) {
             QTableWidgetItem *item = new QTableWidgetItem(data[row][col]);
