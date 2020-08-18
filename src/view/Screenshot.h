@@ -130,7 +130,8 @@ public:
     QPixmap getPixmap();
     void showDrawPanel();
     void moveDrawPanel();
-    QPoint fixPos(QPoint p);
+    QPoint adjustPos(QPoint p);
+    QRect adjustRect(QRect r);
 
 protected:
     void updateCursorDir(const QPoint &cursor);

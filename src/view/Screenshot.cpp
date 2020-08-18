@@ -34,6 +34,8 @@ static const int MARKERT_WIDTH = 4;
 static int BORDER_ESTHESIA_WIDTH = 6;
 // 颜色显示RGB格式
 static bool IS_RGB_COLOR = true;
+// 背景透明色
+const QColor BACKGROUND_COLOR(0, 0, 0, 160);
 
 ScreenshotWidget::ScreenshotWidget(QWidget *parent) 
     : QWidget(parent),
@@ -133,7 +135,7 @@ const std::shared_ptr<QPixmap>& ScreenshotWidget::getBackgroundScreen(void) {
 
     // 制作暗色屏幕背景
     QPixmap pixmap(screen->width(), screen->height());
-    pixmap.fill((QColor(0, 0, 0, 160)));
+    pixmap.fill(BACKGROUND_COLOR); // 背景透明度默认160
     darkScreen_.reset(new QPixmap(*screen));
     QPainter p(darkScreen_.get());
     p.drawPixmap(0, 0, pixmap);
@@ -330,18 +332,50 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
             clipboard->setText(amplifierTool_->getCursorPointColor());
             return;
         }
-    } else if (e->key() == Qt::Key_Left || e->key() == Qt::Key_A) {
-        left = -1;
-        right = e->modifiers() & Qt::ShiftModifier ? 0 : -1;
-    } else if (e->key() == Qt::Key_Right || e->key() == Qt::Key_D) {
-        right = 1;
-        left = e->modifiers() & Qt::ShiftModifier ? 0 : 1;
-    } else if (e->key() == Qt::Key_Up || e->key() == Qt::Key_W) {
-        top = -1;
-        bottom = e->modifiers() & Qt::ShiftModifier ? 0 : -1;
-    } else if (e->key() == Qt::Key_Down || e->key() == Qt::Key_S) {
-        bottom = 1;
-        top = e->modifiers() & Qt::ShiftModifier ? 0 : 1;
+    } else if (e->key() == Qt::Key_Left) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            left = -1;
+            right = 0;
+        } else if (e->modifiers() & Qt::ShiftModifier) {
+            left = 0;
+            right = -1;
+        } else {
+            left = -1;
+            right = -1;
+        }
+    } else if (e->key() == Qt::Key_Right) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            left = 0;
+            right = 1;
+        } else if (e->modifiers() & Qt::ShiftModifier) {
+            left = 1;
+            right = 0;
+        } else {
+            left = 1;
+            right = 1;
+        }
+    } else if (e->key() == Qt::Key_Up) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            top = -1;
+            bottom = 0;
+        } else if (e->modifiers() & Qt::ShiftModifier) {
+            top = 0;
+            bottom = -1;
+        } else {
+            top = -1;
+            bottom = -1;
+        }
+    } else if (e->key() == Qt::Key_Down) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            top = 0;
+            bottom = 1;
+        } else if (e->modifiers() & Qt::ShiftModifier) {
+            top = 1;
+            bottom = 0;
+        } else {
+            top = 1;
+            bottom = 1;
+        }
     }
 
     if (selectedScreen_) {
@@ -460,7 +494,7 @@ void SelectedScreenWidget::moveDrawPanel()
     drawPanel_.onReferRectChanged(QRect(this->pos(), this->size()));
 }
 
-QPoint SelectedScreenWidget::fixPos(QPoint p)
+QPoint SelectedScreenWidget::adjustPos(QPoint p)
 {
     if (p.x() < 0) {
         p.setX(0);
@@ -473,6 +507,23 @@ QPoint SelectedScreenWidget::fixPos(QPoint p)
         p.setY(QApplication::desktop()->rect().height() - this->height());
     }
     return p;
+}
+
+QRect SelectedScreenWidget::adjustRect(QRect r)
+{
+    if (r.left() < 0) {
+        r.setLeft(0);
+    }
+    if (r.right() > QApplication::desktop()->rect().width()) {
+        r.setRight(QApplication::desktop()->rect().width());
+    }
+    if (r.top() < 0) {
+        r.setTop(0);
+    }
+    if (r.bottom() > QApplication::desktop()->rect().height()) {
+        r.setBottom(QApplication::desktop()->rect().height());
+    }
+    return r;
 }
 
 void SelectedScreenWidget::updateCursorDir(const QPoint &cursor) {
@@ -608,7 +659,7 @@ void SelectedScreenWidget::mouseMoveEvent(QMouseEvent * e) {
             // 鼠标按下移动选区
             if ((e->globalPos() - movePos_).manhattanLength() > QApplication::startDragDistance()) {
                 QPoint newPos = e->globalPos() - movePos_;
-                move(fixPos(newPos));
+                move(adjustPos(newPos));
                 movePos_ = e->globalPos() - pos();
                 moveDrawPanel();
             }
@@ -654,14 +705,18 @@ void SelectedScreenWidget::paintEvent(QPaintEvent *) {
     int bw = Style::SELECTED_BORDER_WIDTH / 2;
     /// 绘制截屏编辑窗口i
     QRect pixmapRect = currentRect_;
-    pixmapRect.setWidth(pixmapRect.width() - bw * 2);
-    pixmapRect.setHeight(pixmapRect.height() - bw * 2);
+    pixmapRect.setWidth(pixmapRect.width() - bw);
+    pixmapRect.setHeight(pixmapRect.height() - bw);
     // 背景图往内缩bw像素，让给边线和点的绘制
-    painter.drawPixmap(QPoint(bw, bw), *originScreen_, pixmapRect);
+    painter.drawPixmap(QPoint(0, 0), *originScreen_, pixmapRect);
     /// 绘制边框线
     QPen pen(QColor(0, 174, 255), bw);
     painter.setPen(pen);
     painter.drawRect(rect() - QMargins(bw, bw, bw, bw));
+    /// 将白色边框填充为背景色
+    QPen pen2(BACKGROUND_COLOR, bw);
+    painter.setPen(pen2);
+    painter.drawRect(rect() + QMargins(0, 0, bw, bw));
 
     // 绘制边框上八个点
     QBrush brush(Qt::red);
@@ -753,8 +808,7 @@ void SelectedScreenWidget::onSelectRectChanged(int left, int top, int right, int
     newRect.setRight(currentRect_.right() + right);
     newRect.setTop(currentRect_.top() + top);
     newRect.setBottom(currentRect_.bottom() + bottom);
-    if (QPoint(currentRect_.left(), currentRect_.top()) != fixPos(QPoint(newRect.left(), newRect.top())) ||
-        QPoint(currentRect_.right(), currentRect_.bottom()) != fixPos(QPoint(newRect.right(), newRect.bottom()))) {
+    if (adjustRect(newRect) == newRect) {
         currentRect_ = newRect;
         this->setGeometry(currentRect_);
         // 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
