@@ -734,7 +734,7 @@ void SelectedScreenWidget::onSaveScreenOther(void) {
         return;
     }
 
-    QString name = Util::pixmapUniqueName(pixmap);
+    QString name = Util::pixmapName();
     QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), name, "PNG (*.png)");
     if (fileName.length() > 0) {
         pixmap.save(fileName, "png");
@@ -808,6 +808,10 @@ void SelectedScreenWidget::onSelectRectChanged(int left, int top, int right, int
     newRect.setRight(currentRect_.right() + right);
     newRect.setTop(currentRect_.top() + top);
     newRect.setBottom(currentRect_.bottom() + bottom);
+    if (newRect.width() <= 0 || newRect.height() <= 0) {
+        return;
+    }
+
     if (adjustRect(newRect) == newRect) {
         currentRect_ = newRect;
         this->setGeometry(currentRect_);

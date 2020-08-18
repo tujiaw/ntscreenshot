@@ -8,6 +8,8 @@ static const QString PIN_GLOBAL_KEY = "PIN_GLOBAL_KEY";
 static const QString UPLOAD_IMAGE_URL_KEY = "UPLOAD_IMAGE_URL_KEY";
 static const QString PIN_NO_BORDER = "PIN_NO_BORDER";
 static const QString RGB_COLOR = "RGB_COLOR";
+static const QString AUTO_SAVE = "AUTO_SAVE";
+static const QString AUTO_SAVE_PATH = "AUTO_SAVE_PATH";
 
 static bool defaultAutoStart = false;
 static QString defaultScreenshotGlobalKey = "F5";
@@ -103,4 +105,21 @@ void SettingModel::setRgbColor(bool enable)
 bool SettingModel::rgbColor() const
 {
     return settings_.value(RGB_COLOR, true).toBool();
+}
+
+void SettingModel::getAutoSaveImage(bool &autoSave, QString &path)
+{
+    QDir dir(QDir::homePath());
+    if (!dir.cd("Pictures")) {
+        dir.mkdir("ntscreenshot");
+        dir.cd("ntscreenshot");
+    }
+    autoSave = settings_.value(AUTO_SAVE, false).toBool();
+    path = settings_.value(AUTO_SAVE_PATH, dir.absolutePath()).toString();
+}
+
+void SettingModel::setAutoSaveImage(bool autoSave, const QString &path)
+{
+    settings_.setValue(AUTO_SAVE, autoSave);
+    settings_.setValue(AUTO_SAVE_PATH, path);
 }

@@ -30,6 +30,7 @@ namespace Util {
 	QString list2json(const QVariantList &val);
     uint toKey(const QString& str);
     QString pixmapUniqueName(const QPixmap &pixmap);
+    QString pixmapName();
     bool getSmallestWindowFromCursor(QRect &out_rect);
     QPoint fixPoint(const QPoint &point, const QSize &size);
     QString strKeyEvent(QKeyEvent *key);

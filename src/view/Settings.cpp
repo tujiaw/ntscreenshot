@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QKeyEvent>
 #include <QClipboard>
+#include <QFileDialog>
 #include "component/qxtglobalshortcut/qxtglobalshortcut.h"
 #include "model/SettingModel.h"
 #include "common/Util.h"
@@ -26,6 +27,9 @@ Settings::Settings(QWidget *parent)
     connect(ui.leUploadImageUrl, &QLineEdit::textChanged, this, &Settings::onUploadImageUrlChanged);
     connect(ui.rbRGB, &QPushButton::clicked, this, &Settings::onColorShowChanged);
     connect(ui.rbHexadecimal, &QPushButton::clicked, this, &Settings::onColorShowChanged);
+    connect(ui.cbAutoSave, &QCheckBox::clicked, this, &Settings::onAutoSaveChanged);
+    connect(ui.pbOpenImagePath, &QPushButton::clicked, this, &Settings::onOpenImagePath);
+    connect(ui.pbModifyImagePath, &QPushButton::clicked, this, &Settings::onModifyImagePath);
 
     readData();
     setFixedSize(400, 280);
@@ -45,6 +49,14 @@ void Settings::readData()
     ui.leUploadImageUrl->setText(setting->uploadImageUrl());
     ui.rbRGB->setChecked(setting->rgbColor());
     ui.rbHexadecimal->setChecked(!setting->rgbColor());
+
+    bool autoSave = false;
+    QString autoSavePath;
+    setting->getAutoSaveImage(autoSave, autoSavePath);
+    ui.cbAutoSave->setChecked(autoSave);
+    ui.leSavePath->setText(autoSavePath);
+    ui.pbOpenImagePath->setEnabled(autoSave);
+    ui.pbModifyImagePath->setEnabled(autoSave);
 }
 
 void Settings::writeData()
@@ -87,6 +99,7 @@ void Settings::initTablePath()
     ui.tablePath->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui.tablePath->setRowCount(data.size());
     ui.tablePath->setColumnCount(data.first().size());
+    ui.tablePath->setTextElideMode(Qt::ElideMiddle);
 
     connect(ui.tablePath, &QTableWidget::cellDoubleClicked, this, &Settings::onTablePathDoubleClicked);
     for (int row = 0; row < data.size(); row++) {
@@ -157,4 +170,26 @@ void Settings::onColorShowChanged()
     } else {
         WindowManager::instance()->setting()->setRgbColor(false);
     }
+}
+
+void Settings::onAutoSaveChanged()
+{
+    bool autoSave = ui.cbAutoSave->isChecked();
+    ui.pbOpenImagePath->setEnabled(autoSave);
+    ui.pbModifyImagePath->setEnabled(autoSave);
+    WindowManager::instance()->setting()->setAutoSaveImage(autoSave, ui.leSavePath->text().trimmed());
+}
+
+void Settings::onOpenImagePath()
+{
+	Util::shellExecute(ui.leSavePath->text().trimmed());
+}
+
+void Settings::onModifyImagePath()
+{
+	QString newDir = QFileDialog::getExistingDirectory(nullptr, QStringLiteral("Ñ¡Ôñ½ØÍ¼±£´æÄ¿Â¼"));
+	if (!newDir.isEmpty()) {
+		ui.leSavePath->setText(newDir);
+		onAutoSaveChanged();
+	}
 }

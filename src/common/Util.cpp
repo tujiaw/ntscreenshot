@@ -334,6 +334,11 @@ namespace Util
         return strList.join("");
     }
 
+    QString pixmapName()
+    {
+        return "ntscreenshot_" + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".png";
+    }
+
     bool getSmallestWindowFromCursor(QRect &out_rect)
     {
         HWND hwnd;

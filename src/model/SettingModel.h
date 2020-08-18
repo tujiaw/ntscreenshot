@@ -31,6 +31,9 @@ public:
     void setRgbColor(bool enable);
     bool rgbColor() const;
 
+    void getAutoSaveImage(bool &autoSave, QString &path);
+    void setAutoSaveImage(bool autoSave, const QString &path);
+
 private:
     Q_DISABLE_COPY(SettingModel)
     QSettings settings_;

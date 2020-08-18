@@ -207,7 +207,7 @@ void StickerWidget::onCopy()
 void StickerWidget::onSave()
 {
     flush();
-    QString name = Util::pixmapUniqueName(pixmap_);
+    QString name = Util::pixmapName();
 	QString fileName = QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÍ¼Æ¬"), name, "PNG (*.png)");
 	if (fileName.length() > 0) {
 		pixmap_.save(fileName, "png");
