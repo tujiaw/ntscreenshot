@@ -55,7 +55,7 @@ void Settings::readData()
     setting->getAutoSaveImage(autoSave, autoSavePath);
     ui.cbAutoSave->setChecked(autoSave);
     ui.leSavePath->setText(autoSavePath);
-    ui.pbOpenImagePath->setEnabled(autoSave);
+    ui.pbOpenImagePath->setEnabled(true);
     ui.pbModifyImagePath->setEnabled(autoSave);
 }
 
@@ -175,7 +175,6 @@ void Settings::onColorShowChanged()
 void Settings::onAutoSaveChanged()
 {
     bool autoSave = ui.cbAutoSave->isChecked();
-    ui.pbOpenImagePath->setEnabled(autoSave);
     ui.pbModifyImagePath->setEnabled(autoSave);
     WindowManager::instance()->setting()->setAutoSaveImage(autoSave, ui.leSavePath->text().trimmed());
 }

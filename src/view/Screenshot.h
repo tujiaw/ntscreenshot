@@ -29,6 +29,7 @@ signals:
     void sigCursorPosChanged(int, int);
     void sigDoubleClick(void);
     void sigChildWindowRectChanged();
+	void sigSaveScreenshot(const QPixmap &pixmap);
 
 protected:
     virtual void mouseDoubleClickEvent(QMouseEvent*);
@@ -111,6 +112,7 @@ signals:
     void sigBorderPressed(int,int);
     void sigBorderReleased(int,int);
     void sigClose();
+	void sigSaveScreenshot(const QPixmap &pixmap);
 
 public:
     // ·½Î»Ã¶¾Ù

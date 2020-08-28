@@ -7,6 +7,8 @@
 #include "view/Screenshot.h"
 #include "view/Settings.h"
 #include "view/Stickers.h"
+#include "common/Util.h"
+#include <QDebug>
 
 WindowManager::WindowManager()
 {
@@ -45,6 +47,7 @@ void WindowManager::openWidget(const QString &id)
         ScreenshotWidget::setRgbColor(settingModel_->rgbColor());
         connect(screenshot_.get(), &ScreenshotWidget::sigReopen, this, &WindowManager::onScreenshotReopen, Qt::QueuedConnection);
         connect(screenshot_.get(), &ScreenshotWidget::sigClose, this, &WindowManager::onScreenshotClose, Qt::QueuedConnection);
+		connect(screenshot_.get(), &ScreenshotWidget::sigSaveScreenshot, this, &WindowManager::onSaveScreenshot, Qt::QueuedConnection);
 		return;
 	}
 	else if (id == WidgetID::MAIN) {
@@ -119,6 +122,16 @@ void WindowManager::onScreenshotReopen()
 void WindowManager::onScreenshotClose()
 {
     closeWidget(WidgetID::SCREENSHOT);
+}
+
+void WindowManager::onSaveScreenshot(const QPixmap &pixmap)
+{
+	bool autoSave = false;
+	QString dir;
+	settingModel_->getAutoSaveImage(autoSave, dir);
+	if (autoSave) {
+		pixmap.save(dir + "/" + Util::pixmapName());
+	}
 }
 
 void WindowManager::onPin()

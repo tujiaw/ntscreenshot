@@ -67,22 +67,22 @@ DrawSettings::DrawSettings(QWidget *parent)
     }
     mLayout->addWidget(sizeList_);
 
-    QHBoxLayout *firstLineLayout = new QHBoxLayout(this);
+    QHBoxLayout *firstLineLayout = new QHBoxLayout();
     firstLineLayout->setSpacing(2);
     for (int i = 0; i < 8; i++) {
         firstLineLayout->addWidget(colorBtns[i]);
     }
-    QHBoxLayout *secondLineLayout = new QHBoxLayout(this);
+    QHBoxLayout *secondLineLayout = new QHBoxLayout();
     secondLineLayout->setSpacing(2);
     for (int i = 8; i < 16; i++) {
         secondLineLayout->addWidget(colorBtns[i]);
     }
-    QVBoxLayout *vLayout = new QVBoxLayout(this);
+    QVBoxLayout *vLayout = new QVBoxLayout();
     vLayout->setSpacing(2);
     vLayout->addLayout(firstLineLayout);
     vLayout->addLayout(secondLineLayout);
 
-    QHBoxLayout *colorLayout = new QHBoxLayout(this);
+    QHBoxLayout *colorLayout = new QHBoxLayout();
     colorLayout->setContentsMargins(0, 0, 0, 0);
     colorLayout->setSpacing(2);
     colorLayout->addWidget(pbCurrentColor_);

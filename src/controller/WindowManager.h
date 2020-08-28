@@ -33,6 +33,7 @@ signals:
 private slots:
     void onScreenshotReopen();
     void onScreenshotClose();
+	void onSaveScreenshot(const QPixmap &pixmap);
     void onPin();
 
 private:

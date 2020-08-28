@@ -228,6 +228,7 @@ void ScreenshotWidget::initSelectedScreen(const QPoint &pos)
         connect(selectedScreen_.get(), SIGNAL(sigBorderPressed(int, int)), this, SLOT(onScreenBorderPressed(int, int)));
         connect(selectedScreen_.get(), SIGNAL(sigBorderReleased(int, int)), this, SLOT(onScreenBorderReleased(int, int)));
         connect(selectedScreen_.get(), SIGNAL(sigClose()), this, SIGNAL(sigClose()));
+		connect(selectedScreen_.get(), SIGNAL(sigSaveScreenshot(const QPixmap&)), this, SIGNAL(sigSaveScreenshot(const QPixmap&)));
     }
 }
 
@@ -766,6 +767,8 @@ void SelectedScreenWidget::onSticker()
         return;
     }
 
+	emit sigSaveScreenshot(pixmap);
+
     QPoint pos(currentRect_.x(), currentRect_.y());
     if (StickerWidget::hasBorder()) {
         pos -= QPoint(1, 1);
@@ -792,6 +795,9 @@ void SelectedScreenWidget::onSaveScreen(void)
     /// 把图片放入剪切板
     QClipboard *board = QApplication::clipboard();
     board->setPixmap(pixmap);
+
+	emit sigSaveScreenshot(pixmap);
+
     /// 退出当前截图工具
     quitScreenshot();
 }
