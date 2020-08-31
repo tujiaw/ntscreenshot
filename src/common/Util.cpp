@@ -130,7 +130,6 @@ namespace Util
             return false;
         }
 
-		path.toStdString();
         HINSTANCE hinst = ShellExecute(NULL, towstring(operation).c_str(), towstring(path).c_str(), NULL, NULL, SW_SHOWNORMAL);
         LONG64 result = (LONG64)hinst;
         if (result <= 32) {
@@ -663,7 +662,6 @@ namespace Util
 
     void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func)
     {
-		return;
         static QMap<std::string, QTimer*> s_intervalHandleTimers;
         QTimer *timer = s_intervalHandleTimers[name];
         if (func == nullptr) {
@@ -680,17 +678,6 @@ namespace Util
             s_intervalHandleTimers[name] = timer;
             timer->setSingleShot(true);
             timer->setInterval(msTime);
-            //QObject::connect(timer, &QTimer::timeout, [name, func]() {
-            //    auto iter = s_intervalHandleTimers.find(name);
-            //    if (iter != s_intervalHandleTimers.end()) {
-            //        if (iter.value()) {
-            //            iter.value()->stop();
-            //            iter.value()->deleteLater();
-            //        }
-            //        s_intervalHandleTimers.erase(iter);
-            //    }
-            //    func();
-            //});
         }
 
         if (timer->interval() != msTime) {

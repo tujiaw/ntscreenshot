@@ -1,18 +1,4 @@
-/*
-###############################################################################
-#                                                                             #
-# The MIT License                                                             #
-#                                                                             #
-# Copyright (C) 2017 by Juergen Skrotzky (JorgenVikingGod@gmail.com)          #
-#               >> https://github.com/Jorgen-VikingGod                        #
-#                                                                             #
-# Sources: https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle  #
-#                                                                             #
-###############################################################################
-*/
-
-#ifndef _CDarkStyle_HPP
-#define _CDarkStyle_HPP
+#pragma once
 
 #include <QtCore>
 #include <QtGui>
@@ -74,5 +60,4 @@ public:
 	}
 };
 
-#endif  // _CDarkStyle_HPP
 

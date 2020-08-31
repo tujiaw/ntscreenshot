@@ -12,7 +12,6 @@ class DrawPanel;
 class QTimer;
 class QMenu;
 
-
 class ScreenshotWidget : public QWidget {
     Q_OBJECT
 public:

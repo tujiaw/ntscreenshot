@@ -1,6 +1,7 @@
 #include "WindowManager.h"
 #include <QTimer>
 #include <QEventLoop>
+#include <mutex>
 #include "component/TitleWidget.h"
 #include "component/FramelessWidget.h"
 #include "view/MainWidget.h"
@@ -23,8 +24,10 @@ WindowManager::~WindowManager()
 
 WindowManager* WindowManager::instance()
 {
-	static WindowManager s_inst;
-	return &s_inst;
+	static std::once_flag once;
+	static WindowManager* s_inst;
+	std::call_once(once, []() { s_inst = new WindowManager(); });
+	return s_inst;
 }
 
 void WindowManager::destory()
