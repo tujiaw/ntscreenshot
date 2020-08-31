@@ -18,7 +18,7 @@ HttpRequest::~HttpRequest()
 
 void HttpRequest::get(const QString &url)
 {
-    QNetworkReply *reply = manager_->get(QNetworkRequest(QUrl(url)));
+    const QNetworkReply *reply = manager_->get(QNetworkRequest(QUrl(url)));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(slotError(QNetworkReply::NetworkError)));
 }
 
@@ -28,7 +28,7 @@ void HttpRequest::postForm(const QString &url, const QByteArray &data)
     QUrl aurl(url);
     QNetworkRequest req(aurl);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    QNetworkReply *reply = manager_->post(req, data);
+    const QNetworkReply *reply = manager_->post(req, data);
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(slotError(QNetworkReply::NetworkError)));
 }
 

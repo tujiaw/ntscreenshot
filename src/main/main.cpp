@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	CDarkStyle::setFontFamily("Microsoft YaHei", false);
 	CDarkStyle::assign();
 
-	a.setQuitOnLastWindowClosed(false);
+	QApplication::setQuitOnLastWindowClosed(false);
 	QObject::connect(&a, &QApplication::aboutToQuit, []{ WindowManager::instance()->destory(); });
 	WindowManager::instance()->openWidget(WidgetID::MAIN);
 
