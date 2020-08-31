@@ -318,6 +318,8 @@ void DrawMode::draw(QPainter &painter)
     case Text:
         drawText(textRect_, text_, painter);
         break;
+	default:
+		break;
     }
 }
 
@@ -449,17 +451,16 @@ void Drawer::undo()
 
 void Drawer::onPaint(QPainter &painter)
 {
-    // 当前绘制
-    if (isDraw()) {
-        drawMode_.setPos(drawStartPos_, drawEndPos_);
-        drawMode_.draw(painter);
-    }
-
     // 绘制缓存
-    for (int i = 0; i < drawModeCache_.size(); i++) {
-        DrawMode& dm = drawModeCache_[i];
-        dm.draw(painter);
-    }
+	std::for_each(drawModeCache_.begin(), drawModeCache_.end(), [&](DrawMode &dm) {
+		dm.draw(painter);
+	});
+
+	// 当前绘制
+	if (isDraw()) {
+		drawMode_.setPos(drawStartPos_, drawEndPos_);
+		drawMode_.draw(painter);
+	}
 }
 
 void Drawer::showTextEdit(const QPoint &pos)

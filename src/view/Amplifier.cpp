@@ -54,14 +54,14 @@ void AmplifierWidget::onPositionChanged(int x, int y)
     move(dest_x, dest_y);
 }
 
-/// 绘制鼠标拖拽时选区矩形的右下顶点的放大图;
+//// 绘制鼠标拖拽时选区矩形的右下顶点的放大图;
 void AmplifierWidget::paintEvent(QPaintEvent *) 
 {
     QPainter painter(this);
-    // 绘制背景
+    /// 绘制背景
     painter.fillRect(rect(), QColor(0, 0, 0, 200));
     QPixmap endPointImage;
-    // 绘制放大图;
+    /// 绘制放大图;
     const QSize& parent_size = parentWidget()->size();
     
     int mx = IMAGE_SIZE.width() / 2;
@@ -84,26 +84,26 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     /// 绘制十字
     const int PEN_WIDTH = MULTIPLE;
     painter.setPen(QPen(QColor(0, 180, 255, 180), PEN_WIDTH));
-    // 竖线;
+    /// 竖线;
     painter.drawLine(QPoint((width() >> 1) + 1, 0), QPoint((width() >> 1) + 1, imageHeight_ - MULTIPLE));
-    // 横线;
+    /// 横线;
     painter.drawLine(QPoint(0, (imageHeight_ >> 1) + 1), QPoint(height(), (imageHeight_ >> 1) + 1));
 
-    // 绘制中间颜色块
+    /// 绘制中间颜色块
     painter.fillRect((width() >> 1) - 2, (imageHeight_ >> 1) - 2, 6, 6, cursorPointColor_);
-    // 绘制中间颜色块边框
+    /// 绘制中间颜色块边框
     painter.setPen(QPen(Qt::black, 1));
     painter.drawRect((width() >> 1) - 3, (imageHeight_ >> 1) - 3, 7, 7);
 
-    // 绘制大图内边框
+    /// 绘制大图内边框
     painter.setPen(QPen(Qt::white, 2));
     painter.drawRect(2,2,width()-4, imageHeight_-4);
 
-    // 绘制外边框
+    /// 绘制外边框
     painter.setPen(QPen(Qt::black, 1));
     painter.drawRect(0,0,width()-1,height()-1);
 
-    // 当前选中矩形的宽高信息;
+    /// 当前选中矩形的宽高信息;
     QString posInfo = QStringLiteral("%1 x %2").arg(QCursor::pos().x()).arg(QCursor::pos().y());
     
     const int SPACING = 4;

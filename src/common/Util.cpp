@@ -472,7 +472,7 @@ namespace Util
 		}
 		int len = MultiByteToWideChar(CP_ACP, 0, ansi.c_str(), -1, NULL, 0);
 		std::wstring unicode(len + 1, L'\0');
-		len = MultiByteToWideChar(CP_ACP, 0, ansi.c_str(), ansi.size(), &unicode[0], len);
+		MultiByteToWideChar(CP_ACP, 0, ansi.c_str(), ansi.size(), &unicode[0], len);
 		return unicode;
 	}
 
