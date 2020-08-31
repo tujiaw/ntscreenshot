@@ -547,6 +547,7 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
                 drawModeCache_.push_back(drawMode_);
             }
             drawMode_.clear();
+            parent_->update();
         }
 
         drawStartPos_ = QPoint(0, 0);
@@ -570,6 +571,7 @@ bool Drawer::onMouseMoveEvent(QMouseEvent *e)
         if (drawMode_.shape() == DrawMode::PolyLine) {
             drawMode_.addPos(e->pos());
         }
+
         parent_->update();
         return true;
     }

@@ -103,18 +103,41 @@ namespace Util
         return shellExecute(path, "open");
 	}
 
+	std::wstring towstring(const QString& str)
+	{
+		std::wstring result;
+		result.reserve(str.size());
+		for (int i = 0; i < str.size(); i++) {
+			result.push_back(str.at(i).unicode());
+		}
+		return result;
+	}
+
+	std::string tostring(const QString& str)
+	{
+		QByteArray b = str.toLocal8Bit();
+		std::string result;
+		result.reserve(b.size());
+		for (int i = 0; i < b.size(); i++) {
+			result.push_back(b[i]);
+		}
+		return result;
+	}
+
     bool shellExecute(const QString &path, const QString &operation)
     {
         if (path.isEmpty()) {
             return false;
         }
 
-        HINSTANCE hinst = ShellExecute(NULL, operation.toStdWString().c_str(), path.toStdWString().c_str(), NULL, NULL, SW_SHOWNORMAL);
+		path.toStdString();
+        HINSTANCE hinst = ShellExecute(NULL, towstring(operation).c_str(), towstring(path).c_str(), NULL, NULL, SW_SHOWNORMAL);
         LONG64 result = (LONG64)hinst;
         if (result <= 32) {
             qDebug() << "shellExecute failed, code:" << result;
             return false;
         }
+			
         return true;
     }
 
