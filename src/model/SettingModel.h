@@ -31,7 +31,7 @@ public:
     void setRgbColor(bool enable);
     bool rgbColor() const;
 
-    void getAutoSaveImage(bool &autoSave, QString &path);
+    void getAutoSaveImage(bool &autoSave, QString &path) const;
     void setAutoSaveImage(bool autoSave, const QString &path);
 
 private:

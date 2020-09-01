@@ -107,9 +107,9 @@ bool SettingModel::rgbColor() const
     return settings_.value(RGB_COLOR, true).toBool();
 }
 
-void SettingModel::getAutoSaveImage(bool &autoSave, QString &path)
+void SettingModel::getAutoSaveImage(bool &autoSave, QString &path) const
 {
-    QDir dir(QDir::homePath());
+    QDir dir = QDir::homePath();
     if (!dir.cd("Pictures")) {
         dir.mkdir("ntscreenshot");
         dir.cd("ntscreenshot");

@@ -45,9 +45,9 @@ void WindowManager::openWidget(const QString &id)
         QEventLoop loop;
         loop.processEvents();
         screenshot_.reset(new ScreenshotWidget());
-        ScreenshotWidget::setPinGlobalKey(settingModel_->pinGlobalKey());
-        ScreenshotWidget::setUploadImageUrl(settingModel_->uploadImageUrl());
-        ScreenshotWidget::setRgbColor(settingModel_->rgbColor());
+		screenshot_->setPinGlobalKey(settingModel_->pinGlobalKey());
+		screenshot_->setUploadImageUrl(settingModel_->uploadImageUrl());
+		screenshot_->setRgbColor(settingModel_->rgbColor());
         connect(screenshot_.get(), &ScreenshotWidget::sigReopen, this, &WindowManager::onScreenshotReopen, Qt::QueuedConnection);
         connect(screenshot_.get(), &ScreenshotWidget::sigClose, this, &WindowManager::onScreenshotClose, Qt::QueuedConnection);
 		connect(screenshot_.get(), &ScreenshotWidget::sigSaveScreenshot, this, &WindowManager::onSaveScreenshot, Qt::QueuedConnection);

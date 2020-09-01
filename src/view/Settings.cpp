@@ -25,8 +25,8 @@ Settings::Settings(QWidget *parent)
     connect(ui.cbPinNoBorder, &QCheckBox::clicked, this, &Settings::onPinNoBorder);
     connect(ui.pbRevert, &QPushButton::clicked, this, &Settings::onRevertClicked);
     connect(ui.leUploadImageUrl, &QLineEdit::textChanged, this, &Settings::onUploadImageUrlChanged);
-    connect(ui.rbRGB, &QPushButton::clicked, this, &Settings::onColorShowChanged);
-    connect(ui.rbHexadecimal, &QPushButton::clicked, this, &Settings::onColorShowChanged);
+    connect(ui.rbRGB, &QRadioButton::toggled, this, &Settings::onRgbColorToggled);
+    connect(ui.rbHexadecimal, &QRadioButton::toggled, this, &Settings::onHexColorToggled);
     connect(ui.cbAutoSave, &QCheckBox::clicked, this, &Settings::onAutoSaveChanged);
     connect(ui.pbOpenImagePath, &QPushButton::clicked, this, &Settings::onOpenImagePath);
     connect(ui.pbModifyImagePath, &QPushButton::clicked, this, &Settings::onModifyImagePath);
@@ -163,13 +163,14 @@ void Settings::onUploadImageUrlChanged(const QString& text)
     WindowManager::instance()->setting()->setUploadImageUrl(text);
 }
 
-void Settings::onColorShowChanged()
+void Settings::onRgbColorToggled(bool checked)
 {
-    if (ui.rbRGB->isChecked()) {
-        WindowManager::instance()->setting()->setRgbColor(true);
-    } else {
-        WindowManager::instance()->setting()->setRgbColor(false);
-    }
+	WindowManager::instance()->setting()->setRgbColor(checked);
+}
+
+void Settings::onHexColorToggled(bool checked)
+{
+	WindowManager::instance()->setting()->setRgbColor(!checked);
 }
 
 void Settings::onAutoSaveChanged()

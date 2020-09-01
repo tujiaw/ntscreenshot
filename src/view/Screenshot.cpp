@@ -90,6 +90,9 @@ void ScreenshotWidget::setUploadImageUrl(const QString &url)
 void ScreenshotWidget::setRgbColor(bool yes)
 {
     IS_RGB_COLOR = yes;
+	if (amplifierTool_) {
+		amplifierTool_->setRgbColor(IS_RGB_COLOR);
+	}
 }
 
 void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *)
@@ -145,9 +148,8 @@ const std::shared_ptr<QPixmap>& ScreenshotWidget::getBackgroundScreen(void) {
 std::shared_ptr<QPixmap> ScreenshotWidget::getGlobalScreen(void) {
     if (!originScreen_) {
         // 截取当前桌面，作为截屏的背景图
-        QScreen *screen = QGuiApplication::primaryScreen();
         const QRect& rect = getDesktopRect();
-        originScreen_.reset(new QPixmap(screen->grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())));
+        originScreen_.reset(new QPixmap(QGuiApplication::primaryScreen()->grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())));
     }
     return originScreen_;
 }

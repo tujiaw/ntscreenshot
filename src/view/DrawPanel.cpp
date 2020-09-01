@@ -496,10 +496,9 @@ void Drawer::drawPixmap(QPixmap &pixmap)
     saveText();
     if (!drawModeCache_.isEmpty()) {
         QPainter painter(&pixmap);
-        for (int i = 0; i < drawModeCache_.size(); i++) {
-            DrawMode &dm = drawModeCache_[i];
-            dm.draw(painter);
-        }
+		std::for_each(drawModeCache_.begin(), drawModeCache_.end(), [&painter](DrawMode &dw) {
+			dw.draw(painter);
+		});
     }
 }
 

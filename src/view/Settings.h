@@ -25,7 +25,8 @@ private:
     void onRevertClicked();
     void onTablePathDoubleClicked(int row, int col);
     void onUploadImageUrlChanged(const QString& text);
-    void onColorShowChanged();
+    void onRgbColorToggled(bool checked);
+	void onHexColorToggled(bool checked);
     void onAutoSaveChanged();
     void onOpenImagePath();
     void onModifyImagePath();

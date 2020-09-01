@@ -18,9 +18,9 @@ public:
     explicit ScreenshotWidget(QWidget *parent = 0);
     ~ScreenshotWidget(void);
     void pin();
-    static void setPinGlobalKey(const QString &key);
-    static void setUploadImageUrl(const QString &url);
-    static void setRgbColor(bool yes);
+    void setPinGlobalKey(const QString &key);
+    void setUploadImageUrl(const QString &url);
+    void setRgbColor(bool yes);
 
 signals:
     void sigReopen();
