@@ -70,24 +70,24 @@ ScreenshotWidget::~ScreenshotWidget(void)
 {
 }
 
-void ScreenshotWidget::pin()
+void ScreenshotWidget::pin() const
 {
     if (selectedScreen_) {
         selectedScreen_->onSticker();
     }
 }
 
-void ScreenshotWidget::setPinGlobalKey(const QString &key)
+void ScreenshotWidget::setPinGlobalKey(const QString &key) const
 {
     PIN_KEY = key;
 }
 
-void ScreenshotWidget::setUploadImageUrl(const QString &url)
+void ScreenshotWidget::setUploadImageUrl(const QString &url) const
 {
     UPLOAD_IMAGE_URL = url;
 }
 
-void ScreenshotWidget::setRgbColor(bool yes)
+void ScreenshotWidget::setRgbColor(bool yes) const
 {
     IS_RGB_COLOR = yes;
 	if (amplifierTool_) {
@@ -257,7 +257,7 @@ void ScreenshotWidget::mouseReleaseEvent(QMouseEvent *e) {
         // 选择窗口选区
         if (startPoint_ == e->pos() && !getEsthesiaRect().isEmpty()) {
             if (selectedScreen_) {
-                selectedScreen_->setGeometry(getEsthesiaRect());
+				selectedScreen_->setCurrentRect(getEsthesiaRect());
                 selectedScreen_->show();
             }
             // 感知区域置空
@@ -512,6 +512,12 @@ QPoint SelectedScreenWidget::adjustPos(QPoint p)
     return p;
 }
 
+void SelectedScreenWidget::setCurrentRect(const QRect &rect)
+{
+	currentRect_ = rect;
+	setGeometry(rect);
+}
+
 QRect SelectedScreenWidget::adjustRect(QRect r)
 {
     if (r.left() < 0) {
@@ -602,8 +608,8 @@ void SelectedScreenWidget::mousePressEvent(QMouseEvent *e) {
 
 void SelectedScreenWidget::mouseReleaseEvent(QMouseEvent * e) {
     if (e->button() == Qt::LeftButton) {
+		isPressed_ = false;
         emit sigBorderReleased(e->globalX(), e->globalY());
-        isPressed_ = false;
     }
 }
 
@@ -697,7 +703,8 @@ void SelectedScreenWidget::resizeEvent(QResizeEvent *)
     emit sigSizeChanged(width(), height());
 }
 
-void SelectedScreenWidget::hideEvent(QHideEvent *) {
+void SelectedScreenWidget::hideEvent(QHideEvent *) 
+{
     currentRect_ = {};
     movePos_ = {};
     originPoint_ = {};
@@ -821,8 +828,7 @@ void SelectedScreenWidget::onSelectRectChanged(int left, int top, int right, int
     }
 
     if (adjustRect(newRect) == newRect) {
-        currentRect_ = newRect;
-        this->setGeometry(currentRect_);
+		this->setCurrentRect(newRect);
         // 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
         parentWidget()->update();
     }
@@ -844,8 +850,7 @@ void SelectedScreenWidget::onCursorPosChanged(int x, int y)
     int rh = abs(y - originPoint_.y());
 
     // 改变大小
-    currentRect_ = QRect(rx, ry, rw, rh);
-    this->setGeometry(currentRect_);
+	this->setCurrentRect(QRect(rx, ry, rw, rh));
     // 改变大小后更新父窗口，防止父窗口未及时刷新而导致的问题
     parentWidget()->update();
 }

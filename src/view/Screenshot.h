@@ -17,10 +17,10 @@ class ScreenshotWidget : public QWidget {
 public:
     explicit ScreenshotWidget(QWidget *parent = 0);
     ~ScreenshotWidget(void);
-    void pin();
-    void setPinGlobalKey(const QString &key);
-    void setUploadImageUrl(const QString &url);
-    void setRgbColor(bool yes);
+    void pin() const;
+    void setPinGlobalKey(const QString &key) const;
+    void setUploadImageUrl(const QString &url) const;
+    void setRgbColor(bool yes) const;
 
 signals:
     void sigReopen();
@@ -133,6 +133,7 @@ public:
     void moveDrawPanel();
     QPoint adjustPos(QPoint p);
     QRect adjustRect(QRect r);
+	void setCurrentRect(const QRect &rect);
 
 protected:
     void updateCursorDir(const QPoint &cursor);
@@ -170,7 +171,7 @@ private:
     QPolygon listMarker_;
     // 屏幕原画
     std::shared_ptr<QPixmap> originScreen_;
-    // 当前窗口几何数据 用于绘制截图区域
+    // 选中区域窗口rect用于绘制截图区域
     QRect currentRect_;
     // 右键菜单对象
     QMenu *menu_;

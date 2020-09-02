@@ -42,8 +42,8 @@ void WindowManager::openWidget(const QString &id)
 {
 	if (id == WidgetID::SCREENSHOT) {
 		screenshot_.reset();
-        QEventLoop loop;
-        loop.processEvents();
+        //QEventLoop loop;
+        //loop.processEvents();
         screenshot_.reset(new ScreenshotWidget());
 		screenshot_->setPinGlobalKey(settingModel_->pinGlobalKey());
 		screenshot_->setUploadImageUrl(settingModel_->uploadImageUrl());
