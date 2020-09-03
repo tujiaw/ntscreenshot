@@ -680,7 +680,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\Debug\moc_Stickers.cpp" />
+    <ClCompile Include="GeneratedFiles\Debug\moc_Stickers.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_SystemTray.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_TextEdit.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_TipsWidget.cpp" />
@@ -705,7 +708,10 @@
     <ClCompile Include="GeneratedFiles\Release\moc_Screenshot.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_SettingModel.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_Settings.cpp" />
-    <ClCompile Include="GeneratedFiles\Release\moc_Stickers.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_Stickers.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GeneratedFiles\Release\moc_SystemTray.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_TextEdit.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_TipsWidget.cpp" />

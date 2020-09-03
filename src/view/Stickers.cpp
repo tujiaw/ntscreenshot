@@ -26,7 +26,7 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
 {
     uploadImageUtil_ = new UploadImageUtil(this);
 	menu_ = new QMenu(this);
-    menu_->addAction(QStringLiteral("绘制"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
+    menu_->addAction(QStringLiteral("标注"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
     menu_->addAction(QStringLiteral("撤销"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
 	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
