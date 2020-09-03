@@ -26,5 +26,5 @@ int main(int argc, char *argv[])
 	QObject::connect(&a, &QApplication::aboutToQuit, []{ WindowManager::instance()->destory(); });
 	WindowManager::instance()->openWidget(WidgetID::MAIN);
 
-	return a.exec();
+	return QApplication::exec();
 }

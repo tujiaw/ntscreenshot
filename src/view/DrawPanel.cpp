@@ -90,9 +90,9 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     hLayout->setContentsMargins(0, 0, 0, 0);
     hLayout->setSpacing(0);
     hLayout->addWidget(pbFont_);
-    for (int i = 0; i < btns_.size(); i++) {
-        hLayout->addWidget(btns_[i].first);
-    }
+	std::for_each(btns_.begin(), btns_.end(), [hLayout](const auto &btn) {
+		hLayout->addWidget(btn.first);
+	});
     hLayout->addWidget(line2);
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(pbSticker);
