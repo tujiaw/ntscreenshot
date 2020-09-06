@@ -152,6 +152,7 @@ public slots:
     void onCursorPosChanged(int x, int y);
     void onSticker();
     void onUpload();
+    void onOcr();
     void onSaveScreen(void);
     void onSaveScreenOther(void);
     void onKeyEvent(QKeyEvent *e);
@@ -179,5 +180,7 @@ private:
     DrawPanel drawPanel_;
     // 上传图片工具
     class UploadImageUtil *uploadImageUtil_;
+    // OCR
+    class Ocr* ocr_;
 };
 

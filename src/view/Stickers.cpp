@@ -16,13 +16,14 @@
 #include "common/Constants.h"
 #include "common/Util.h"
 #include "common/HttpRequest.h"
+#include "component/Ocr.h"
 #include "controller/WindowManager.h"
 #include "component/TipsWidget.h"
 #include "view/DrawPanel.h"
 
 static QList<QPair<QPoint, QPixmap>> HidedStickerList;
 StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
-    : QWidget(parent), pixmap_(pixmap)
+    : QWidget(parent), pixmap_(pixmap), ocr_(nullptr)
 {
     uploadImageUtil_ = new UploadImageUtil(this);
 	menu_ = new QMenu(this);
@@ -36,11 +37,12 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
     menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
+
+    menu_->addSeparator();
     if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
-        menu_->addSeparator();
         menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
     }
-
+    menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()));
 
     this->setFocusPolicy(Qt::StrongFocus);
     emit WindowManager::instance()->sigStickerCountChanged();
@@ -218,6 +220,14 @@ void StickerWidget::onUpload()
 {
     flush();
     uploadImageUtil_->upload(pixmap_);
+}
+
+void StickerWidget::onOcr()
+{
+    if (!ocr_) {
+        ocr_ = new Ocr(this);
+    }
+    ocr_->start(pixmap_);
 }
 
 void StickerWidget::onClose()

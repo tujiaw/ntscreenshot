@@ -21,6 +21,7 @@
 
 #include "common/Constants.h"
 #include "common/Util.h"
+#include "component/Ocr.h"
 #include "view/Amplifier.h"
 #include "view/Stickers.h"
 
@@ -443,7 +444,8 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     originPoint_(pos),
     isPressed_(false), 
     originScreen_(originPainting),
-    drawPanel_(parent, this)
+    drawPanel_(parent, this),
+    ocr_(nullptr)
 {
     drawPanel_.hide();
     connect(&drawPanel_, SIGNAL(sigSticker()), this, SLOT(onSticker()));
@@ -459,6 +461,7 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     if (!UPLOAD_IMAGE_URL.isEmpty()) {
         menu_->addAction(QStringLiteral("ÉÏ´«Í¼´²"), this, SLOT(onUpload()));
     }
+    menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()), QKeySequence("Ctrl+O"));
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("ÍË³ö"), this, SLOT(quitScreenshot()));
 
@@ -792,6 +795,14 @@ void SelectedScreenWidget::onSticker()
 void SelectedScreenWidget::onUpload()
 {
     uploadImageUtil_->upload(getPixmap());
+}
+
+void SelectedScreenWidget::onOcr()
+{
+    if (!ocr_) {
+        ocr_ = new Ocr(this);
+    }
+    ocr_->start(getPixmap());
 }
 
 void SelectedScreenWidget::onSaveScreen(void) 
