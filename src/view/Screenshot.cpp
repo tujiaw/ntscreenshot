@@ -330,7 +330,22 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
     if (e->key() == Qt::Key_Escape) {
         emit sigClose();
         return;
-    } else if (e->key() == Qt::Key_C) {
+	}
+	else if (e->key() == Qt::Key_Equal) {
+		if (selectedScreen_) {
+			selectedScreen_->plusRect();
+			selectedScreen_->moveDrawPanel();
+			return;
+		}
+	}
+	else if (e->key() == Qt::Key_Minus) {
+		if (selectedScreen_) {		
+			selectedScreen_->minusRect();
+			selectedScreen_->moveDrawPanel();
+			return;
+		}
+	}
+	else if (e->key() == Qt::Key_C) {
         if (amplifierTool_ && amplifierTool_->isVisible()) {
             QClipboard *clipboard = QApplication::clipboard();
             clipboard->setText(amplifierTool_->getCursorPointColor());
@@ -519,6 +534,121 @@ void SelectedScreenWidget::setCurrentRect(const QRect &rect)
 {
 	currentRect_ = rect;
 	setGeometry(rect);
+}
+
+QRect SelectedScreenWidget::currentRect() const
+{
+	return currentRect_;
+}
+
+void SelectedScreenWidget::minusRect()
+{
+	scaledRect(1);
+}
+
+void SelectedScreenWidget::plusRect()
+{
+	scaledRect(-1);
+}
+
+void SelectedScreenWidget::scaledRect(int direction)
+{
+	if (!originScreen_) {
+		return;
+	}
+
+	QImage image = originScreen_->toImage();
+	int w = currentRect_.width();
+	int h = currentRect_.height();
+	int left = currentRect_.left();
+	int right = currentRect_.right();
+	int top = currentRect_.top();
+	int bottom = currentRect_.bottom();
+
+	auto getLinePixel = [&image](const QPoint &from, QPoint &to) -> QRgb {
+		QMap<QRgb, int> mp;
+		for (int i = from.x(); i <= to.x(); i++) {
+			for (int j = from.y(); j <= to.y(); j++) {
+				if (image.rect().contains(i, j)) {
+					mp[image.pixel(i, j)]++;
+				}
+			}
+		}
+		QRgb rgb = 0;
+		int count = 0;
+		QMapIterator<QRgb, int> i(mp);
+		while (i.hasNext()) {
+			i.next();
+			if (i.value() > count) {
+				count = i.value();
+				rgb = i.key();
+			}
+		}
+		return rgb;
+	};
+
+	int offsetLeft = 0;
+	int offsetRight = 0;
+	int offsetTop = 0;
+	int offsetBottom = 0;
+
+	// left
+	QRgb clr = getLinePixel(QPoint(left, top), QPoint(left, bottom));
+	if (clr > 0) {
+		for (int i = 1; i <= image.width(); i++) {
+			int offset = i * direction;
+			QRgb tmpClr = getLinePixel(QPoint(left + offset, top), QPoint(left + offset, bottom));
+			if (tmpClr == 0) break;
+			if (clr != tmpClr) {
+				offsetLeft = offset;
+				break;
+			}
+		}
+	}
+
+	// right
+	clr = getLinePixel(QPoint(right, top), QPoint(right, bottom));
+	if (clr > 0) {
+		for (int i = 1; i <= image.width(); i++) {
+			int offset = -1 * i * direction;
+			QRgb tmpClr = getLinePixel(QPoint(right + offset, top), QPoint(right + offset, bottom));
+			if (tmpClr == 0) break;
+			if (clr != tmpClr) {
+				offsetRight = offset;
+				break;
+			}
+		}
+	}
+
+	// top
+	clr = getLinePixel(QPoint(left, top), QPoint(right, top));
+	if (clr > 0) {
+		for (int i = 1; i <= image.height(); i++) {
+			int offset = i * direction;
+			QRgb tmpClr = getLinePixel(QPoint(left, top + offset), QPoint(right, top + offset));
+			if (tmpClr == 0) break;
+			if (clr != tmpClr) {
+				offsetTop = offset;
+				break;
+			}
+		}
+	}
+
+	// bottom
+	clr = getLinePixel(QPoint(left, bottom), QPoint(right, bottom));
+	if (clr > 0) {
+		for (int i = 1; i <= image.height(); i++) {
+			int offset = -1 * i * direction;
+			QRgb tmpClr = getLinePixel(QPoint(left, bottom + offset), QPoint(right, bottom + offset));
+			if (tmpClr == 0) break;
+			if (clr != tmpClr) {
+				offsetBottom = offset;
+				break;
+			}
+		}
+	}
+
+	onSelectRectChanged(offsetLeft, offsetTop, offsetRight, offsetBottom);
 }
 
 QRect SelectedScreenWidget::adjustRect(QRect r)

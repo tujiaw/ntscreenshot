@@ -51,7 +51,13 @@ void Ocr::onHttpResponse(int err, const QByteArray& data)
 
 void Ocr::start(const QPixmap& pixmap)
 {
+	QWidget* parentWidget = qobject_cast<QWidget*>(this->parent());
 	QByteArray b = Util::pixmap2ByteArray(pixmap);
+	if (b.size() > 1024 * 1024) {
+		TipsWidget::popup(parentWidget, QStringLiteral("图片不能大于1M！"), 5);
+		return;
+	}
+
 	QList<QPair<QString, QVariant>> params;
 	params.push_back(QPair<QString, QVariant>("app_id", APPID));
 	params.push_back(QPair<QString, QVariant>("time_stamp", QDateTime::currentSecsSinceEpoch()));

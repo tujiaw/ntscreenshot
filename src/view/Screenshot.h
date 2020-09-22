@@ -134,6 +134,10 @@ public:
     QPoint adjustPos(QPoint p);
     QRect adjustRect(QRect r);
 	void setCurrentRect(const QRect &rect);
+	QRect currentRect() const;
+	void minusRect();
+	void plusRect();
+	void scaledRect(int direction);
 
 protected:
     void updateCursorDir(const QPoint &cursor);

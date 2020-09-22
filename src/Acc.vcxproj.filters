@@ -178,6 +178,15 @@
     <ClCompile Include="GeneratedFiles\Release\moc_WindowManager.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
+    <ClCompile Include="component\Ocr.cpp">
+      <Filter>component</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_Ocr.cpp">
+      <Filter>Generated Files\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_Ocr.cpp">
+      <Filter>Generated Files\Release</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\Constants.h">
@@ -268,6 +277,9 @@
     </CustomBuild>
     <CustomBuild Include="view\DrawSettings.h">
       <Filter>view</Filter>
+    </CustomBuild>
+    <CustomBuild Include="component\Ocr.h">
+      <Filter>component</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
