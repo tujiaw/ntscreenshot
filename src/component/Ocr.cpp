@@ -10,8 +10,8 @@
 #include "common/HttpRequest.h"
 #include "component/TipsWidget.h"
 
-const qint64 APPID = 2156348148;
-const QString APPKEY = "XFpS522Lm1kPcAQ3";
+const qint64 APPID = 123456;
+const QString APPKEY = "abcd";
 const QString OCRURL = "https://api.ai.qq.com/fcgi-bin/ocr/ocr_generalocr";
 
 Ocr::Ocr(QObject* parent) : QObject(parent)

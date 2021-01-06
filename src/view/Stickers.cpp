@@ -15,17 +15,14 @@
 #include "component/FramelessWidget.h"
 #include "common/Constants.h"
 #include "common/Util.h"
-#include "common/HttpRequest.h"
-#include "component/Ocr.h"
 #include "controller/WindowManager.h"
 #include "component/TipsWidget.h"
 #include "view/DrawPanel.h"
 
 static QList<QPair<QPoint, QPixmap>> HidedStickerList;
 StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
-    : QWidget(parent), pixmap_(pixmap), ocr_(nullptr)
+    : QWidget(parent), pixmap_(pixmap)
 {
-    uploadImageUtil_ = new UploadImageUtil(this);
 	menu_ = new QMenu(this);
     menu_->addAction(QStringLiteral("±ê×¢"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
     menu_->addAction(QStringLiteral("³·Ïú"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
@@ -37,12 +34,6 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("Ïú»Ù"), this, SLOT(onClose()), QKeySequence("Esc"));
     menu_->addAction(QStringLiteral("Ïú»ÙËùÓÐ"), this, SLOT(onCloseAll()));
-
-    menu_->addSeparator();
-    if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
-        menu_->addAction(QStringLiteral("ÉÏ´«Í¼´²"), this, SLOT(onUpload()));
-    }
-    menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()));
 
     this->setFocusPolicy(Qt::StrongFocus);
     emit WindowManager::instance()->sigStickerCountChanged();
@@ -216,20 +207,6 @@ void StickerWidget::onSave()
 	}
 }
 
-void StickerWidget::onUpload()
-{
-    flush();
-    uploadImageUtil_->upload(pixmap_);
-}
-
-void StickerWidget::onOcr()
-{
-    if (!ocr_) {
-        ocr_ = new Ocr(this);
-    }
-    ocr_->start(pixmap_);
-}
-
 void StickerWidget::onClose()
 {
 	if (this->parentWidget()) {
@@ -261,44 +238,44 @@ void StickerWidget::onHideAll()
 }
 
 //////////////////////////////////////////////////////////////////////////
-UploadImageUtil::UploadImageUtil(QWidget *parent)
-    : QObject(parent), parentWidget_(parent), http_(nullptr)
-{
-}
-
-void UploadImageUtil::upload(const QPixmap &pixmap)
-{
-    if (pixmap.isNull()) {
-        return;
-    }
-
-    if (!http_) {
-        http_ = new HttpRequest(this);
-        connect(http_, &HttpRequest::sigHttpResponse, this, &UploadImageUtil::onHttpResponse);
-    }
-
-    QByteArray b = Util::pixmap2ByteArray(pixmap);
-    if (b.isEmpty()) {
-        qDebug() << "upload image data is empty";
-        return;
-    }
-
-    QString fileName = Util::pixmapUniqueName(pixmap);
-    http_->postImage(WindowManager::instance()->setting()->uploadImageUrl(), fileName, b);
-}
-
-void UploadImageUtil::onHttpResponse(int err, const QByteArray& data)
-{
-    if (err != 0) {
-        QString tips = QStringLiteral("ÍøÂç´íÎó£¬´íÎóÂë£º%1").arg(err);
-        TipsWidget::popup(parentWidget_, tips, 5);
-    } else {
-        QVariantMap vm = Util::json2map(data);
-        if (vm["errcode"].toInt() == 0) {
-            TipsWidget::popup(parentWidget_, vm["url"].toString(), 5, 0, true);
-        } else {
-            QString tips = QStringLiteral("Ó¦´ð´íÎó£¬´íÎóÂë£º%1").arg(vm["errcode"].toInt());
-            TipsWidget::popup(parentWidget_, tips, 5, 0, true);
-        }
-    }
-}
+//UploadImageUtil::UploadImageUtil(QWidget *parent)
+//    : QObject(parent), parentWidget_(parent), http_(nullptr)
+//{
+//}
+//
+//void UploadImageUtil::upload(const QPixmap &pixmap)
+//{
+//    if (pixmap.isNull()) {
+//        return;
+//    }
+//
+//    if (!http_) {
+//        http_ = new HttpRequest(this);
+//        connect(http_, &HttpRequest::sigHttpResponse, this, &UploadImageUtil::onHttpResponse);
+//    }
+//
+//    QByteArray b = Util::pixmap2ByteArray(pixmap);
+//    if (b.isEmpty()) {
+//        qDebug() << "upload image data is empty";
+//        return;
+//    }
+//
+//    QString fileName = Util::pixmapUniqueName(pixmap);
+//    http_->postImage(WindowManager::instance()->setting()->uploadImageUrl(), fileName, b);
+//}
+//
+//void UploadImageUtil::onHttpResponse(int err, const QByteArray& data)
+//{
+//    if (err != 0) {
+//        QString tips = QStringLiteral("ÍøÂç´íÎó£¬´íÎóÂë£º%1").arg(err);
+//        TipsWidget::popup(parentWidget_, tips, 5);
+//    } else {
+//        QVariantMap vm = Util::json2map(data);
+//        if (vm["errcode"].toInt() == 0) {
+//            TipsWidget::popup(parentWidget_, vm["url"].toString(), 5, 0, true);
+//        } else {
+//            QString tips = QStringLiteral("Ó¦´ð´íÎó£¬´íÎóÂë£º%1").arg(vm["errcode"].toInt());
+//            TipsWidget::popup(parentWidget_, tips, 5, 0, true);
+//        }
+//    }
+//}

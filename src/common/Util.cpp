@@ -234,56 +234,6 @@ namespace Util
         return configDir.absolutePath();
     }
 
-	QString getSystemDir(int csidl)
-	{
-		//CSIDL_COMMON_PROGRAMS CSIDL_PROGRAMS CSIDL_DESKTOP
-		int csidls[] = { CSIDL_ADMINTOOLS, CSIDL_ALTSTARTUP, CSIDL_APPDATA, CSIDL_BITBUCKET, CSIDL_CDBURN_AREA,
-			CSIDL_COMMON_ADMINTOOLS, CSIDL_COMMON_ALTSTARTUP, CSIDL_COMMON_APPDATA, CSIDL_COMMON_DESKTOPDIRECTORY,
-			CSIDL_COMMON_DOCUMENTS, CSIDL_COMMON_FAVORITES, CSIDL_COMMON_MUSIC, CSIDL_COMMON_OEM_LINKS,
-			CSIDL_COMMON_PICTURES, CSIDL_COMMON_PROGRAMS, CSIDL_COMMON_STARTMENU, CSIDL_COMMON_STARTUP,
-			CSIDL_COMMON_TEMPLATES, CSIDL_COMMON_VIDEO, CSIDL_COMPUTERSNEARME, CSIDL_CONNECTIONS, CSIDL_CONTROLS,
-			CSIDL_COOKIES, CSIDL_DESKTOP, CSIDL_DESKTOPDIRECTORY, CSIDL_DRIVES, CSIDL_FAVORITES, CSIDL_FONTS,
-			CSIDL_HISTORY, CSIDL_INTERNET, CSIDL_INTERNET_CACHE, CSIDL_LOCAL_APPDATA, CSIDL_MYDOCUMENTS,
-			CSIDL_MYMUSIC, CSIDL_MYPICTURES, CSIDL_MYVIDEO, CSIDL_NETHOOD, CSIDL_NETWORK, CSIDL_PERSONAL,
-			CSIDL_PRINTERS, CSIDL_PRINTHOOD, CSIDL_PROFILE, CSIDL_PROGRAM_FILES, CSIDL_PROGRAM_FILESX86,
-			CSIDL_PROGRAM_FILES_COMMON, CSIDL_PROGRAM_FILES_COMMONX86, CSIDL_PROGRAMS, CSIDL_RECENT, CSIDL_RESOURCES,
-			CSIDL_RESOURCES_LOCALIZED, CSIDL_SENDTO, CSIDL_STARTMENU, CSIDL_STARTUP, CSIDL_SYSTEM, CSIDL_SYSTEMX86,
-			CSIDL_TEMPLATES, CSIDL_WINDOWS, CSIDL_FLAG_DONT_UNEXPAND, CSIDL_FLAG_DONT_VERIFY, CSIDL_FLAG_NO_ALIAS,
-			CSIDL_FLAG_PER_USER_INIT, CSIDL_FLAG_MASK
-		};
-
-		LPITEMIDLIST pidl;
-		LPMALLOC pShellMalloc;
-		wchar_t szDir[MAX_PATH] = { 0 };
-		if (SUCCEEDED(SHGetMalloc(&pShellMalloc))) {
-			if (SUCCEEDED(SHGetSpecialFolderLocation(NULL, csidl, &pidl))) {
-				SHGetPathFromIDList(pidl, szDir);
-				pShellMalloc->Free(pidl);
-			}
-			pShellMalloc->Release();
-		}
-		return QString::fromStdWString(szDir);
-	}
-
-	QStringList getAllLnk()
-	{
-		QStringList result;
-		QString desktop = getSystemDir(CSIDL_DESKTOP);
-		QString commonPrograms = getSystemDir(CSIDL_COMMON_PROGRAMS);
-		QString programs = getSystemDir(CSIDL_PROGRAMS);
-        QString commonDesktop = getSystemDir(CSIDL_COMMON_DESKTOPDIRECTORY);
-
-		result.append(getFiles(desktop, false));
-		result.append(getFiles(commonPrograms));
-		result.append(getFiles(programs));
-        result.append(getFiles(commonDesktop));
-
-		//EnumerateFileInDirectory(desktop, false, result);
-		//EnumerateFileInDirectory(commonPrograms, true, result);
-		//EnumerateFileInDirectory(programs, true, result);
-
-		return result;
-	}
 	QVariantMap json2map(const QByteArray &val)
 	{
 		QJsonParseError jError;
@@ -464,99 +414,6 @@ namespace Util
         return b;
     }
 
-	std::wstring ansi2unicode(const std::string& ansi)
-	{
-		if (ansi.empty()) {
-			return std::wstring(L"");
-		}
-		int len = MultiByteToWideChar(CP_ACP, 0, ansi.c_str(), -1, NULL, 0);
-		std::wstring unicode(len + 1, L'\0');
-		MultiByteToWideChar(CP_ACP, 0, ansi.c_str(), ansi.size(), &unicode[0], len);
-		return unicode;
-	}
-
-	std::string unicode2ansi(const std::wstring& unicode)
-	{
-		if (unicode.empty()) {
-			return std::string("");
-		}
-		int len = WideCharToMultiByte(CP_ACP, 0, unicode.c_str(), -1, NULL, 0, NULL, NULL);
-		std::string ansi(len + 1, '\0');
-		WideCharToMultiByte(CP_ACP, 0, unicode.c_str(), unicode.size(), &ansi[0], len, NULL, NULL);
-		return ansi;
-	}
-
-	std::string string_to_utf8(const std::string& srcStr)
-	{
-		if (srcStr.empty())
-		{
-			return "";
-		}
-
-		int nwLen = MultiByteToWideChar(CP_ACP, 0, srcStr.c_str(), -1, NULL, 0);
-		wchar_t* pwBuf = new wchar_t[nwLen + 1];
-		ZeroMemory(pwBuf, nwLen * 2 + 2);
-		MultiByteToWideChar(CP_ACP, 0, srcStr.c_str(), srcStr.length(), pwBuf, nwLen);
-		int nLen = ::WideCharToMultiByte(CP_UTF8, 0, pwBuf, -1, NULL, NULL, NULL, NULL);
-		char* pBuf = new char[nLen + 1];
-		ZeroMemory(pBuf, nLen + 1);
-		WideCharToMultiByte(CP_UTF8, 0, pwBuf, nwLen, pBuf, nLen, NULL, NULL);
-		std::string retStr(pBuf);
-		delete[]pwBuf;
-		delete[]pBuf;
-		pwBuf = NULL;
-		pBuf = NULL;
-		return retStr;
-	}
-
-	std::string utf8_to_string(const std::string& srcStr)
-	{
-		if (srcStr.empty())
-		{
-			return "";
-		}
-
-		int nwLen = MultiByteToWideChar(CP_UTF8, 0, srcStr.c_str(), -1, NULL, 0);
-		wchar_t* pwBuf = new wchar_t[nwLen + 1];
-		memset(pwBuf, 0, nwLen * 2 + 2);
-		MultiByteToWideChar(CP_UTF8, 0, srcStr.c_str(), srcStr.length(), pwBuf, nwLen);
-		int nLen = WideCharToMultiByte(CP_ACP, 0, pwBuf, -1, NULL, NULL, NULL, NULL);
-		char* pBuf = new char[nLen + 1];
-		memset(pBuf, 0, nLen + 1);
-		WideCharToMultiByte(CP_ACP, 0, pwBuf, nwLen, pBuf, nLen, NULL, NULL);
-		std::string retStr = pBuf;
-		delete[]pBuf;
-		delete[]pwBuf;
-		pBuf = NULL;
-		pwBuf = NULL;
-		return retStr;
-	}
-
-	std::wstring utf8_to_wstring(const std::string& str)
-	{
-		int len = str.size();
-		int unicodeLen = ::MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-		wchar_t* pUnicode;
-		pUnicode = new wchar_t[unicodeLen + 1];
-		memset((void*)pUnicode, 0, (unicodeLen + 1) * sizeof(wchar_t));
-		::MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, (LPWSTR)pUnicode, unicodeLen);
-		std::wstring wstrReturn(pUnicode);
-		delete[] pUnicode;
-		return wstrReturn;
-	}
-
-	std::string wstring_to_utf8(const std::wstring& str)
-	{
-		char* pElementText = NULL;
-		int iTextLen = ::WideCharToMultiByte(CP_UTF8, 0, (LPWSTR)str.c_str(), -1, NULL, 0, NULL, NULL);
-		pElementText = new char[iTextLen + 1];
-		memset((void*)pElementText, 0, (iTextLen + 1) * sizeof(char));
-		::WideCharToMultiByte(CP_UTF8, 0, (LPWSTR)str.c_str(), -1, pElementText, iTextLen, NULL, NULL);
-		std::string strReturn(pElementText);
-		delete[] pElementText;
-		return strReturn;
-	}
-
 	std::string getImageFormat(const char* data, int size)
 	{
 		if (size < 8) {
@@ -585,20 +442,6 @@ namespace Util
 		default:
 			return "";
 		}
-	}
-
-	UINT32 GetFileSize(const std::string& filePath)
-	{
-		UINT32 size = 0;
-		FILE* pFile = NULL;
-		_wfopen_s(&pFile, utf8_to_wstring(filePath).c_str(), L"rb");
-		if (NULL != pFile)
-		{
-			fseek(pFile, 0, SEEK_END);
-			size = ftell(pFile);
-			fclose(pFile);
-		}
-		return size;
 	}
 
     QString md5Pixmap(const QPixmap &pixmap)

@@ -21,7 +21,6 @@
 
 #include "common/Constants.h"
 #include "common/Util.h"
-#include "component/Ocr.h"
 #include "view/Amplifier.h"
 #include "view/Stickers.h"
 
@@ -459,24 +458,23 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     originPoint_(pos),
     isPressed_(false), 
     originScreen_(originPainting),
-    drawPanel_(parent, this),
-    ocr_(nullptr)
+    drawPanel_(parent, this)
 {
     drawPanel_.hide();
     connect(&drawPanel_, SIGNAL(sigSticker()), this, SLOT(onSticker()));
     connect(&drawPanel_, SIGNAL(sigSave()), this, SLOT(onSaveScreenOther()));
     connect(&drawPanel_, SIGNAL(sigFinished()), this, SLOT(onSaveScreen()));
 
-    uploadImageUtil_ = new UploadImageUtil(this);
+    //uploadImageUtil_ = new UploadImageUtil(this);
     menu_ = new QMenu(this);
     menu_->addAction(QStringLiteral("完成"), this, SLOT(onSaveScreen()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSaveScreenOther()), QKeySequence("Ctrl+S"));
     menu_->addAction(QStringLiteral("贴图"), this, SLOT(onSticker()), QKeySequence(PIN_KEY));
     menu_->addAction(QStringLiteral("撤销"), drawPanel_.drawer(), &Drawer::undo, QKeySequence("Ctrl+Z"));
-    if (!UPLOAD_IMAGE_URL.isEmpty()) {
-        menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
-    }
-    menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()), QKeySequence("Ctrl+O"));
+    //if (!UPLOAD_IMAGE_URL.isEmpty()) {
+    //    menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
+    //}
+    //menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()), QKeySequence("Ctrl+O"));
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("退出"), this, SLOT(quitScreenshot()));
 
@@ -920,19 +918,6 @@ void SelectedScreenWidget::onSticker()
     // 使用QTimer在主屏幕退出后再弹出贴图，否则在任务栏时贴图会显示在任务栏下面
     // 等待quitScreenshot的事件完成，放弃当前环境执行，等待下一个QTimer事件再执行
     QTimer::singleShot(0, [=]() { StickerWidget::popup(pixmap, pos); });
-}
-
-void SelectedScreenWidget::onUpload()
-{
-    uploadImageUtil_->upload(getPixmap());
-}
-
-void SelectedScreenWidget::onOcr()
-{
-    if (!ocr_) {
-        ocr_ = new Ocr(this);
-    }
-    ocr_->start(getPixmap());
 }
 
 void SelectedScreenWidget::onSaveScreen(void) 

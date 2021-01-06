@@ -7,10 +7,7 @@
 class QLabel;
 class QContextMenuEvent;
 class QMenu;
-class HttpRequest;
 class DrawPanel;
-class UploadImageUtil;
-class Ocr;
 
 class StickerWidget : public QWidget
 {
@@ -39,8 +36,6 @@ private slots:
     void onUndo();
 	void onCopy();
 	void onSave();
-    void onUpload();
-    void onOcr();
 	void onClose();
 	void onCloseAll();
     void onHide();
@@ -51,22 +46,20 @@ private:
     QPixmap pixmap_;
 	QMenu* menu_;
     std::unique_ptr<DrawPanel> drawPanel_;
-    UploadImageUtil *uploadImageUtil_;
-    Ocr* ocr_;
 };
 
-class UploadImageUtil : public QObject
-{
-    Q_OBJECT
-public:
-    UploadImageUtil(QWidget *parent);
-    void upload(const QPixmap &pixmap);
-
-private slots:
-    void onHttpResponse(int err, const QByteArray& data);
-
-private:
-    Q_DISABLE_COPY(UploadImageUtil)
-    QWidget *parentWidget_;
-    HttpRequest* http_;
-};
+//class UploadImageUtil : public QObject
+//{
+//    Q_OBJECT
+//public:
+//    UploadImageUtil(QWidget *parent);
+//    void upload(const QPixmap &pixmap);
+//
+//private slots:
+//    void onHttpResponse(int err, const QByteArray& data);
+//
+//private:
+//    Q_DISABLE_COPY(UploadImageUtil)
+//    QWidget *parentWidget_;
+//    HttpRequest* http_;
+//};

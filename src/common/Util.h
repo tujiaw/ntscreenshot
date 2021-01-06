@@ -22,8 +22,6 @@ namespace Util {
 	QString getConfigDir();
 	QString getConfigPath();
     QString getLogsDir();
-	QString getSystemDir(int csidl);
-	QStringList getAllLnk();
 	QVariantMap json2map(const QByteArray &val);
 	QString map2json(const QVariantMap &val);
 	QVariantList json2list(const QByteArray &val);
@@ -37,12 +35,6 @@ namespace Util {
     QString strKeySequence(const QKeySequence &key);
 	QByteArray pixmap2ByteArray(const QPixmap& pixmap, const char *format = "png");
     QByteArray image2ByteArray(const QImage &image, const char *format = "png");
-	std::wstring ansi2unicode(const std::string& ansi);
-	std::string unicode2ansi(const std::wstring& unicode);
-	std::string string_to_utf8(const std::string& srcStr);
-	std::string utf8_to_string(const std::string& srcStr);
-	std::wstring utf8_to_wstring(const std::string& str);
-	std::string wstring_to_utf8(const std::wstring& str);
 	std::string getImageFormat(const char* data, int size);
     QString md5Pixmap(const QPixmap &pixmap);
     QString md5Image(const QImage &image);

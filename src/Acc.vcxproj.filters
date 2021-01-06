@@ -55,9 +55,6 @@
     <ClCompile Include="model\SettingModel.cpp">
       <Filter>model</Filter>
     </ClCompile>
-    <ClCompile Include="common\HttpRequest.cpp">
-      <Filter>common</Filter>
-    </ClCompile>
     <ClCompile Include="common\LogHandler.cpp">
       <Filter>common</Filter>
     </ClCompile>
@@ -178,9 +175,6 @@
     <ClCompile Include="GeneratedFiles\Release\moc_WindowManager.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
-    <ClCompile Include="component\Ocr.cpp">
-      <Filter>component</Filter>
-    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_Ocr.cpp">
       <Filter>Generated Files\Debug</Filter>
     </ClCompile>
@@ -266,9 +260,6 @@
     <CustomBuild Include="model\SettingModel.h">
       <Filter>model</Filter>
     </CustomBuild>
-    <CustomBuild Include="common\HttpRequest.h">
-      <Filter>common</Filter>
-    </CustomBuild>
     <CustomBuild Include="component\TipsWidget.h">
       <Filter>component</Filter>
     </CustomBuild>
@@ -277,9 +268,6 @@
     </CustomBuild>
     <CustomBuild Include="view\DrawSettings.h">
       <Filter>view</Filter>
-    </CustomBuild>
-    <CustomBuild Include="component\Ocr.h">
-      <Filter>component</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
