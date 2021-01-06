@@ -1,3 +1,5 @@
+![ntscreenshot](https://github.com/tujiaw/ntscreenshot/ntscreenshot_demo.png)
+
 # ntscreenshot
 windows截图工具
 
