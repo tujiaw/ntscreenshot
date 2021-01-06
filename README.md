@@ -1,5 +1,6 @@
 ![ntscreenshot](https://github.com/tujiaw/ntscreenshot/ntscreenshot_demo.png)
 
+[已编译好的绿色包下载](https://download.csdn.net/download/tujiaw/14033475)
 # ntscreenshot
 windows截图工具
 
