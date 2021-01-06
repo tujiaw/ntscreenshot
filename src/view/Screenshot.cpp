@@ -282,11 +282,12 @@ void ScreenshotWidget::mouseReleaseEvent(QMouseEvent *e) {
 void ScreenshotWidget::mouseMoveEvent(QMouseEvent *e) {
     emit sigCursorPosChanged(e->x(), e->y());
     if (isLeftPressed_) {
-        amplifierTool_->raise();
-        setEsthesiaRect(QRect());
-        update();
-    }
-    else if (!isLeftPressed_ && (!selectedScreen_ || selectedScreen_->isHidden())){
+        if ((e->pos() - startPoint_).manhattanLength() > QApplication::startDragDistance()) {
+            amplifierTool_->raise();
+            setEsthesiaRect(QRect());
+            update();
+        }
+    } else if (!isLeftPressed_ && (!selectedScreen_ || selectedScreen_->isHidden())) {
         onTopMost();
         updateMouse();
     }
