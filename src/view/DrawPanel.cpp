@@ -61,6 +61,7 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     QPushButton* pbRectangle = createShapeBtn(shapeGroup, ":/images/rectangle.png", QStringLiteral("矩形"));
     QPushButton* pbEllipse = createShapeBtn(shapeGroup, ":/images/ellipse.png", QStringLiteral("椭圆"));
     QPushButton* pbText = createShapeBtn(shapeGroup, ":/images/text.png", QStringLiteral("文本"));
+    QPushButton* pbMosaic = createShapeBtn(shapeGroup, ":/images/mosaic.png", QStringLiteral("马赛克"));
     QPushButton* line2 = createLine();
     QPushButton* pbUndo = createActionBtn(":/images/undo.png", QStringLiteral("撤销"));
     QPushButton* pbSticker = createActionBtn(":/images/pin.png", QStringLiteral("贴图"));
@@ -79,12 +80,14 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     DrawMode rectangleMode(DrawMode::Rectangle);
     DrawMode ellipseMode(DrawMode::Ellipse);
     DrawMode textMode(DrawMode::Text);
+    DrawMode mosaicMode(DrawMode::Mosaic);
     btns_.push_back(qMakePair(pbPolyLine, polylineMode));
     btns_.push_back(qMakePair(pbLine, lineMode));
     btns_.push_back(qMakePair(pbArrow, arrowMode));
     btns_.push_back(qMakePair(pbRectangle, rectangleMode));
     btns_.push_back(qMakePair(pbEllipse, ellipseMode));
     btns_.push_back(qMakePair(pbText, textMode));
+    btns_.push_back(qMakePair(pbMosaic, mosaicMode));
 
     QHBoxLayout *hLayout = new QHBoxLayout();
     hLayout->setContentsMargins(0, 0, 0, 0);
@@ -241,6 +244,8 @@ void DrawMode::init()
     } else {
         if (shape_ == Text) {
             cursor_ = Qt::IBeamCursor;
+        } else if (shape_ == Mosaic) {
+            cursor_ = Qt::ArrowCursor;
         } else {
             cursor_ = Qt::CrossCursor;
         }
@@ -262,6 +267,8 @@ bool DrawMode::isValid() const
         return !points_.isEmpty();
     } else if (shape_ == Text) {
         return !text_.isEmpty();
+    } else if (shape_ == Mosaic) {
+        return !mosaics_.isEmpty();
     } else {
         // 起止距离太短认为是一个无效的绘制
         return (start_ - end_).manhattanLength() > QApplication::startDragDistance();
@@ -279,6 +286,23 @@ void DrawMode::addPos(const QPoint &pos)
     points_.push_back(pos);
 }
 
+const int MASK_WIDTH = 6;
+void DrawMode::addMosaic(const QPoint &pos, const QColor &clr, const QColor &clr2)
+{
+    QRect rect1(pos.x(), pos.y() - MASK_WIDTH, MASK_WIDTH, MASK_WIDTH);
+    QRect rect2(pos.x(), pos.y(), MASK_WIDTH, MASK_WIDTH);
+    for (auto m : mosaics_) {
+        if (std::get<0>(m).intersects(rect1)) {
+            return;
+        }
+        if (std::get<0>(m).intersects(rect2)) {
+            return;
+        }
+    }
+    mosaics_.push_back(std::make_tuple(rect1, clr));
+    mosaics_.push_back(std::make_tuple(rect2, clr2));
+}
+
 void DrawMode::setText(const QRectF &rect, const QString& text)
 {
     textRect_ = rect;
@@ -290,6 +314,7 @@ void DrawMode::clear()
     start_ = QPoint(0, 0);
     end_ = QPoint(0, 0);
     points_.clear();
+    mosaics_.clear();
     text_.clear();
 }
 
@@ -318,6 +343,8 @@ void DrawMode::draw(QPainter &painter)
     case Text:
         drawText(textRect_, text_, painter);
         break;
+    case Mosaic:
+        drawMosaic(mosaics_, painter);
 	default:
 		break;
     }
@@ -392,6 +419,22 @@ void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter&
 void DrawMode::drawText(const QRectF &rectangle, const QString& text, QPainter& painter)
 {
     painter.drawText(rectangle, Qt::AlignLeft, text);
+}
+
+void DrawMode::drawMosaic(const QVector<std::tuple<QRect, QColor>> &mosaics, QPainter& painter)
+{
+    if (mosaics_.isEmpty()) {
+        return;
+    }
+
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    for (const auto m : mosaics_) {
+        QBrush brush(std::get<1>(m));
+        painter.setBrush(brush);
+        painter.drawRect(std::get<0>(m));
+    }
+    painter.restore();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -570,6 +613,13 @@ bool Drawer::onMouseMoveEvent(QMouseEvent *e)
         // 绘制折线保存鼠标移动的每一个点
         if (drawMode_.shape() == DrawMode::PolyLine) {
             drawMode_.addPos(e->pos());
+        } else if (drawMode_.shape() == DrawMode::Mosaic) {
+            if (bkImage_.isNull()) {
+                bkImage_ = this->parentWidget()->grab().toImage();
+            }
+            QPoint pos1(e->pos().x(), e->pos().y() - MASK_WIDTH);
+            QPoint pos2 = e->pos();
+            drawMode_.addMosaic(e->pos(), bkImage_.pixelColor(pos1), bkImage_.pixelColor(pos2));
         }
 
         parent_->update();

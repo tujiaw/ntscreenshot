@@ -24,5 +24,6 @@
         <file>images/text.png</file>
         <file>images/tips.png</file>
         <file>images/setting.png</file>
+        <file>images/mosaic.png</file>
     </qresource>
 </RCC>

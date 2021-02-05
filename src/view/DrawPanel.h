@@ -23,6 +23,7 @@ public:
         Rectangle,
         Ellipse,
         Text,
+        Mosaic,
     };
 
     DrawMode();
@@ -36,6 +37,7 @@ public:
     QFont& font() { return font_; }
     void setPos(const QPoint &start, const QPoint &end);
     void addPos(const QPoint &pos);
+    void addMosaic(const QPoint &pos, const QColor &clr, const QColor &clr2);
     void setText(const QRectF &rect, const QString& text);
     void clear();
     void draw(QPainter &painter);
@@ -50,6 +52,7 @@ public:
     void drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
     void drawText(const QPoint& startPoint, const QString& text, QPainter& painter);
     void drawText(const QRectF &rectangle, const QString& text, QPainter& painter);
+    void drawMosaic(const QVector<std::tuple<QRect, QColor>> &mosaics, QPainter& painter);
 
 private:
     Shape shape_;
@@ -59,6 +62,7 @@ private:
     QBrush brush_;
     QFont font_;
     QVector<QPoint> points_;
+    QVector<std::tuple<QRect, QColor>> mosaics_;
     QRectF textRect_;
     QString text_;
     QCursor cursor_;
@@ -103,6 +107,7 @@ private:
     // 历史绘制模式缓存
     QList<DrawMode> drawModeCache_;
     TextEdit *textEdit_;
+    QImage bkImage_;
 };
 
 //////////////////////////////////////////////////////////////////////////
