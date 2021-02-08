@@ -286,21 +286,19 @@ void DrawMode::addPos(const QPoint &pos)
     points_.push_back(pos);
 }
 
-const int MASK_WIDTH = 6;
-void DrawMode::addMosaic(const QPoint &pos, const QColor &clr, const QColor &clr2)
+void DrawMode::addMosaic(const QPoint &pos, const QColor &clr)
 {
-    QRect rect1(pos.x(), pos.y() - MASK_WIDTH, MASK_WIDTH, MASK_WIDTH);
-    QRect rect2(pos.x(), pos.y(), MASK_WIDTH, MASK_WIDTH);
-    for (auto m : mosaics_) {
-        if (std::get<0>(m).intersects(rect1)) {
-            return;
-        }
-        if (std::get<0>(m).intersects(rect2)) {
+    int blockWidth = DrawSettings::penWidth() * 2 + 2;
+    int x = (pos.x() / blockWidth) * blockWidth;
+    int y = (pos.y() / blockWidth) * blockWidth;
+    QRect rect(x, y + blockWidth / 2, blockWidth, blockWidth);
+    for (const auto& m : mosaics_) {
+        QRect r = std::get<0>(m);
+        if (rect == r) {
             return;
         }
     }
-    mosaics_.push_back(std::make_tuple(rect1, clr));
-    mosaics_.push_back(std::make_tuple(rect2, clr2));
+    mosaics_.push_back(std::make_tuple(rect, clr));
 }
 
 void DrawMode::setText(const QRectF &rect, const QString& text)
@@ -423,15 +421,14 @@ void DrawMode::drawText(const QRectF &rectangle, const QString& text, QPainter& 
 
 void DrawMode::drawMosaic(const QVector<std::tuple<QRect, QColor>> &mosaics, QPainter& painter)
 {
-    if (mosaics_.isEmpty()) {
+    if (mosaics.isEmpty()) {
         return;
     }
 
     painter.save();
     painter.setPen(Qt::NoPen);
-    for (const auto m : mosaics_) {
-        QBrush brush(std::get<1>(m));
-        painter.setBrush(brush);
+    for (auto m : mosaics) {
+        painter.setBrush(std::get<1>(m));
         painter.drawRect(std::get<0>(m));
     }
     painter.restore();
@@ -617,9 +614,7 @@ bool Drawer::onMouseMoveEvent(QMouseEvent *e)
             if (bkImage_.isNull()) {
                 bkImage_ = this->parentWidget()->grab().toImage();
             }
-            QPoint pos1(e->pos().x(), e->pos().y() - MASK_WIDTH);
-            QPoint pos2 = e->pos();
-            drawMode_.addMosaic(e->pos(), bkImage_.pixelColor(pos1), bkImage_.pixelColor(pos2));
+            drawMode_.addMosaic(e->pos(), bkImage_.pixelColor(e->pos()));
         }
 
         parent_->update();

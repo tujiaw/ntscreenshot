@@ -37,7 +37,7 @@ public:
     QFont& font() { return font_; }
     void setPos(const QPoint &start, const QPoint &end);
     void addPos(const QPoint &pos);
-    void addMosaic(const QPoint &pos, const QColor &clr, const QColor &clr2);
+    void addMosaic(const QPoint &pos, const QColor &clr);
     void setText(const QRectF &rect, const QString& text);
     void clear();
     void draw(QPainter &painter);
