@@ -12,6 +12,8 @@
 #include <qmath.h>
 #include <QSslConfiguration>
 #include <qmessagebox.h>
+#include <QProcess>
+#include <thread>
 #include "component/FramelessWidget.h"
 #include "common/Constants.h"
 #include "common/Util.h"
@@ -28,6 +30,9 @@ StickerWidget::StickerWidget(const QPixmap& pixmap, QWidget* parent)
     menu_->addAction(QStringLiteral("撤销"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
 	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
+    if (!WindowManager::instance()->setting()->uploadImageUrl().isEmpty()) {
+        menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUploadImg()));
+    }
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("隐藏"), this, SLOT(onHide()), QKeySequence("Ctrl+H"));
     menu_->addAction(QStringLiteral("隐藏所有"), this, SLOT(onHideAll()));
@@ -205,6 +210,32 @@ void StickerWidget::onSave()
 	if (fileName.length() > 0) {
 		pixmap_.save(fileName, "png");
 	}
+}
+
+void StickerWidget::onUploadImg()
+{
+    QString writeDir = Util::getWritebaleDir();
+    QString imgName = QString("ntscreenshot-") + QDateTime::currentDateTime().toString("hhmmss") + ".png";
+    QString imgPath = writeDir + "/" + imgName;
+    pixmap_.save(imgPath);
+
+    QString command = QString("uploadimg.exe -url %1 -path %2").arg(WindowManager::instance()->setting()->uploadImageUrl()).arg(imgPath);
+    QProcess process;
+    process.setWorkingDirectory(Util::getRunDir());
+    process.start(command);
+    process.waitForFinished();
+    QByteArray arr = process.readAllStandardOutput();
+    QVariantMap vm = Util::json2map(arr);
+    if (!vm["errcode"].isNull()) {
+        qDebug() << vm;
+        if (vm["errcode"].toInt() == 0) {
+            QClipboard *clip = qApp->clipboard();
+            clip->setText(vm["content"].toString());
+        }
+    } else {
+        QString str = QString::fromLocal8Bit(arr);
+        qDebug() << str;
+    }
 }
 
 void StickerWidget::onClose()

@@ -14,6 +14,7 @@
 #include <QBrush>
 #include <QTimer>
 #include <QDebug>
+#include <QProcess>
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
@@ -472,9 +473,9 @@ SelectedScreenWidget::SelectedScreenWidget(std::shared_ptr<QPixmap> originPainti
     menu_->addAction(QStringLiteral("保存"), this, SLOT(onSaveScreenOther()), QKeySequence("Ctrl+S"));
     menu_->addAction(QStringLiteral("贴图"), this, SLOT(onSticker()), QKeySequence(PIN_KEY));
     menu_->addAction(QStringLiteral("撤销"), drawPanel_.drawer(), &Drawer::undo, QKeySequence("Ctrl+Z"));
-    //if (!UPLOAD_IMAGE_URL.isEmpty()) {
-    //    menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUpload()));
-    //}
+    if (!UPLOAD_IMAGE_URL.isEmpty()) {
+        menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUploadImg()));
+    }
     //menu_->addAction(QStringLiteral("OCR"), this, SLOT(onOcr()), QKeySequence("Ctrl+O"));
     menu_->addSeparator();
     menu_->addAction(QStringLiteral("退出"), this, SLOT(quitScreenshot()));
@@ -881,6 +882,38 @@ void SelectedScreenWidget::onSaveScreenOther(void) {
     if (fileName.length() > 0) {
         pixmap.save(fileName, "png");
         quitScreenshot();
+    }
+}
+
+void SelectedScreenWidget::onUploadImg()
+{
+    QPixmap pixmap = getPixmap();
+    if (pixmap.isNull()) {
+        qDebug() << "onUploadImg pixmap is null";
+        return;
+    }
+
+    QString writeDir = Util::getWritebaleDir();
+    QString imgName = QString("ntscreenshot-") + QDateTime::currentDateTime().toString("hhmmss") + ".png";
+    QString imgPath = writeDir + "/" + imgName;
+    pixmap.save(imgPath);
+
+    QString command = QString("uploadimg.exe -url %1 -path %2").arg(UPLOAD_IMAGE_URL).arg(imgPath);
+    QProcess process;
+    process.setWorkingDirectory(Util::getRunDir());
+    process.start(command);
+    process.waitForFinished();
+    QByteArray arr = process.readAllStandardOutput();
+    QVariantMap vm = Util::json2map(arr);
+    if (!vm["errcode"].isNull()) {
+        qDebug() << vm;
+        if (vm["errcode"].toInt() == 0) {
+            QClipboard *clip = qApp->clipboard();
+            clip->setText(vm["content"].toString());
+        }
+    } else {
+        QString str = QString::fromLocal8Bit(arr);
+        qDebug() << str;
     }
 }
 

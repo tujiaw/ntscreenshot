@@ -36,6 +36,7 @@ private slots:
     void onUndo();
 	void onCopy();
 	void onSave();
+    void onUploadImg();
 	void onClose();
 	void onCloseAll();
     void onHide();

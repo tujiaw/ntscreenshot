@@ -157,6 +157,7 @@ public slots:
     void onSticker();
     void onSaveScreen(void);
     void onSaveScreenOther(void);
+    void onUploadImg();
     void onKeyEvent(QKeyEvent *e);
     void quitScreenshot(void);
 
