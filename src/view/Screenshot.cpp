@@ -24,6 +24,7 @@
 #include "common/Util.h"
 #include "view/Amplifier.h"
 #include "view/Stickers.h"
+#include "component/TipsWidget.h"
 
 // Ä¬ÈÏÌùÍ¼¿ì½Ý¼ü
 static QString PIN_KEY = "F6";
@@ -898,23 +899,29 @@ void SelectedScreenWidget::onUploadImg()
     QString imgPath = writeDir + "/" + imgName;
     pixmap.save(imgPath);
 
-    QString command = QString("uploadimg.exe -url %1 -path %2").arg(UPLOAD_IMAGE_URL).arg(imgPath);
+    QUrl url(UPLOAD_IMAGE_URL);
+    QString command = QString("uploadimg.exe -url %1 -path %2").arg(url.toString()).arg(imgPath);
     QProcess process;
     process.setWorkingDirectory(Util::getRunDir());
     process.start(command);
     process.waitForFinished();
     QByteArray arr = process.readAllStandardOutput();
     QVariantMap vm = Util::json2map(arr);
+    QString tips;
     if (!vm["errcode"].isNull()) {
         qDebug() << vm;
         if (vm["errcode"].toInt() == 0) {
+            tips = url.scheme() + "://" + url.host() + vm["content"].toString();
             QClipboard *clip = qApp->clipboard();
-            clip->setText(vm["content"].toString());
+            clip->setText(tips);
+        } else {
+            tips = vm["errmsg"].toString();
         }
     } else {
-        QString str = QString::fromLocal8Bit(arr);
-        qDebug() << str;
+        tips = QString::fromLocal8Bit(arr);
+        qDebug() << tips;
     }
+    TipsWidget::popup(this, tips, 5, 0, true);
 }
 
 void SelectedScreenWidget::onKeyEvent(QKeyEvent *e)
