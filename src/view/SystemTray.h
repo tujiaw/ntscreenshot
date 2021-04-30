@@ -20,6 +20,7 @@ private slots:
     void onSetting();
     void onExit();
     void onUpdate();
+    void onTest();
 
 private:
     Q_DISABLE_COPY(SystemTray)

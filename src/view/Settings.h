@@ -30,6 +30,8 @@ private:
     void onAutoSaveChanged();
     void onOpenImagePath();
     void onModifyImagePath();
+    void onBackgroundChanged();
+    void onBackgroundAlphaReleased();
 
 private:
     Q_DISABLE_COPY(Settings)

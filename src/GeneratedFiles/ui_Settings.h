@@ -19,6 +19,7 @@
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QRadioButton>
+#include <QtWidgets/QSlider>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
@@ -50,7 +51,12 @@ public:
     QHBoxLayout *horizontalLayout_6;
     QLabel *label_6;
     QLineEdit *leUploadImageUrl;
+    QHBoxLayout *horizontalLayout_11;
     QCheckBox *cbPinNoBorder;
+    QHBoxLayout *horizontalLayout_12;
+    QCheckBox *cbBackground;
+    QSlider *hsBackgroundAlpha;
+    QSpacerItem *horizontalSpacer_6;
     QWidget *widget;
     QHBoxLayout *horizontalLayout_8;
     QLabel *label_8;
@@ -194,10 +200,45 @@ public:
 
         verticalLayout_2->addLayout(horizontalLayout_6);
 
+        horizontalLayout_11 = new QHBoxLayout();
+        horizontalLayout_11->setSpacing(5);
+        horizontalLayout_11->setObjectName(QString::fromUtf8("horizontalLayout_11"));
+        horizontalLayout_11->setContentsMargins(-1, -1, 0, 0);
         cbPinNoBorder = new QCheckBox(tab);
         cbPinNoBorder->setObjectName(QString::fromUtf8("cbPinNoBorder"));
 
-        verticalLayout_2->addWidget(cbPinNoBorder);
+        horizontalLayout_11->addWidget(cbPinNoBorder);
+
+        horizontalLayout_12 = new QHBoxLayout();
+        horizontalLayout_12->setSpacing(6);
+        horizontalLayout_12->setObjectName(QString::fromUtf8("horizontalLayout_12"));
+        horizontalLayout_12->setContentsMargins(10, -1, 0, -1);
+
+        horizontalLayout_11->addLayout(horizontalLayout_12);
+
+        cbBackground = new QCheckBox(tab);
+        cbBackground->setObjectName(QString::fromUtf8("cbBackground"));
+
+        horizontalLayout_11->addWidget(cbBackground);
+
+        hsBackgroundAlpha = new QSlider(tab);
+        hsBackgroundAlpha->setObjectName(QString::fromUtf8("hsBackgroundAlpha"));
+        hsBackgroundAlpha->setMinimumSize(QSize(100, 0));
+        hsBackgroundAlpha->setMaximumSize(QSize(100, 16777215));
+        hsBackgroundAlpha->setMaximum(255);
+        hsBackgroundAlpha->setValue(160);
+        hsBackgroundAlpha->setOrientation(Qt::Horizontal);
+        hsBackgroundAlpha->setInvertedAppearance(false);
+        hsBackgroundAlpha->setInvertedControls(false);
+
+        horizontalLayout_11->addWidget(hsBackgroundAlpha);
+
+        horizontalSpacer_6 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayout_11->addItem(horizontalSpacer_6);
+
+
+        verticalLayout_2->addLayout(horizontalLayout_11);
 
         widget = new QWidget(tab);
         widget->setObjectName(QString::fromUtf8("widget"));
@@ -398,6 +439,7 @@ public:
         pbPinStatus->setText(QString());
         label_6->setText(QApplication::translate("Settings", "\345\233\276\345\272\212\345\234\260\345\235\200\357\274\232", nullptr));
         cbPinNoBorder->setText(QApplication::translate("Settings", "\350\264\264\345\233\276\346\227\240\350\276\271\346\241\206", nullptr));
+        cbBackground->setText(QApplication::translate("Settings", "\346\210\252\345\233\276\350\203\214\346\231\257\351\200\217\346\230\216\345\272\246", nullptr));
         label_8->setText(QApplication::translate("Settings", "\351\242\234\350\211\262\346\240\274\345\274\217\346\230\276\347\244\272(C\351\224\256\345\244\215\345\210\266\351\242\234\350\211\262)\357\274\232", nullptr));
         rbRGB->setText(QApplication::translate("Settings", "RGB", nullptr));
         rbHexadecimal->setText(QApplication::translate("Settings", "\345\215\201\345\205\255\350\277\233\345\210\266", nullptr));

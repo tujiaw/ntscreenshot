@@ -29,7 +29,6 @@ FramelessWidget::FramelessWidget(QWidget *parent)
 
 FramelessWidget::~FramelessWidget()
 {
-
 }
 
 void FramelessWidget::setTitle(QWidget *title)
@@ -222,12 +221,14 @@ void FramelessWidget::setBackground(const QPixmap &pixmap)
 
 void FramelessWidget::setActiveStyle()
 {
-    this->setStyleSheet(QString("QWidget#FramelessWidget{ background: transparent; border:1px solid rgb(24, 131, 215) ;}"));
+    this->setStyleSheet(QString("QWidget#FramelessWidget{ background: transparent; border:1px solid %1;}").arg(
+        Style::FRAMELESS_BROKDER_ACTIVE));
 }
 
 void FramelessWidget::setDeactiveStyle()
 {
-    this->setStyleSheet("QWidget#FramelessWidget{ background: transparent; border: 1px solid rgb(170, 170, 170);}");
+    this->setStyleSheet(QString("QWidget#FramelessWidget{ background: transparent; border: 1px solid %1;}").arg(
+        Style::FRAMELESS_BROKDER_DEACTIVE));
 }
 
 // 鼠标目前的位置转换对应窗口所在区域

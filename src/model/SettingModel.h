@@ -34,6 +34,10 @@ public:
     void getAutoSaveImage(bool &autoSave, QString &path) const;
     void setAutoSaveImage(bool autoSave, const QString &path);
 
+    void setBackgroundColor(bool checked, int alpha);
+    int backgroundColorAlpha() const;
+    bool backgroundColorChecked() const;
+
 private:
     Q_DISABLE_COPY(SettingModel)
     QSettings settings_;

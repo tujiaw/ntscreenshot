@@ -20,6 +20,7 @@
 #pragma warning(disable:4091)
 #include <ShlObj.h>
 #pragma comment(lib, "Shell32.lib")
+#include "HWndRectCache.h"
 
 /*
 * DWORD EnumerateFileInDirectory(LPSTR szPath)
@@ -311,32 +312,40 @@ namespace Util
         return "ntscreenshot_" + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".png";
     }
 
-    bool getSmallestWindowFromCursor(QRect &out_rect)
+    bool getRectFromCurrentPoint(HWND hWndMySelf, QRect &out_rect)
+    {
+        POINT pt;
+        ::GetCursorPos(&pt);
+        HWndRectCacheManager::GetInstance()->setFilterHWnd(hWndMySelf);
+        RECT rect = HWndRectCacheManager::GetInstance()->getWndRect(pt, TRUE);
+        out_rect = QRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+        return out_rect.isValid();
+    }
+
+    bool getSmallestWindowFromCursor(QRect &smallestRect)
     {
         HWND hwnd;
         POINT pt;
         // 获得当前鼠标位置
         ::GetCursorPos(&pt);
         // 获得当前位置桌面上的子窗口
-        hwnd = ::ChildWindowFromPointEx(::GetDesktopWindow(),
-            pt, CWP_SKIPDISABLED | CWP_SKIPINVISIBLE);
+        hwnd = ::ChildWindowFromPointEx(::GetDesktopWindow(), pt, CWP_SKIPDISABLED | CWP_SKIPINVISIBLE);
         if (hwnd != NULL) {
             HWND temp_hwnd;
             temp_hwnd = hwnd;
             while (true) {
                 ::GetCursorPos(&pt);
                 ::ScreenToClient(temp_hwnd, &pt);
-                temp_hwnd = ::ChildWindowFromPointEx(temp_hwnd,
-                    pt, CWP_SKIPINVISIBLE);
-                if (temp_hwnd == NULL || temp_hwnd == hwnd)
+                temp_hwnd = ::ChildWindowFromPointEx(temp_hwnd, pt, CWP_SKIPINVISIBLE);
+                if (temp_hwnd == NULL || temp_hwnd == hwnd) {
                     break;
+                }
                 hwnd = temp_hwnd;
             }
-            RECT temp_window;
-            ::GetWindowRect(hwnd, &temp_window);
-            out_rect.setRect(temp_window.left, temp_window.top,
-                temp_window.right - temp_window.left,
-                temp_window.bottom - temp_window.top);
+            RECT r;
+            ::GetWindowRect(hwnd, &r);
+            setCurrentHwnd(hwnd);
+            smallestRect.setRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
             return true;
         }
         return false;
@@ -420,8 +429,8 @@ namespace Util
 			return "";
 		}
 
-		uchar png_type[9] = { 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,'/0' };
-		uchar file_head[9];
+		int png_type[9] = { 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,'/0' };
+		int file_head[9];
 		for (int i = 0; i < 8; ++i) {
 			file_head[i] = data[i];
 		}
@@ -501,6 +510,43 @@ namespace Util
         };
         pixmap.loadFromData(uc_mouse_image, sizeof(uc_mouse_image));
         return pixmap;
+    }
+
+    double colorDistance(QColor e1, QColor e2)
+    {
+        int rmean = (e1.red() + e2.red()) / 2;
+        int r = e1.red() - e2.red();
+        int g = e1.green() - e2.green();
+        int b = e1.blue() - e2.blue();
+        return sqrt((((512 + rmean)*r*r) >> 8) + 4 * g*g + (((767 - rmean)*b*b) >> 8));
+    }
+
+    QColor colorOpposite(QColor clr)
+    {
+        QString opposite;
+        QString s1 = "0123456789ABCDEF";
+        QString s2 = "FEDCBA9876543210";
+        QString name = clr.name();
+        for (int i = 0; i < name.size(); i++) {
+            int j = s1.indexOf(name.at(i).toUpper());
+            if (j >= 0) {
+                opposite.append(s2[j]);
+            } else {
+                opposite.append(name[i]);
+            }
+        }
+        return opposite;
+    }
+
+    static HWND s_currentHwnd;
+    void setCurrentHwnd(HWND hwnd)
+    {
+        s_currentHwnd = hwnd;
+    }
+
+    HWND getCurrentHwnd()
+    {
+        return s_currentHwnd;
     }
 
     void intervalHandleOnce(const std::string &name, int msTime, const std::function<void()> &func)

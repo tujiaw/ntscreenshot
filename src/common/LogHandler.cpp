@@ -85,7 +85,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
     if (s_logWrap.ts) {
         QString text = _TIME_ + QString("[%1:%2]%3\n").arg(context.file).arg(context.line).arg(formatMsg);
 #ifdef DEBUG
-        OutputDebugStringA(text.toStdString().c_str());
+        OutputDebugStringW(text.toStdWString().c_str());
 #endif
         QMutexLocker locker(&s_logWrap.locker);
         (*s_logWrap.ts << text).flush();

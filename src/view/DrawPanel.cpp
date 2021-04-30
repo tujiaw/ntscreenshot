@@ -20,9 +20,9 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     : QWidget(parent), drawer_(drawWidget)
 {    
     this->setObjectName("DrawPanel");
-    QButtonGroup* shapeGroup = new QButtonGroup(this);
-    shapeGroup->setExclusive(false);
-    connect(shapeGroup, SIGNAL(buttonClicked(QAbstractButton*)), this, SLOT(onShapeBtnClicked(QAbstractButton*)));
+    shapeGroup_ = new QButtonGroup(this);
+    shapeGroup_->setExclusive(false);
+    connect(shapeGroup_, SIGNAL(buttonClicked(QAbstractButton*)), this, SLOT(onShapeBtnClicked(QAbstractButton*)));
 
     auto createLine = [this]() -> QPushButton * {
         QPushButton* pb = new QPushButton("|", this);
@@ -31,12 +31,12 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
         return pb;
     };
 
-    auto createShapeBtn = [this](QButtonGroup * shapeGroup, const QString &iconPath, const QString &tooltip) -> QPushButton* {
+    auto createShapeBtn = [this](const QString &iconPath, const QString &tooltip) -> QPushButton* {
         QPushButton* pb = new QPushButton(QIcon(iconPath), "", this);
         pb->setToolTip(tooltip);
         pb->setCheckable(true);
         pb->setFixedSize(25, 25);
-        shapeGroup->addButton(pb);
+        shapeGroup_->addButton(pb);
         return pb;
     };
 
@@ -55,13 +55,13 @@ DrawPanel::DrawPanel(QWidget *parent, QWidget *drawWidget)
     drawSettings_->setVisible(false);
     connect(drawSettings_, &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
 
-    QPushButton* pbPolyLine = createShapeBtn(shapeGroup, ":/images/polyline.png", QStringLiteral("折线"));
-    QPushButton* pbLine = createShapeBtn(shapeGroup, ":/images/line.png", QStringLiteral("直线"));
-    QPushButton* pbArrow = createShapeBtn(shapeGroup, ":/images/arrow.png", QStringLiteral("箭头"));
-    QPushButton* pbRectangle = createShapeBtn(shapeGroup, ":/images/rectangle.png", QStringLiteral("矩形"));
-    QPushButton* pbEllipse = createShapeBtn(shapeGroup, ":/images/ellipse.png", QStringLiteral("椭圆"));
-    QPushButton* pbText = createShapeBtn(shapeGroup, ":/images/text.png", QStringLiteral("文本"));
-    QPushButton* pbMosaic = createShapeBtn(shapeGroup, ":/images/mosaic.png", QStringLiteral("马赛克"));
+    QPushButton* pbPolyLine = createShapeBtn(":/images/polyline.png", QStringLiteral("折线"));
+    QPushButton* pbLine = createShapeBtn(":/images/line.png", QStringLiteral("直线"));
+    QPushButton* pbArrow = createShapeBtn(":/images/arrow.png", QStringLiteral("箭头"));
+    QPushButton* pbRectangle = createShapeBtn(":/images/rectangle.png", QStringLiteral("矩形"));
+    QPushButton* pbEllipse = createShapeBtn(":/images/ellipse.png", QStringLiteral("椭圆"));
+    QPushButton* pbText = createShapeBtn(":/images/text.png", QStringLiteral("文本"));
+    QPushButton* pbMosaic = createShapeBtn(":/images/mosaic.png", QStringLiteral("马赛克"));
     QPushButton* line2 = createLine();
     QPushButton* pbUndo = createActionBtn(":/images/undo.png", QStringLiteral("撤销"));
     QPushButton* pbSticker = createActionBtn(":/images/pin.png", QStringLiteral("贴图"));
@@ -154,6 +154,16 @@ void DrawPanel::adjustPos()
 Drawer* DrawPanel::drawer()
 {
     return &drawer_;
+}
+
+void DrawPanel::cancelChecked()
+{
+    for (int i = 0; i < btns_.size(); i++) {
+        if (btns_[i].first->isChecked()) {
+            emit shapeGroup_->buttonClicked(btns_[i].first);
+            break;
+        }
+    }
 }
 
 int DrawPanel::fontSize()

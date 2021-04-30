@@ -21,6 +21,10 @@ SystemTray::SystemTray(QWidget *parent)
 	QAction *exitAction = menu_->addAction(QStringLiteral("ÍË³ö"));
     connect(exitAction, &QAction::triggered, this, &SystemTray::onExit);
 
+    QAction *testAction = menu_->addAction(QStringLiteral("test"));
+    connect(testAction, &QAction::triggered, this, &SystemTray::onTest);
+    testAction->setVisible(false);
+
 	this->setContextMenu(menu_);
 
     onUpdate();
@@ -50,6 +54,11 @@ void SystemTray::onSetting()
 void SystemTray::onExit()
 {
     qApp->exit();
+}
+
+void SystemTray::onTest()
+{
+    WindowManager::instance()->openWidget(WidgetID::MASK);
 }
 
 void SystemTray::onUpdate()

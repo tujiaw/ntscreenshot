@@ -11,6 +11,7 @@
 class QPushButton;
 class QAbstractButton;
 class TextEdit;
+class QButtonGroup;
 
 class DrawMode
 {
@@ -119,6 +120,7 @@ public:
     DrawMode getMode();
     void adjustPos();
     Drawer* drawer();
+    void cancelChecked();
     static int fontSize();
     static QColor currentColor();
 
@@ -143,6 +145,7 @@ private:
     QRect referRect_;
     QPushButton *pbFont_;
     DrawSettings *drawSettings_;
+    QButtonGroup *shapeGroup_;
     QList<QPair<QPushButton*, DrawMode>> btns_;
     Drawer drawer_;
 };

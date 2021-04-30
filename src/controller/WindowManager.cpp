@@ -9,6 +9,7 @@
 #include "view/Settings.h"
 #include "view/Stickers.h"
 #include "common/Util.h"
+#include <QDateTime>
 #include <QDebug>
 
 WindowManager::WindowManager()
@@ -41,13 +42,13 @@ void WindowManager::destory()
 void WindowManager::openWidget(const QString &id)
 {
 	if (id == WidgetID::SCREENSHOT) {
-		screenshot_.reset();
         //QEventLoop loop;
         //loop.processEvents();
         screenshot_.reset(new ScreenshotWidget());
 		screenshot_->setPinGlobalKey(settingModel_->pinGlobalKey());
 		screenshot_->setUploadImageUrl(settingModel_->uploadImageUrl());
 		screenshot_->setRgbColor(settingModel_->rgbColor());
+        screenshot_->setBackgroundColorAlpha(settingModel_->backgroundColorAlpha());
         connect(screenshot_.get(), &ScreenshotWidget::sigReopen, this, &WindowManager::onScreenshotReopen, Qt::QueuedConnection);
         connect(screenshot_.get(), &ScreenshotWidget::sigClose, this, &WindowManager::onScreenshotClose, Qt::QueuedConnection);
 		connect(screenshot_.get(), &ScreenshotWidget::sigSaveScreenshot, this, &WindowManager::onSaveScreenshot, Qt::QueuedConnection);
@@ -83,6 +84,11 @@ void WindowManager::openWidget(const QString &id)
 		widget->show();
 		widget->raise();
 	}
+    else if (id == WidgetID::MASK) {
+        //MaskFrame *mask = new MaskFrame();
+        //mask->resize(500, 500);
+        //mask->show();
+    }
 }
 
 void WindowManager::closeWidget(const QString &id)

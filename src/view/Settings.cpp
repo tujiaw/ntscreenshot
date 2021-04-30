@@ -30,6 +30,8 @@ Settings::Settings(QWidget *parent)
     connect(ui.cbAutoSave, &QCheckBox::clicked, this, &Settings::onAutoSaveChanged);
     connect(ui.pbOpenImagePath, &QPushButton::clicked, this, &Settings::onOpenImagePath);
     connect(ui.pbModifyImagePath, &QPushButton::clicked, this, &Settings::onModifyImagePath);
+    connect(ui.cbBackground, &QCheckBox::clicked, this, &Settings::onBackgroundChanged);
+    connect(ui.hsBackgroundAlpha, &QSlider::sliderReleased, this, &Settings::onBackgroundAlphaReleased);
 
     readData();
     setFixedSize(400, 280);
@@ -57,6 +59,10 @@ void Settings::readData()
     ui.leSavePath->setText(autoSavePath);
     ui.pbOpenImagePath->setEnabled(true);
     ui.pbModifyImagePath->setEnabled(autoSave);
+
+    ui.cbBackground->setChecked(setting->backgroundColorChecked());
+    ui.hsBackgroundAlpha->setValue(setting->backgroundColorAlpha());
+    ui.hsBackgroundAlpha->setEnabled(ui.cbBackground->isChecked());
 }
 
 void Settings::writeData()
@@ -192,4 +198,18 @@ void Settings::onModifyImagePath()
 		ui.leSavePath->setText(newDir);
 		onAutoSaveChanged();
 	}
+}
+
+void Settings::onBackgroundChanged()
+{
+    ui.hsBackgroundAlpha->setEnabled(ui.cbBackground->isChecked());
+    if (!ui.cbBackground->isChecked()) {
+        ui.hsBackgroundAlpha->setValue(160);
+    }
+    WindowManager::instance()->setting()->setBackgroundColor(ui.cbBackground->isChecked(), ui.hsBackgroundAlpha->value());
+}
+
+void Settings::onBackgroundAlphaReleased()
+{
+    WindowManager::instance()->setting()->setBackgroundColor(ui.cbBackground->isChecked(), ui.hsBackgroundAlpha->value());
 }

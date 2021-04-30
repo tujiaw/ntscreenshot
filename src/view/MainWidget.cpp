@@ -15,15 +15,15 @@ MainWidget::MainWidget(QWidget *parent)
 
 	mainShortcut_ = new QxtGlobalShortcut(this);
 	connect(mainShortcut_, &QxtGlobalShortcut::activated, this, &MainWidget::slotMainShortcut);
-    setScreenshotGlobalKey(WindowManager::instance()->setting()->screenhotGlobalKey());
+	setScreenshotGlobalKey(WindowManager::instance()->setting()->screenhotGlobalKey());
 
-    pinShortcut_ = new QxtGlobalShortcut(this);
-    connect(pinShortcut_, &QxtGlobalShortcut::activated, this, &MainWidget::slotPinShortcut);
-    setPinGlobalKey(WindowManager::instance()->setting()->pinGlobalKey());
+	pinShortcut_ = new QxtGlobalShortcut(this);
+	connect(pinShortcut_, &QxtGlobalShortcut::activated, this, &MainWidget::slotPinShortcut);
+	setPinGlobalKey(WindowManager::instance()->setting()->pinGlobalKey());
 
-    QxtGlobalShortcut *exitShortcut = new QxtGlobalShortcut(this);
-    exitShortcut->setShortcut(QKeySequence(Qt::ALT + Qt::Key_Q));
-    connect(exitShortcut, &QxtGlobalShortcut::activated, this, &MainWidget::slotExit);
+	QxtGlobalShortcut *exitShortcut = new QxtGlobalShortcut(this);
+	exitShortcut->setShortcut(QKeySequence(Qt::ALT + Qt::Key_Q));
+	connect(exitShortcut, &QxtGlobalShortcut::activated, this, &MainWidget::slotExit);
 
 	QVBoxLayout *mLayout = new QVBoxLayout(this);
 	mLayout->setContentsMargins(10, 10, 10, 10);
@@ -38,12 +38,12 @@ MainWidget::~MainWidget()
 
 bool MainWidget::setScreenshotGlobalKey(const QString &key)
 {
-    return mainShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
+	return mainShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
 }
 
 bool MainWidget::setPinGlobalKey(const QString &key)
 {
-    return pinShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
+	return pinShortcut_->setShortcut(QKeySequence::fromString(key, QKeySequence::NativeText));
 }
 
 void MainWidget::slotReload()
@@ -64,10 +64,10 @@ void MainWidget::slotMainShortcut()
 
 void MainWidget::slotPinShortcut()
 {
-    emit WindowManager::instance()->sigPin();
+	emit WindowManager::instance()->sigPin();
 }
 
 void MainWidget::slotExit()
 {
-    qApp->exit();
+	qApp->exit();
 }

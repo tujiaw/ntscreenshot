@@ -10,11 +10,14 @@ static const QString PIN_NO_BORDER = "PIN_NO_BORDER";
 static const QString RGB_COLOR = "RGB_COLOR";
 static const QString AUTO_SAVE = "AUTO_SAVE";
 static const QString AUTO_SAVE_PATH = "AUTO_SAVE_PATH";
+static const QString BACKGROUND_COLOR_ALPHA = "BACKGROUND_COLOR_ALPHA";
+static const QString BACKGROUND_COLOR_CHECKED = "BACKGROUND_COLOR_CHECKED";
 
 static bool defaultAutoStart = false;
 static QString defaultScreenshotGlobalKey = "F5";
 static QString defaultPinKey = "F6";
 static QString defaultUploadImageUrl = "";
+static int defaultBackgroundColorAlpha = 160;
 
 SettingModel::SettingModel(QObject *parent)
     : QObject(parent),
@@ -122,4 +125,20 @@ void SettingModel::setAutoSaveImage(bool autoSave, const QString &path)
 {
     settings_.setValue(AUTO_SAVE, autoSave);
     settings_.setValue(AUTO_SAVE_PATH, path);
+}
+
+void SettingModel::setBackgroundColor(bool checked, int alpha)
+{
+    settings_.setValue(BACKGROUND_COLOR_CHECKED, checked);
+    settings_.setValue(BACKGROUND_COLOR_ALPHA, alpha);
+}
+
+int SettingModel::backgroundColorAlpha() const
+{
+    return settings_.value(BACKGROUND_COLOR_ALPHA, defaultBackgroundColorAlpha).toInt();
+}
+
+bool SettingModel::backgroundColorChecked() const
+{
+    return settings_.value(BACKGROUND_COLOR_CHECKED, false).toBool();
 }

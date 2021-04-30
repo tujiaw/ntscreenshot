@@ -9,6 +9,8 @@
 
 const QSize IMAGE_SIZE(30, 22);
 const int MULTIPLE = 4;
+const QSize OFFSET(8, 27);
+
 AmplifierWidget::AmplifierWidget(const std::shared_ptr<QPixmap> &originPainting, QWidget *parent) 
     : QWidget(parent), originPainting_(originPainting)
 {
@@ -39,19 +41,20 @@ void AmplifierWidget::onSizeChanged(int w, int h)
 void AmplifierWidget::onPositionChanged(int x, int y) 
 {
     cursorPoint_ = QPoint(x, y);
-    int dest_x = x + 4;
-    int dest_y = y + 26;
+    QPoint destPos(x + OFFSET.width(), y + OFFSET.height());
 
     /// 超出屏幕检测
     const QSize& parent_size = parentWidget()->size();
-    if (dest_y + height() > parent_size.height()) {
-        dest_y = y - 26 - height();
-    }
-    if (dest_x + width() > parent_size.width()) {
-        dest_x = x - 4 - width();
+
+    if (destPos.x() + width() > parent_size.width()) {
+        destPos.setX(x - OFFSET.width() - width());
     }
 
-    move(dest_x, dest_y);
+    if (destPos.y() + height() > parent_size.height()) {
+        destPos.setY(y - OFFSET.height() - height());
+    }
+
+    move(destPos);
 }
 
 //// 绘制鼠标拖拽时选区矩形的右下顶点的放大图;
