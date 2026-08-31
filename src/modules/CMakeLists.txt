@@ -1,0 +1,6 @@
+add_subdirectory(assistant)
+add_subdirectory(capture)
+add_subdirectory(clipboard)
+add_subdirectory(settings)
+add_subdirectory(text_selection)
+add_subdirectory(local_search)

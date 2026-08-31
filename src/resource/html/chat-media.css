@@ -1,0 +1,22 @@
+.image-wrap {
+  padding: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.message.user .image-wrap {
+  padding: 0 13px 10px;
+}
+
+.message.error .image-wrap {
+  padding: 0 12px 8px;
+}
+
+.image-wrap img {
+  display: block;
+  max-width: 210px;
+  max-height: 150px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}

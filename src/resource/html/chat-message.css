@@ -1,0 +1,89 @@
+.message {
+  display: flex;
+  width: 100%;
+}
+
+.message.user {
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+
+.message.assistant,
+.message.error {
+  justify-content: flex-start;
+}
+
+.bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.message.assistant .bubble {
+  width: 100%;
+}
+
+.message.user .bubble {
+  max-width: var(--user-width);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.message.user .bubble.has-toggle {
+  padding-top: 2px;
+}
+
+.message.error .bubble {
+  max-width: 100%;
+  background: var(--error-surface);
+  border: 1px solid var(--error-border);
+  border-radius: 12px;
+}
+
+.content {
+  font-size: 12px;
+  line-height: 1.65;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.message.user .content {
+  padding: 9px 13px 7px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.message.user .content.collapsible {
+  position: relative;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+  padding-right: 30px;
+}
+
+.message.user .content.collapsible.is-collapsed {
+  max-height: var(--user-collapse-max-height);
+}
+
+.message.user .content.collapsible.is-collapsed::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(to bottom, rgba(238, 243, 251, 0), var(--surface) 78%);
+  pointer-events: none;
+}
+
+.message.error .content {
+  padding: 8px 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .message.user .content.collapsible.is-collapsed::after {
+    background: linear-gradient(to bottom, rgba(36, 42, 53, 0), var(--surface) 78%);
+  }
+}

@@ -1,0 +1,323 @@
+/* === DrawPanel === */
+QWidget#DrawPanel {
+    background: #FFFFFF;
+    border: 1px solid rgba(31, 35, 40, 25);
+    border-radius: 4px;
+}
+QWidget#DrawPanel QPushButton {
+    background: transparent;
+    border: none;
+    padding: 2px;
+}
+QWidget#DrawPanel QPushButton:hover {
+    background: rgba(31, 35, 40, 8);
+    border-radius: 2px;
+}
+QWidget#DrawPanel QPushButton:checked {
+    background: rgba(42, 130, 218, 25);
+    border-radius: 2px;
+}
+QWidget#DrawPanel QPushButton:pressed {
+    background: rgba(31, 35, 40, 15);
+    border-radius: 2px;
+}
+
+/* === TitleWidget === */
+QFrame#TitleWidget {
+    background: #F0F0F0;
+}
+QPushButton#closeButton {
+    border-image: url(:/images/icon_window_close.png);
+    width: 24px;
+    height: 24px;
+    background: #909090;
+}
+QPushButton#closeButton:hover {
+    background: #E81123;
+}
+
+/* === FramelessWidget === */
+QWidget#FramelessWidget[windowActive="true"] {
+    background: transparent;
+    border: 1px solid #1883D7;
+}
+QWidget#FramelessWidget[windowActive="false"] {
+    background: transparent;
+    border: 1px solid #AAAAAA;
+}
+
+/* === LongScreenshotControlPanel === */
+QMenu {
+    font-size: 12px;
+}
+QWidget#LongScreenshotControlPanel {
+    background: transparent;
+}
+QPushButton#longScreenshotCancelButton {
+    background-color: rgba(255, 59, 48, 200);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 12px;
+    border: none;
+}
+QPushButton#longScreenshotCancelButton:hover {
+    background-color: rgba(255, 59, 48, 255);
+}
+QPushButton#longScreenshotFinishButton {
+    background-color: rgba(52, 199, 89, 200);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 12px;
+    border: none;
+}
+QPushButton#longScreenshotFinishButton:hover {
+    background-color: rgba(52, 199, 89, 255);
+}
+QLabel#longScreenshotInfoLabel {
+    background-color: rgba(255, 255, 255, 220);
+    color: #1F2328;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(31, 35, 40, 40);
+}
+
+/* === TipsWidget === */
+QLabel#TipsWidget {
+    height: 20px;
+    font-size: 12px;
+    color: rgb(31, 35, 40);
+    padding-left: 8px;
+    padding-right: 8px;
+    background: rgba(255, 255, 255, 235);
+    border: 1px solid rgba(31, 35, 40, 40);
+    border-radius: 5px;
+}
+
+/* === TrayNotificationWidget === */
+QLabel#notificationTitleLabel {
+    color: #1F2328;
+    font-weight: bold;
+    font-size: 10px;
+    background: transparent;
+}
+QFrame#notificationDivider {
+    border: none;
+    background: #D0D7DE;
+    min-height: 1px;
+    max-height: 1px;
+}
+QPushButton#notificationCopyButton,
+QPushButton#notificationCloseButton {
+    color: #6E7781;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-weight: bold;
+}
+QPushButton#notificationCopyButton:hover,
+QPushButton#notificationCloseButton:hover {
+    color: #1F2328;
+}
+QPushButton#notificationCopyButton:pressed,
+QPushButton#notificationCloseButton:pressed {
+    color: #57606A;
+}
+QPushButton#notificationCopyButton[success="true"],
+QPushButton#notificationCopyButton[success="true"]:hover,
+QPushButton#notificationCopyButton[success="true"]:pressed {
+    color: #4CAF50;
+}
+QPushButton#chatPinButton {
+    color: #6E7781;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+}
+QPushButton#chatPinButton:hover {
+    color: #1F2328;
+}
+QPushButton#chatPinButton:pressed {
+    color: #57606A;
+}
+QPushButton#chatPinButton[pinned="true"] {
+    color: #0969DA;
+}
+QTextBrowser#notificationMessageBrowser {
+    color: #24292F;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+}
+QTextBrowser#notificationMessageBrowser QScrollBar:vertical {
+    width: 6px;
+    background: transparent;
+    margin: 0px;
+}
+QTextBrowser#notificationMessageBrowser QScrollBar::handle:vertical {
+    background: #C1C7D0;
+    border-radius: 3px;
+    min-height: 20px;
+}
+QTextBrowser#notificationMessageBrowser QScrollBar::handle:vertical:hover {
+    background: #A9B2BC;
+}
+QTextBrowser#notificationMessageBrowser QScrollBar::add-line:vertical,
+QTextBrowser#notificationMessageBrowser QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+QTextBrowser#notificationMessageBrowser QScrollBar::add-page:vertical,
+QTextBrowser#notificationMessageBrowser QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+/* === Settings === */
+QListWidget#promptListWidget::item {
+    padding-left: 3px;
+    height: 25px;
+}
+
+/* === ChatInputWidget === */
+QFrame#chatInputSurface {
+    background: #FFFFFF;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    border-radius: 18px;
+}
+QWidget#chatQuoteContainer {
+    background: transparent;
+}
+QFrame#chatQuoteChip {
+    background: rgba(15, 23, 42, 0.035);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 8px;
+    min-height: 26px;
+    max-height: 26px;
+}
+QPushButton#chatQuotePreviewButton {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #374151;
+    text-align: left;
+}
+QPushButton#chatQuotePreviewButton:hover {
+    color: #111827;
+}
+QToolButton#chatQuoteRemoveButton {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+    min-width: 14px;
+    max-width: 14px;
+    min-height: 14px;
+    max-height: 14px;
+    font-size: 12px;
+    color: #6B7280;
+}
+QToolButton#chatQuoteRemoveButton:hover {
+    color: #111827;
+}
+QToolButton#chatQueueRemoveButton {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+    min-width: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    max-height: 18px;
+    font-size: 14px;
+    color: #6B7280;
+}
+QToolButton#chatQueueRemoveButton:hover {
+    color: #111827;
+}
+QLineEdit#chatInputEditor,
+QPlainTextEdit#chatInputEditor {
+    background: transparent;
+    border: none;
+    padding: 4px 2px 4px 2px;
+    font-size: 14px;
+    color: #111827;
+    selection-background-color: rgba(59, 130, 246, 0.20);
+}
+QToolButton#chatInputGhostButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: #6B7280;
+}
+QToolButton#chatInputGhostButton:hover {
+    background: rgba(15, 23, 42, 0.05);
+    color: #374151;
+}
+QToolButton#chatInputGhostButton:pressed {
+    background: rgba(15, 23, 42, 0.08);
+}
+QPushButton#chatInputSendButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0px;
+}
+QPushButton#chatInputSendButton:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+QPushButton#chatInputSendButton:pressed {
+    background: rgba(15, 23, 42, 0.08);
+}
+QPushButton#chatInputSendButton:disabled {
+    background: transparent;
+    opacity: 0.45;
+}
+QMenu#chatModelMenu {
+    background: rgba(255, 255, 255, 248);
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    border-radius: 12px;
+    padding: 8px;
+    color: #111827;
+}
+QMenu#chatModelMenu::item {
+    padding: 8px 12px 8px 30px;
+    border-radius: 8px;
+    background: transparent;
+    margin: 1px 0px;
+}
+QMenu#chatModelMenu::item:selected {
+    background: rgba(26, 115, 232, 0.10);
+    color: #111827;
+}
+QMenu#chatModelMenu::item:checked {
+    background: rgba(26, 115, 232, 0.14);
+    color: #111827;
+    font-weight: 600;
+}
+QMenu#chatModelMenu::item:disabled {
+    color: #6B7280;
+}
+QMenu#chatModelMenu::separator {
+    height: 1px;
+    margin: 6px 4px;
+    background: rgba(15, 23, 42, 0.10);
+}
+QMenu#chatModelMenu::indicator {
+    width: 12px;
+    height: 12px;
+    left: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    background: transparent;
+}
+QMenu#chatModelMenu::indicator:checked {
+    background: #1A73E8;
+    border-color: #1A73E8;
+}

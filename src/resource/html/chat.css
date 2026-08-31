@@ -1,0 +1,113 @@
+:root {
+  color-scheme: light dark;
+  --bg: transparent;
+  --surface: #eef3fb;
+  --error-surface: #fff1f0;
+  --error-border: rgba(220, 38, 38, 0.14);
+  --line: rgba(15, 23, 42, 0.08);
+  --text: #1f2937;
+  --muted: #7a8393;
+  --inline-code-bg: rgba(99, 102, 241, 0.08);
+  --code-bg: #f5f7fb;
+  --link: #3b82f6;
+  --blockquote-border: rgba(15, 23, 42, 0.18);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.18);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.32);
+  --code-scrollbar-track: rgba(15, 23, 42, 0.05);
+  --code-scrollbar-thumb: rgba(100, 116, 139, 0.36);
+  --code-scrollbar-thumb-hover: rgba(71, 85, 105, 0.56);
+  --user-width: 82%;
+  --user-collapse-max-height: 86px;
+  /* 当前轮对话整体最小高度；空白在助手内容下方用 .chat-turn-fill 吸收，答案从用户下方向上排 */
+  --chat-turn-min-height: calc(100vh * 0.62);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #242a35;
+    --error-surface: #3a1f23;
+    --error-border: rgba(248, 113, 113, 0.18);
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #f3f4f6;
+    --muted: #98a2b3;
+    --inline-code-bg: rgba(255, 255, 255, 0.08);
+    --code-bg: #1d2430;
+    --link: #60a5fa;
+    --blockquote-border: rgba(255, 255, 255, 0.22);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
+    --code-scrollbar-track: rgba(255, 255, 255, 0.06);
+    --code-scrollbar-thumb: rgba(148, 163, 184, 0.42);
+    --code-scrollbar-thumb-hover: rgba(203, 213, 225, 0.56);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "Segoe UI", "PingFang SC", sans-serif;
+  overflow-anchor: none;
+}
+
+body {
+  padding: 6px 2px 8px 0;
+}
+
+#app {
+  padding: 0 8px 0 12px;
+}
+
+#message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 一轮对话：用户 → 助手/等待 → 弹性占位；min-height 由底部 fill 消化，避免「大块空白在上方、字在底下」 */
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.chat-turn--active {
+  min-height: var(--chat-turn-min-height);
+}
+
+.chat-turn-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  pointer-events: none;
+}

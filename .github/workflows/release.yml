@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build Windows package
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      VCPKG_DEFAULT_TRIPLET: x64-windows
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Validate release metadata
+        shell: pwsh
+        run: ./scripts/check-repository.ps1 -Tag $env:RELEASE_TAG
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          modules: 'qtpositioning qtwebchannel qtwebengine'
+          cache: true
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
+        with:
+          vcpkgGitCommitId: ddd0023b0eee70986e42ed49d9d4afb8098f212e
+
+      - name: Configure
+        shell: pwsh
+        run: >-
+          cmake -S . -B build/release-windows -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DBUILD_TESTING=ON
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          cmake --build build/release-windows --parallel
+          ctest --test-dir build/release-windows --output-on-failure
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          ./scripts/package-win.ps1 -Config Release -Platform x64 `
+            -QtDir "$env:QT_ROOT_DIR" `
+            -ExePath ./build/release-windows/ntscreenshot.exe `
+            -VcpkgInstalledDir ./build/release-windows/vcpkg_installed `
+            -VcpkgTriplet x64-windows -Zip
+          $archive = Resolve-Path ./dist/ntscreenshot-x64-Release.zip
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          "$hash  $([IO.Path]::GetFileName($archive))" | Set-Content -Encoding ascii "$archive.sha256"
+
+      - name: Upload Windows release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-windows
+          path: |
+            dist/ntscreenshot-x64-Release.zip
+            dist/ntscreenshot-x64-Release.zip.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Download tested artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          draft: false
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*.zip
+            artifacts/*.sha256

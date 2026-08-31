@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 常见问题 / FAQ
+    url: https://github.com/tujiaw/ntscreenshot/blob/master/docs/faq.md
+    about: 下载、杀毒误报、快捷键、体积、OCR 和 AI
+  - name: 下载发布包 / Releases
+    url: https://github.com/tujiaw/ntscreenshot/releases
+    about: Windows 绿色包 ntscreenshot-x64-Release.zip
