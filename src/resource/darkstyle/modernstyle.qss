@@ -287,7 +287,7 @@ QRadioButton::indicator:hover { border-color: @ACCENT@; background: @ACCENT_SUBT
 QRadioButton::indicator:pressed { border-color: @ACCENT@; }
 QRadioButton::indicator:checked {
     border: 2px solid @ACCENT@;
-    background: transparent;
+    background: @ACCENT@;
     image: url(:/darkstyle/radio_dot_white.png);
 }
 QRadioButton::indicator:disabled { border-color: @BORDER@; }

@@ -41,8 +41,20 @@ target_link_libraries(ui_theme_tests PRIVATE Qt6::Core Qt6::Gui)
 if(MSVC)
     target_compile_options(ui_theme_tests PRIVATE /utf-8)
 endif()
+
+add_executable(modern_style_tests
+    theme/ModernStyleTest.cpp
+    ${NT_SOURCE_DIR}/resource/darkstyle.qrc
+)
+target_link_libraries(modern_style_tests PRIVATE Qt6::Widgets)
+if(MSVC)
+    target_compile_options(modern_style_tests PRIVATE /utf-8)
+endif()
 nt_add_qt_test(conversation_history_contract assistant_history_tests)
 nt_add_qt_test(ui_theme_contract ui_theme_tests)
+nt_add_qt_test(modern_style_contract modern_style_tests)
+set_tests_properties(modern_style_contract PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 nt_add_qt_test(local_search_store local_search_tests)
 
 if(WIN32)
