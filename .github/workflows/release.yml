@@ -33,6 +33,11 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
 
+      - name: Enable MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
       - name: Validate release metadata
         shell: pwsh
         run: ./scripts/check-repository.ps1 -Tag $env:RELEASE_TAG
@@ -54,6 +59,8 @@ jobs:
         shell: pwsh
         run: >-
           cmake -S . -B build/release-windows -G Ninja
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"

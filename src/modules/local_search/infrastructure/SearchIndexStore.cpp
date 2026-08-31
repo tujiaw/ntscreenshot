@@ -53,6 +53,14 @@ QString pinyinMatchTerm(const QString& term)
     return out;
 }
 
+void applySqlitePragmas(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+    query.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+    query.exec(QStringLiteral("PRAGMA busy_timeout=3000"));
+}
+
 class ScopedConnection final {
 public:
     explicit ScopedConnection(const QString& path)
@@ -67,9 +75,7 @@ public:
         db_.setDatabaseName(path);
         db_.open();
         if (db_.isOpen()) {
-            db_.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
-            db_.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-            db_.exec(QStringLiteral("PRAGMA busy_timeout=3000"));
+            applySqlitePragmas(db_);
         }
     }
 
@@ -359,9 +365,7 @@ QSqlDatabase SearchIndexStore::readConnection() const
     db.setDatabaseName(databasePath_);
     db.open();
     if (db.isOpen()) {
-        db.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
-        db.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-        db.exec(QStringLiteral("PRAGMA busy_timeout=3000"));
+        applySqlitePragmas(db);
     }
     return db;
 }

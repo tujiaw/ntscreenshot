@@ -1,3 +1,15 @@
+function(nt_add_qt_test test_name target_name)
+    if(WIN32)
+        add_test(NAME ${test_name}
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
+                "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+                $<TARGET_FILE:${target_name}>)
+    else()
+        add_test(NAME ${test_name} COMMAND ${target_name})
+    endif()
+endfunction()
+
 add_executable(local_search_tests
     local_search/SearchIndexStoreTest.cpp
     ${NT_SOURCE_DIR}/modules/local_search/infrastructure/SearchIndexStore.cpp
@@ -29,27 +41,9 @@ target_link_libraries(ui_theme_tests PRIVATE Qt6::Core Qt6::Gui)
 if(MSVC)
     target_compile_options(ui_theme_tests PRIVATE /utf-8)
 endif()
-if(WIN32)
-    add_test(NAME conversation_history_contract
-        COMMAND ${CMAKE_COMMAND} -E env
-            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
-            $<TARGET_FILE:assistant_history_tests>)
-    add_test(NAME ui_theme_contract
-        COMMAND ${CMAKE_COMMAND} -E env
-            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
-            $<TARGET_FILE:ui_theme_tests>)
-else()
-    add_test(NAME conversation_history_contract COMMAND assistant_history_tests)
-    add_test(NAME ui_theme_contract COMMAND ui_theme_tests)
-endif()
-if(WIN32)
-    add_test(NAME local_search_store
-        COMMAND ${CMAKE_COMMAND} -E env
-            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
-            $<TARGET_FILE:local_search_tests>)
-else()
-    add_test(NAME local_search_store COMMAND local_search_tests)
-endif()
+nt_add_qt_test(conversation_history_contract assistant_history_tests)
+nt_add_qt_test(ui_theme_contract ui_theme_tests)
+nt_add_qt_test(local_search_store local_search_tests)
 
 if(WIN32)
     add_test(
