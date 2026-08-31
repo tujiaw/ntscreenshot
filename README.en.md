@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-A free, open-source Windows screenshot and desktop productivity app. Capture, pin, annotate, scrolling screenshots, clipboard history, and local search stay on your machine. AI and OCR are opt-in and off by default.
+A Windows tray app for screenshots and desktop productivity. Capture, annotate, pin, scrolling shots, clipboard history, and local search stay on your machine. AI and OCR are opt-in and off by default.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.en.md)
@@ -12,48 +12,61 @@ A free, open-source Windows screenshot and desktop productivity app. Capture, pi
 
 **[Download the Windows portable build](https://github.com/tujiaw/ntscreenshot/releases)** · [FAQ](#faq) · [Build from source](docs/building.en.md)
 
-Extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe`. No installer. If a release archive is not published yet, follow the [build guide](docs/building.en.md).
-
-![Capture and annotation](ntscreenshot_demo.png)
-![Pinning and productivity tools](ntscreenshot_demo2.png)
-
-## Why ntscreenshot
-
-The built-in Windows snipping tool is fine for a quick copy. It does not pin images, stitch long pages, or keep a local clipboard history. Commercial tools are polished, but they are often closed-source or subscription-based. ntscreenshot puts the daily workflow in one tray app, with public source and a default-offline design.
+Extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe`. No installer. If a release has no assets yet, follow the [build guide](docs/building.en.md).
 
 ## Features
 
-**Capture**
-- Region capture, window snapping, pixel-level adjustment
-- Magnifier and color picker (`C` copies the current color)
-- Pen, arrow, rectangle, ellipse, text, mosaic, undo
-- Scrolling capture and GIF recording
-- QR / barcode recognition; optional OCR
+### Capture and annotate
 
-**Pinning and productivity**
-- Image pins with borders and multi-pin management
+Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier, and a color picker (`C` copies the color) stay in the overlay.
+
+- Pen, line, arrow, rectangle, ellipse, text, mosaic, undo
+- Copy, save, or pin; scrolling capture and GIF recording
+- QR / barcode recognition; optional OCR and AI
+
+![Region capture and annotation](screenshot.png)
+
+### Local search
+
+One box for local apps, files, folders, and browser bookmarks. Arrow keys select, Enter opens.
+
+![Local search](local-search.png)
+
+### Pinning and productivity
+
+- `F6` pins a clipboard image on the desktop, with multi-pin and border options
 - Local clipboard history
-- Text-selection toolbar
-- Local file, folder, and browser-bookmark search
+- A text-selection toolbar for quick actions on highlighted text
 
-**Desktop**
-- Tray app, global hotkeys, launch at sign-in
-- Light and dark themes
-- Optional LLM assistant, web search, and image hosting — enabled only in Settings
+### Settings
+
+Open Settings from the tray. Startup, light / dark theme, capture / pin / chat hotkeys, overlay opacity, and color format live here.
+
+![Settings](settings.png)
+
+### AI assistant (optional)
+
+Off by default. Add your own endpoint in Settings, then open chat with the hotkey. No key means no network calls.
+
+![AI chat](ai-chat.png)
 
 ## 30-second start
 
-1. Launch the app and find it in the system tray. Open Settings once to confirm hotkeys.
-2. Press `F5` to capture: drag a region, annotate from the toolbar, then copy, save, pin, or start a scrolling capture.
-3. Press `F6` to pin the clipboard image on the desktop.
-4. Turn on OCR or AI in Settings only if you need them, using your own keys.
+1. Launch the app, find it in the tray, and confirm hotkeys in Settings.
+2. `F5` to capture: drag a region, annotate from the toolbar, then copy, save, or pin.
+3. `F6` to pin.
+4. Enable OCR or AI in Settings only if you need them, using your own keys.
 
 | Hotkey | Action |
 | --- | --- |
 | `F5` | Screenshot |
 | `F6` | Pin |
 
-Change hotkeys in tray → Settings if they clash with a game or another app.
+Change hotkeys if they clash with a game or another app.
+
+## Why ntscreenshot
+
+The built-in snipping tool is fine for a quick copy. It does not pin images, stitch long pages, or search local files. Commercial tools are polished, but they are often closed-source or subscription-based. ntscreenshot puts the daily workflow in one open-source tray app, and keeps data on your machine by default.
 
 ## Platforms
 
@@ -70,23 +83,18 @@ Change hotkeys in tray → Settings if they clash with a game or another app.
 - Antivirus flags, dead hotkeys, no window after launch: [FAQ](docs/faq.en.md)
 - OCR / AI / where data lives: [FAQ](docs/faq.en.md) · [Privacy](PRIVACY.en.md)
 
-## Privacy
-
 Capture, pinning, clipboard history, and local search run offline by default. Text or images leave the machine only when you enable and invoke a network feature. See [Privacy](PRIVACY.en.md).
 
 ## Docs
 
-- [FAQ](docs/faq.en.md): downloads, antivirus false positives, hotkeys, package size, OCR / AI
+- [FAQ](docs/faq.en.md)
 - [Build from source](docs/building.en.md)
 - [Docs index](docs/README.md)
-- [Project structure](docs/project-structure.md)
 - [Changelog](CHANGELOG.md)
 
 ## Contributing
 
-Bug reports, documentation fixes, and pull requests are welcome. Read [Contributing](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [Security](SECURITY.md). Do not file them as public issues.
-
-## License
+Bug reports, documentation fixes, and pull requests are welcome. Read [Contributing](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [Security](SECURITY.md).
 
 [Apache License 2.0](LICENSE). Copyright: [NOTICE](NOTICE). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
