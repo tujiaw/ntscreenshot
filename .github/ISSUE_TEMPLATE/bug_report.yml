@@ -1,0 +1,50 @@
+name: 缺陷反馈
+description: 报告可复现的问题（请先阅读 FAQ）
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请阅读 [常见问题](https://github.com/tujiaw/ntscreenshot/blob/master/docs/faq.md)。
+        不要粘贴 API Key、剪贴板内容或未脱敏日志。安全问题请按 SECURITY.md 私下报告。
+  - type: checkboxes
+    attributes:
+      label: 确认
+      options:
+        - label: 已搜索现有 Issue，附件已去掉密钥和个人信息。
+          required: true
+        - label: 这不是安全漏洞（安全问题请私信仓库所有者）。
+          required: true
+        - label: 已阅读 docs/faq.md，确认不是快捷键冲突、托盘隐藏窗口或杀毒误报。
+          required: true
+  - type: input
+    attributes:
+      label: 版本
+      description: Releases 上的版本号，或 git commit。
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: 系统环境
+      placeholder: Windows 11 24H2 x64
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 复现步骤
+      description: 尽量短、稳定。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 实际结果
+      description: 可附脱敏日志。不要贴密钥和剪贴板原文。
+    validations:
+      required: true

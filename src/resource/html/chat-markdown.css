@@ -1,0 +1,195 @@
+.content p {
+  margin: 0 0 6px;
+}
+
+.content p:last-child {
+  margin-bottom: 0;
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 {
+  margin: 10px 0 4px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.content h1:first-child,
+.content h2:first-child,
+.content h3:first-child {
+  margin-top: 2px;
+}
+
+.content h1 { font-size: 1.25em; }
+.content h2 { font-size: 1.1em; }
+.content h3 { font-size: 1em; }
+.content h4,
+.content h5,
+.content h6 { font-size: 0.95em; }
+
+.content ul,
+.content ol {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+}
+
+.content li {
+  margin: 2px 0;
+  line-height: 1.6;
+}
+
+.content blockquote {
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--muted);
+}
+
+.content hr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+}
+
+.content:has(table) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.content table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.95em;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.content thead {
+  background: var(--inline-code-bg);
+}
+
+.content th,
+.content td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+
+.content th {
+  font-weight: 600;
+}
+
+.content strong {
+  font-weight: 600;
+}
+
+.content em {
+  font-style: italic;
+}
+
+.content a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.content a:hover {
+  text-decoration: underline;
+}
+
+.content code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--inline-code-bg);
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.9em;
+}
+
+.content pre {
+  position: relative;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  scrollbar-width: thin;
+  scrollbar-color: var(--code-scrollbar-thumb) var(--code-scrollbar-track);
+}
+
+.content pre code {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.content pre::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.content pre::-webkit-scrollbar-track {
+  background: var(--code-scrollbar-track);
+  border-radius: 999px;
+  margin: 4px 6px 2px;
+}
+
+.content pre::-webkit-scrollbar-thumb {
+  background: var(--code-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.content pre::-webkit-scrollbar-thumb:hover {
+  background: var(--code-scrollbar-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.content pre::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.content pre .code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: background 0.15s ease;
+}
+
+.content pre:hover .code-copy-btn,
+.content pre .code-copy-btn:focus-visible,
+.content pre .code-copy-btn:hover {
+  opacity: 1;
+}
+
+.content pre .code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+@media (prefers-color-scheme: dark) {
+  .content pre .code-copy-btn {
+    background: rgba(29, 36, 48, 0.72);
+  }
+
+  .content pre .code-copy-btn:hover {
+    background: rgba(29, 36, 48, 0.96);
+  }
+}

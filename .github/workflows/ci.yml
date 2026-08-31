@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows / MSVC
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          modules: 'qtpositioning qtwebchannel qtwebengine'
+          cache: true
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
+        with:
+          vcpkgGitCommitId: ddd0023b0eee70986e42ed49d9d4afb8098f212e
+
+      - name: Check repository
+        shell: pwsh
+        run: ./scripts/check-repository.ps1
+
+      - name: Configure
+        shell: pwsh
+        run: >-
+          cmake -S . -B build/ci-windows -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build/ci-windows --parallel
+
+      - name: Test
+        run: ctest --test-dir build/ci-windows --output-on-failure
+
+      - name: Package
+        shell: pwsh
+        run: >-
+          ./scripts/package-win.ps1
+          -Config Release
+          -Platform x64
+          -QtDir "$env:QT_ROOT_DIR"
+          -ExePath ./build/ci-windows/ntscreenshot.exe
+          -VcpkgInstalledDir ./build/ci-windows/vcpkg_installed
+          -VcpkgTriplet x64-windows
+          -Zip
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ntscreenshot-windows-${{ github.sha }}
+          path: dist/ntscreenshot-x64-Release.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  linux:
+    name: Linux / GCC (experimental)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            cmake ninja-build g++ libopencv-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libx11-dev libxcb-cursor0 libxcb-xfixes0-dev libxtst-dev libxi-dev libxkbfile-dev \
+            libnss3 libasound2t64 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libdrm2 libcups2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: '6.8.3'
+          arch: linux_gcc_64
+          modules: 'qtpositioning qtwebchannel qtwebengine'
+          cache: true
+
+      - name: Validate Linux packaging script
+        run: bash -n scripts/docker-linux-release.sh
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-linux -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build/ci-linux --parallel
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/ci-linux --output-on-failure

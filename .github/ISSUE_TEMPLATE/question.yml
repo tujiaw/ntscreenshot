@@ -1,0 +1,28 @@
+name: 使用提问
+description: 安装、运行、快捷键等问题（请先看 FAQ）
+title: "[Question]: "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        多数「装不上 / 没窗口 / F5 没反应 / 杀毒报警」已写在 [FAQ](https://github.com/tujiaw/ntscreenshot/blob/master/docs/faq.md)。
+        若 FAQ 已覆盖你的情况，请不要再开 Issue。
+  - type: checkboxes
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经读过 docs/faq.md，其中没有解答。
+          required: true
+  - type: textarea
+    attributes:
+      label: 问题
+      description: 你做了什么、期望什么、实际看到什么。
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: 版本与系统
+      placeholder: v0.1.0，Windows 11
+    validations:
+      required: true

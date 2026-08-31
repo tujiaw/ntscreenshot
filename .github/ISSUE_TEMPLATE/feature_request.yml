@@ -1,0 +1,24 @@
+name: 功能建议
+description: 提出一个具体、可讨论的改进
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: 请说明真实使用场景。范围过大或与截图/效率主线无关的想法可能暂不纳入。
+  - type: textarea
+    attributes:
+      label: 现在的痛点
+      description: 谁在什么流程里卡住了？
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 期望行为
+      description: 建议做成什么样，以及你能接受的取舍（例如包体积、隐私、平台）。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 其它方案
+      description: 现有软件、变通办法、或你考虑过但没采用的设计。

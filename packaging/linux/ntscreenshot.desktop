@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ntscreenshot
+Comment=Screenshot tool
+Exec=ntscreenshot
+Icon=ntscreenshot
+Categories=Graphics;Utility;
+Terminal=false

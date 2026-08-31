@@ -1,0 +1,26 @@
+target_sources(ntscreenshot PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/AssistantModule.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/agent/Agent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/agent/AgentToolRegistry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/agent/ConversationHistory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/agent/OpenAI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/skills/SkillManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/EditFileTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/ExecutePythonTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/FetchUrlTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/ListDirectoryTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/LlmTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/LlmToolExecutor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/LlmToolUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/PythonExecutor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/ReadFileTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/RunPowerShellTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/RunShellTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/ToolAbort.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/WebSearchTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/WriteFileTool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui/ChatInputWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui/ChatSessionStore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui/ChatWebBridge.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui/ChatWidget.cpp
+)

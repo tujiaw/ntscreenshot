@@ -1,0 +1,80 @@
+# Local CMake/Ninja out-of-tree dirs (do not commit)
+/build-docker/
+/build-linux-out/
+/build-out*/
+
+# Build outputs
+/build/
+/src/build/
+/.vs/
+/CMakeUserPresets.json
+/vcpkg_installed/
+/buildtrees/
+/packages/
+/.cache/
+
+# VS user settings
+*.vcxproj.user
+*.user
+
+# Qt generated files (moc/uic/rcc)
+/src/GeneratedFiles/*
+
+# MSVC artifacts
+*.pdb
+*.ilk
+*.obj
+*.tlog
+*.log
+*.idb
+*.ipdb
+*.iobj
+*.pch
+*.suo
+*.ilk
+*.exp
+*.lib
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Distribution files
+/dist/
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# IDE and editor files
+.vscode/
+.idea/
+.worktrees/
+.claude/
+.cursor/
+.codex
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmpclaude-*
+*.tmp
+*.temp
+nul
+Running
+*.bak
+compile_commands.json
+
+# Debug files
+debug/
+Debug/
+release/
+Release/
+
+# Visual Studio 临时编辑目录（VS 安全写机制产生，异常退出时残留）
+enc_temp_folder/

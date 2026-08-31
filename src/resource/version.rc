@@ -1,0 +1,39 @@
+#include <winver.h>
+
+#ifndef NT_VERSION_MAJOR
+#define NT_VERSION_MAJOR 0
+#define NT_VERSION_MINOR 1
+#define NT_VERSION_PATCH 0
+#define NT_VERSION_STRING "0.1.0.0"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION NT_VERSION_MAJOR,NT_VERSION_MINOR,NT_VERSION_PATCH,0
+ PRODUCTVERSION NT_VERSION_MAJOR,NT_VERSION_MINOR,NT_VERSION_PATCH,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "FileDescription", "ntscreenshot desktop productivity toolkit\0"
+            VALUE "FileVersion", NT_VERSION_STRING "\0"
+            VALUE "InternalName", "ntscreenshot\0"
+            VALUE "OriginalFilename", "ntscreenshot.exe\0"
+            VALUE "ProductName", "ntscreenshot\0"
+            VALUE "ProductVersion", NT_VERSION_STRING "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

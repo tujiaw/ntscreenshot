@@ -1,0 +1,204 @@
+.msg-action-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.message.user:hover .msg-action-left {
+  opacity: 1;
+}
+
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.bubble-actions-usage {
+  margin-left: 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  user-select: text;
+  white-space: nowrap;
+}
+
+.msg-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.msg-action-btn:hover {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.msg-action-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.msg-action-btn.success {
+  color: #22c55e;
+}
+
+.bubble-toggle-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.message.pending .content {
+  padding: 2px 0 0;
+}
+
+/* 流式输出时气泡底部三点，点击将页面滚动到底部 */
+.bubble-streaming-tail {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 6px 2px 0;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+
+.bubble-streaming-tail:hover {
+  opacity: 0.88;
+}
+
+.bubble-streaming-tail:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/* 已贴底能看见全文时不展示，避免重复提示 */
+.bubble-streaming-tail.bubble-streaming-tail--hidden {
+  display: none;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.typing-dots .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(122, 131, 147, 0.9);
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.typing-dots .dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.typing-dots .dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+/* 有纵向滚动且未贴底时：右下角回到底部（小尺寸、半透明，不挡正文） */
+.chat-scroll-bottom-btn {
+  position: fixed;
+  right: 8px;
+  bottom: 10px;
+  z-index: 100;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 50%;
+  background: rgba(238, 243, 251, 0.55);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-scroll-bottom-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  opacity: 0.92;
+}
+
+.chat-scroll-bottom-btn.chat-scroll-bottom-btn--visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.chat-scroll-bottom-btn:hover {
+  color: var(--text);
+  background: rgba(238, 243, 251, 0.78);
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+.chat-scroll-bottom-btn:focus {
+  outline: none;
+}
+
+.chat-scroll-bottom-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat-scroll-bottom-btn {
+    background: rgba(36, 42, 53, 0.48);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-scroll-bottom-btn:hover {
+    background: rgba(36, 42, 53, 0.72);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .msg-action-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    opacity: 0.28;
+    transform: translateY(0) scale(0.92);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1);
+  }
+}

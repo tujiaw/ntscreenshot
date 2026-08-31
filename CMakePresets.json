@@ -1,0 +1,149 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-vcpkg-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-vcpkg-debug",
+      "displayName": "Windows Debug (Ninja + vcpkg)",
+      "inherits": "windows-vcpkg-base",
+      "binaryDir": "${sourceDir}/build/cmake-x64-Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-vcpkg-release",
+      "displayName": "Windows Release (Ninja + vcpkg)",
+      "inherits": "windows-vcpkg-base",
+      "binaryDir": "${sourceDir}/build/cmake-x64-Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-opencv-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}",
+        "OpenCV_DIR": "$env{OpenCV_DIR}"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-opencv-debug",
+      "displayName": "Windows Debug (Ninja + prebuilt OpenCV)",
+      "inherits": "windows-opencv-base",
+      "binaryDir": "${sourceDir}/build/cmake-x64-Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-opencv-release",
+      "displayName": "Windows Release (Ninja + prebuilt OpenCV)",
+      "inherits": "windows-opencv-base",
+      "binaryDir": "${sourceDir}/build/cmake-x64-Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "windows-vcpkg-debug",
+      "configurePreset": "windows-vcpkg-debug"
+    },
+    {
+      "name": "windows-vcpkg-release",
+      "configurePreset": "windows-vcpkg-release"
+    },
+    {
+      "name": "windows-opencv-debug",
+      "configurePreset": "windows-opencv-debug"
+    },
+    {
+      "name": "windows-opencv-release",
+      "configurePreset": "windows-opencv-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-opencv-debug",
+      "configurePreset": "windows-opencv-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-opencv-release",
+      "configurePreset": "windows-opencv-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
