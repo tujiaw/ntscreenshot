@@ -11,6 +11,8 @@ All notable changes will be documented in this file. The format follows [Keep a 
 ### Changed
 
 - README now leads with download, features, and support instead of internal release-readiness notes.
+- README now includes a social preview and direct latest-release download links.
+- GitHub Releases now include bilingual download instructions and categorized change notes.
 
 ### Removed
 

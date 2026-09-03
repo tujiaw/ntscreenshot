@@ -2,7 +2,9 @@
 
 [English](README.en.md)
 
-Windows 托盘里的截图与桌面效率工具。选区、标注、贴图、长图、剪贴板历史、本地搜索都在本机完成；AI / OCR 可按需开启，默认不联网。
+![ntscreenshot — 开源 Windows 截图工具](docs/assets/social-preview.jpg)
+
+**Windows 上开源、离线优先的截图与贴图工具。** 选区、标注、贴图、长图和 GIF 录制一步到位；剪贴板历史与本地搜索都在本机完成。AI / OCR 可按需开启，默认不联网。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.md)
@@ -10,7 +12,7 @@ Windows 托盘里的截图与桌面效率工具。选区、标注、贴图、长
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[下载 Windows 绿色版](https://github.com/tujiaw/ntscreenshot/releases)** · [常见问题](#faq) · [从源码构建](docs/building.md)
+**[立即下载 Windows 绿色版](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [查看更新](https://github.com/tujiaw/ntscreenshot/releases/latest) · [常见问题](#faq) · [从源码构建](docs/building.md)
 
 解压 `ntscreenshot-x64-Release.zip`，运行 `ntscreenshot.exe`。无需安装。若 Releases 还没有附件，按 [构建指南](docs/building.md) 自行编译。
 

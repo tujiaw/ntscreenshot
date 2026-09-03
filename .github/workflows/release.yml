@@ -118,6 +118,18 @@ jobs:
           draft: false
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           generate_release_notes: true
+          body: |
+            Windows 10/11 x64 portable build. No installation required.
+
+            Windows 10/11 x64 绿色版，解压即用，无需安装。
+
+            ### Download / 下载
+
+            Download `ntscreenshot-x64-Release.zip` from **Assets** below, extract it, and run `ntscreenshot.exe`.
+
+            在下方 **Assets** 中下载 `ntscreenshot-x64-Release.zip`，解压后运行 `ntscreenshot.exe`。
+
+            SHA-256 checksums are provided alongside the archive.
           fail_on_unmatched_files: true
           files: |
             artifacts/*.zip

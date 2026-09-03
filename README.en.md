@@ -2,7 +2,9 @@
 
 [简体中文](README.md)
 
-A Windows tray app for screenshots and desktop productivity. Capture, annotate, pin, scrolling shots, clipboard history, and local search stay on your machine. AI and OCR are opt-in and off by default.
+![ntscreenshot — open-source screenshot tool for Windows](docs/assets/social-preview.jpg)
+
+**An open-source, privacy-first screenshot and pinning tool for Windows.** Capture, annotate, pin, scroll, and record GIFs in one workflow. Clipboard history and local search stay on your machine; AI and OCR are opt-in and off by default.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.en.md)
@@ -10,7 +12,7 @@ A Windows tray app for screenshots and desktop productivity. Capture, annotate, 
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[Download the Windows portable build](https://github.com/tujiaw/ntscreenshot/releases)** · [FAQ](#faq) · [Build from source](docs/building.en.md)
+**[Download the Windows portable build](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [What's new](https://github.com/tujiaw/ntscreenshot/releases/latest) · [FAQ](#faq) · [Build from source](docs/building.en.md)
 
 Extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe`. No installer. If a release has no assets yet, follow the [build guide](docs/building.en.md).
 
