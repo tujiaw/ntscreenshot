@@ -44,8 +44,10 @@ endif()
 
 add_executable(modern_style_tests
     theme/ModernStyleTest.cpp
+    ${NT_SOURCE_DIR}/core/theme/ModernStyle.cpp
     ${NT_SOURCE_DIR}/resource/darkstyle.qrc
 )
+target_include_directories(modern_style_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(modern_style_tests PRIVATE Qt6::Widgets)
 if(MSVC)
     target_compile_options(modern_style_tests PRIVATE /utf-8)

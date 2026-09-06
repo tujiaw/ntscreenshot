@@ -276,22 +276,6 @@ QGroupBox::indicator:disabled {
     border-color: @BORDER@;
 }
 
-QRadioButton::indicator {
-    width: 18px;
-    height: 18px;
-    border: 1px solid @BORDER_STRONG@;
-    border-radius: 9px;
-    background: transparent;
-}
-QRadioButton::indicator:hover { border-color: @ACCENT@; background: @ACCENT_SUBTLE@; }
-QRadioButton::indicator:pressed { border-color: @ACCENT@; }
-QRadioButton::indicator:checked {
-    border: 2px solid @ACCENT@;
-    background: @ACCENT@;
-    image: url(:/darkstyle/radio_dot_white.png);
-}
-QRadioButton::indicator:disabled { border-color: @BORDER@; }
-
 /* 滑块：细轨 + 圆形滑块，已填充部分用强调色 */
 QSlider::groove:horizontal {
     height: 4px;

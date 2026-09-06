@@ -7,6 +7,7 @@
 #include <QStyleFactory>
 
 #include "core/platform/Util.h"
+#include "core/theme/ModernStyle.h"
 
 namespace {
 
@@ -46,7 +47,11 @@ void ThemeManager::apply(AppTheme theme)
     if (!qApp) return;
 
     g_tokens = createThemeTokens(theme);
-    qApp->setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    const double scaleFactor = qMax(1.0, Util::getScreenScaleFactor());
+    const int radioIndicatorSize = qRound(18 * scaleFactor)
+        + 2 * qMax(1, qRound(scaleFactor));
+    qApp->setStyle(new ModernStyle(QStyleFactory::create(QStringLiteral("Fusion")),
+                                   radioIndicatorSize));
 
     QPalette palette;
     palette.setColor(QPalette::Window, g_tokens.canvas);

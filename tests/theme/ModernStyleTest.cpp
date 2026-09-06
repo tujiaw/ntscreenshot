@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QCheckBox>
 #include <QFile>
 #include <QImage>
 #include <QPainter>
@@ -7,6 +8,8 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleOptionButton>
+
+#include "core/theme/ModernStyle.h"
 
 namespace {
 
@@ -27,7 +30,10 @@ QString loadTestStyleSheet()
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
-    app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    app.setStyle(new ModernStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
+    QPalette palette = app.palette();
+    palette.setColor(QPalette::Highlight, QColor(QStringLiteral("#2F7EF7")));
+    app.setPalette(palette);
     app.setStyleSheet(loadTestStyleSheet());
 
     QRadioButton radio(QStringLiteral("RGB"));
@@ -47,19 +53,26 @@ int main(int argc, char* argv[])
     option.state |= QStyle::State_On;
     const QRect indicator = radio.style()->subElementRect(
         QStyle::SE_RadioButtonIndicator, &option, &radio);
-    int accentPixels = 0;
-    for (int y = indicator.top(); y <= indicator.bottom(); ++y) {
-        for (int x = indicator.left(); x <= indicator.right(); ++x) {
+    QCheckBox checkbox(QStringLiteral("Auto start"));
+    checkbox.ensurePolished();
+    QStyleOptionButton checkboxOption;
+    checkboxOption.initFrom(&checkbox);
+    const QRect checkboxIndicator = checkbox.style()->subElementRect(
+        QStyle::SE_CheckBoxIndicator, &checkboxOption, &checkbox);
+    int centerAccentPixels = 0;
+    const QRect center = QRect(QPoint(), QSize(8, 8));
+    const QRect centeredDot = center.translated(indicator.center() - center.center());
+    for (int y = centeredDot.top(); y <= centeredDot.bottom(); ++y) {
+        for (int x = centeredDot.left(); x <= centeredDot.right(); ++x) {
             const QColor pixel = rendered.pixelColor(x, y);
             if (pixel.blue() > 180 && pixel.red() < 100 && pixel.green() < 160) {
-                ++accentPixels;
+                ++centerAccentPixels;
             }
         }
     }
 
-    const int indicatorArea = indicator.width() * indicator.height();
-    if (indicatorArea <= 0 || accentPixels * 2 <= indicatorArea) {
-        qCritical("A checked radio indicator must have a clearly visible accent fill");
+    if (indicator.size() != checkboxIndicator.size() || centerAccentPixels < 40) {
+        qCritical("A checked radio indicator must match checkbox size and have a solid center dot");
         return 1;
     }
     return 0;

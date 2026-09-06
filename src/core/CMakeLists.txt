@@ -15,6 +15,7 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/RunGuard.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/settings/SettingModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/theme/ThemeManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/theme/ModernStyle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/theme/ThemeTokens.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/theme/UiStyler.cpp
 )
