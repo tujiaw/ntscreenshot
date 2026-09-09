@@ -554,17 +554,17 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     const bool isText = history_->Items()[index].kind == ClipKind::Text;
     QMenu menu(this);
     QAction* copyAction = menu.addAction(QStringLiteral("Copy"));
+    QAction* deleteAction = menu.addAction(QStringLiteral("Delete"));
+    menu.addSeparator();
     QAction* aiAction = menu.addAction(QStringLiteral("AI Fill"));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
-    menu.addSeparator();
-    QAction* deleteAction = menu.addAction(QStringLiteral("Delete"));
     QAction* selected = menu.exec(globalPos);
     if (selected == copyAction) {
         CopySelected();
-    } else if (selected == aiAction) {
-        AiFillSelected();
     } else if (selected == deleteAction) {
         DeleteSelected();
+    } else if (selected == aiAction) {
+        AiFillSelected();
     }
 }
 
