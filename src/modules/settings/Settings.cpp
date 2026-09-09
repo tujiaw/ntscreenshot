@@ -3,6 +3,9 @@
 #include <QClipboard>
 #include <QElapsedTimer>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QDir>
+#include <QStandardPaths>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QComboBox>
@@ -117,6 +120,8 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     qInfo() << "Settings: initLlmTab done";
     initLocalSearchTab();
     qInfo() << "Settings: initLocalSearchTab done";
+    initHttpServerTab();
+    qInfo() << "Settings: initHttpServerTab done";
     applyModernLayout();
     qInfo() << "Settings: modern layout applied";
 
@@ -211,6 +216,7 @@ void Settings::applyModernLayout()
     QWidget* llmHostPage = pageByTitle(QStringLiteral("大模型对话"));
     QWidget* githubPage = pageByTitle(QStringLiteral("GitHub图床"));
     QWidget* localSearchPage = pageByTitle(QStringLiteral("本地搜索"));
+    QWidget* httpServerPage = pageByTitle(QStringLiteral("HTTP 服务"));
     QWidget* aboutPage = pageByTitle(QStringLiteral("关于"));
     QTabWidget* llmTabs = llmHostPage
         ? llmHostPage->findChild<QTabWidget*>(QString(), Qt::FindDirectChildrenOnly)
@@ -238,7 +244,8 @@ void Settings::applyModernLayout()
     navigation->setFocusPolicy(Qt::NoFocus);
     navigation->addItems({QStringLiteral("常规"), QStringLiteral("截图与输出"),
                           QStringLiteral("本地搜索"), QStringLiteral("AI 助手"),
-                          QStringLiteral("工具与划词"), QStringLiteral("路径记录"),
+                          QStringLiteral("工具与划词"), QStringLiteral("HTTP 服务"),
+                          QStringLiteral("路径记录"),
                           QStringLiteral("关于")});
 
     auto* content = new QWidget(shell);
@@ -333,6 +340,11 @@ void Settings::applyModernLayout()
             }
             break;
         case 5:
+            titleLabel->setText(QStringLiteral("HTTP 服务"));
+            subtitleLabel->setText(QStringLiteral("用 python http.server 起一个后台静态服务"));
+            legacyTabs->setCurrentWidget(httpServerPage);
+            break;
+        case 6:
             titleLabel->setText(QStringLiteral("路径记录"));
             subtitleLabel->setText(QStringLiteral("查看并复制常用保存路径"));
             legacyTabs->setCurrentWidget(pathPage);
@@ -1637,4 +1649,240 @@ void Settings::onToolCheckChanged()
 void Settings::onToolAutoPermissionToggled(bool checked)
 {
     windowManager_->setting()->setLlmToolAutoPermission(checked);
+}
+
+void Settings::initHttpServerTab()
+{
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
+    Util::scaleLayoutMargins(layout, 14, 14, 14, 14);
+    layout->setSpacing(Util::scaleSize(8));
+
+    auto* hint = new QLabel(
+        QStringLiteral("用 python http.server 在本地/局域网共享一个目录的静态文件。\n"
+                       "设置好参数后点「启动」即可；服务在设置窗口关闭后仍会继续运行。"),
+        page);
+    hint->setWordWrap(true);
+    hint->setStyleSheet(
+        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+    layout->addWidget(hint);
+
+    auto* form = new QFormLayout();
+    form->setSpacing(Util::scaleSize(8));
+
+    // -d/--directory
+    auto* dirRow = new QHBoxLayout();
+    dirRow->setSpacing(Util::scaleSize(8));
+    leHttpDirectory_ = new QLineEdit(page);
+    leHttpDirectory_->setReadOnly(true);
+    leHttpDirectory_->setPlaceholderText(QStringLiteral("选择要共享的目录"));
+    btnHttpBrowse_ = new QPushButton(QStringLiteral("浏览…"), page);
+    dirRow->addWidget(leHttpDirectory_, 1);
+    dirRow->addWidget(btnHttpBrowse_);
+    form->addRow(QStringLiteral("共享目录："), dirRow);
+
+    // 绑定地址 + 端口 + 协议：同一行
+    auto* paramRow = new QHBoxLayout();
+    paramRow->setSpacing(Util::scaleSize(6));
+    leHttpBind_ = new QLineEdit(page);
+    leHttpBind_->setPlaceholderText(QStringLiteral("0.0.0.0 / 127.0.0.1 / ::"));
+    leHttpBind_->setToolTip(
+        QStringLiteral("python http.server 的 --bind；0.0.0.0 表示局域网内可访问"));
+    sbHttpPort_ = new QSpinBox(page);
+    sbHttpPort_->setRange(1, 65535);
+    sbHttpPort_->setValue(8000);
+    sbHttpPort_->setToolTip(QStringLiteral("python http.server 的 --port"));
+    cbHttpProtocol_ = new QComboBox(page);
+    cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.1"), QStringLiteral("HTTP/1.1"));
+    cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.0"), QStringLiteral("HTTP/1.0"));
+    cbHttpProtocol_->setToolTip(QStringLiteral("python http.server 的 --protocol"));
+    cbHttpProtocol_->setMinimumWidth(Util::scaleSize(96));
+    auto addCaption = [page, paramRow](const QString& text) {
+        auto* caption = new QLabel(text, page);
+        caption->setStyleSheet(
+            QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+        paramRow->addWidget(caption);
+    };
+    addCaption(QStringLiteral("绑定地址："));
+    paramRow->addWidget(leHttpBind_, 1);
+    addCaption(QStringLiteral("端口："));
+    paramRow->addWidget(sbHttpPort_);
+    addCaption(QStringLiteral("协议："));
+    paramRow->addWidget(cbHttpProtocol_);
+    form->addRow(QString(), paramRow);
+
+    // --cgi
+    cbHttpCgi_ = new QCheckBox(QStringLiteral("启用 CGI 脚本（--cgi）"), page);
+    form->addRow(QString(), cbHttpCgi_);
+
+    layout->addLayout(form);
+
+    labelHttpStatus_ = new QLabel(QStringLiteral("已停止"), page);
+    labelHttpStatus_->setStyleSheet(
+        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+    layout->addWidget(labelHttpStatus_);
+
+    labelHttpAddress_ = new QLabel(page);
+    labelHttpAddress_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    labelHttpAddress_->setWordWrap(true);
+    labelHttpAddress_->setStyleSheet(
+        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+    layout->addWidget(labelHttpAddress_);
+
+    auto* actionRow = new QHBoxLayout();
+    actionRow->setSpacing(Util::scaleSize(8));
+    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器打开"), page);
+    btnHttpStart_ = new QPushButton(QStringLiteral("启动"), page);
+    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), page);
+    actionRow->addWidget(btnHttpOpen_);
+    actionRow->addStretch();
+    actionRow->addWidget(btnHttpStart_);
+    actionRow->addWidget(btnHttpStop_);
+    layout->addLayout(actionRow);
+    layout->addStretch();
+
+    const int aboutIndex = ui.tabWidget->indexOf(ui.tab_2);
+    if (aboutIndex >= 0) {
+        ui.tabWidget->insertTab(aboutIndex, page, QStringLiteral("HTTP 服务"));
+    } else {
+        ui.tabWidget->addTab(page, QStringLiteral("HTTP 服务"));
+    }
+
+    // 预填默认参数：一次点击「启动」即可用。首次使用且无保存目录时，
+    // 默认共享系统「下载」目录，取不到再回退到用户主目录。
+    HttpServerConfig cfg = windowManager_->setting()->httpServerConfig();
+    if (cfg.directory.trimmed().isEmpty()) {
+        const QString downloads =
+            QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        cfg.directory = downloads.trimmed().isEmpty() ? QDir::homePath() : downloads;
+        windowManager_->setting()->setHttpServerConfig(cfg);
+    }
+    leHttpDirectory_->setText(QDir::toNativeSeparators(cfg.directory));
+    sbHttpPort_->setValue(cfg.port);
+    leHttpBind_->setText(cfg.bind);
+    const int protocolIndex = cbHttpProtocol_->findData(cfg.protocol);
+    cbHttpProtocol_->setCurrentIndex(protocolIndex >= 0 ? protocolIndex : 0);
+    cbHttpCgi_->setChecked(cfg.cgi);
+
+    auto* controller = windowManager_->httpServer();
+
+    connect(btnHttpBrowse_, &QPushButton::clicked, this, [this]() {
+        const QString path = QFileDialog::getExistingDirectory(
+            this, QStringLiteral("选择要共享的目录"), leHttpDirectory_->text());
+        if (path.isEmpty()) {
+            return;
+        }
+        leHttpDirectory_->setText(QDir::toNativeSeparators(path));
+    });
+
+    connect(btnHttpStart_, &QPushButton::clicked, this, [this]() {
+        const QString dir = leHttpDirectory_->text().trimmed();
+        const QFileInfo dirInfo(dir);
+        if (dir.isEmpty() || !dirInfo.isDir()) {
+            showStatusTip(QStringLiteral("请先选择一个有效的共享目录"), false);
+            return;
+        }
+
+        HttpServerController::Params params;
+        params.directory = dir;
+        params.port = sbHttpPort_->value();
+        params.bind = leHttpBind_->text().trimmed();
+        if (params.bind.isEmpty()) {
+            params.bind = QStringLiteral("0.0.0.0");
+        }
+        params.protocol = cbHttpProtocol_->currentData().toString();
+        params.cgi = cbHttpCgi_->isChecked();
+
+        HttpServerConfig cfg;
+        cfg.directory = params.directory;
+        cfg.port = params.port;
+        cfg.bind = params.bind;
+        cfg.protocol = params.protocol;
+        cfg.cgi = params.cgi;
+        windowManager_->setting()->setHttpServerConfig(cfg);
+        emit windowManager_->sigSettingChanged();
+
+        auto* server = windowManager_->httpServer();
+        if (server->start(params)) {
+            labelHttpStatus_->setText(QStringLiteral("正在启动…"));
+            showStatusTip(QStringLiteral("HTTP 服务正在启动"));
+        } else {
+            const QString reason = server->lastError();
+            refreshHttpServerState();
+            showStatusTip(reason, false);
+            QMessageBox::warning(this, QStringLiteral("无法启动 HTTP 服务"), reason);
+        }
+    });
+
+    connect(btnHttpStop_, &QPushButton::clicked, this, [this]() {
+        windowManager_->httpServer()->stop();
+        showStatusTip(QStringLiteral("HTTP 服务已停止"));
+    });
+
+    connect(btnHttpOpen_, &QPushButton::clicked, this, [this]() {
+        if (!httpPrimaryUrl_.isEmpty()) {
+            Util::shellExecute(httpPrimaryUrl_);
+        }
+    });
+
+    connect(controller, &HttpServerController::runningChanged, this,
+            [this](bool) { refreshHttpServerState(); });
+    connect(controller, &HttpServerController::errorOccurred, this,
+            [this](const QString& message) {
+        refreshHttpServerState();
+        labelHttpStatus_->setText(message);
+        showStatusTip(message, false);
+    });
+
+    refreshHttpServerState();
+}
+
+void Settings::refreshHttpServerState()
+{
+    auto* controller = windowManager_->httpServer();
+    if (!controller) {
+        return;
+    }
+
+    const bool running = controller->isRunning();
+    leHttpDirectory_->setEnabled(!running);
+    btnHttpBrowse_->setEnabled(!running);
+    sbHttpPort_->setEnabled(!running);
+    leHttpBind_->setEnabled(!running);
+    cbHttpProtocol_->setEnabled(!running);
+    cbHttpCgi_->setEnabled(!running);
+    btnHttpStart_->setEnabled(!running);
+    btnHttpStop_->setEnabled(running);
+    btnHttpOpen_->setEnabled(running);
+
+    if (!running) {
+        labelHttpStatus_->setText(QStringLiteral("已停止"));
+        labelHttpStatus_->setStyleSheet(
+            QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+        labelHttpAddress_->clear();
+        httpPrimaryUrl_.clear();
+        return;
+    }
+
+    labelHttpStatus_->setText(QStringLiteral("运行中"));
+    labelHttpStatus_->setStyleSheet(
+        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+    const int port = controller->port();
+    QString bind = controller->bind().trimmed();
+    if (bind.isEmpty()) {
+        bind = QStringLiteral("0.0.0.0");
+    }
+    QStringList urls;
+    const bool serveAll = bind == QStringLiteral("0.0.0.0") || bind == QStringLiteral("::");
+    if (serveAll) {
+        urls << QStringLiteral("http://127.0.0.1:%1/").arg(port);
+        const QStringList ips = controller->localIpv4Addresses();
+        for (const QString& ip : ips) {
+            urls << QStringLiteral("http://%1:%2/").arg(ip).arg(port);
+        }
+    } else {
+        urls << QStringLiteral("http://%1:%2/").arg(bind).arg(port);
+    }
+    labelHttpAddress_->setText(urls.join(QLatin1Char('\n')));
+    httpPrimaryUrl_ = urls.constFirst();
 }

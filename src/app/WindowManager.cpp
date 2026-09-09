@@ -13,6 +13,7 @@
 
 WindowManager::WindowManager()
     : settingModel_(std::make_unique<SettingModel>(nullptr))
+    , httpServer_(std::make_unique<HttpServerController>(this))
 {
     qInfo() << "WindowManager: constructing...";
     connect(this, &WindowManager::sigPin, this, [this]() {
@@ -46,6 +47,9 @@ void WindowManager::setModuleRegistry(ModuleRegistry* modules)
 
 void WindowManager::destroy()
 {
+    if (httpServer_) {
+        httpServer_->stop();
+    }
     if (modules_) {
         modules_->shutdownAll();
         modules_ = nullptr;

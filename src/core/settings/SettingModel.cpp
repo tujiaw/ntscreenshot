@@ -62,6 +62,13 @@ static const QString DEFAULT_OCR_JOB_URL =
     QStringLiteral("https://paddleocr.aistudio-app.com/api/v2/ocr/jobs");
 static const QString DEFAULT_OCR_MODEL = QStringLiteral("PP-OCRv6");
 
+// [HttpServer] section - background python -m http.server configuration
+static const QString KEY_HTTP_SERVER_DIR      = "HttpServer/DIRECTORY";
+static const QString KEY_HTTP_SERVER_PORT     = "HttpServer/PORT";
+static const QString KEY_HTTP_SERVER_BIND     = "HttpServer/BIND";
+static const QString KEY_HTTP_SERVER_PROTOCOL = "HttpServer/PROTOCOL";
+static const QString KEY_HTTP_SERVER_CGI      = "HttpServer/CGI";
+
 // [LLM] 节 —— LLM 全局设置
 static const QString KEY_LLM_ACTIVE_PROVIDER = "LLM/ACTIVE_PROVIDER";
 static const QString KEY_LLM_PROVIDERS_COUNT = "LLM/PROVIDERS_COUNT";
@@ -754,6 +761,33 @@ void SettingModel::setPaddleOcrConfig(const PaddleOcrConfig &config)
     settings_.setValue(KEY_OCR_JOB_URL, config.jobUrl.trimmed());
     settings_.setValue(KEY_OCR_TOKEN, config.token.trimmed());
     settings_.setValue(KEY_OCR_MODEL, config.model.trimmed());
+    settings_.sync();
+}
+
+HttpServerConfig SettingModel::httpServerConfig() const
+{
+    HttpServerConfig config;
+    config.directory = settings_.value(KEY_HTTP_SERVER_DIR, QString()).toString();
+    config.port = settings_.value(KEY_HTTP_SERVER_PORT, 8000).toInt();
+    config.bind = settings_.value(KEY_HTTP_SERVER_BIND, QStringLiteral("0.0.0.0")).toString();
+    config.protocol = settings_.value(KEY_HTTP_SERVER_PROTOCOL, QStringLiteral("HTTP/1.1")).toString();
+    config.cgi = settings_.value(KEY_HTTP_SERVER_CGI, false).toBool();
+    if (config.port < 1 || config.port > 65535) {
+        config.port = 8000;
+    }
+    if (config.bind.trimmed().isEmpty()) {
+        config.bind = QStringLiteral("0.0.0.0");
+    }
+    return config;
+}
+
+void SettingModel::setHttpServerConfig(const HttpServerConfig &config)
+{
+    settings_.setValue(KEY_HTTP_SERVER_DIR, config.directory.trimmed());
+    settings_.setValue(KEY_HTTP_SERVER_PORT, config.port);
+    settings_.setValue(KEY_HTTP_SERVER_BIND, config.bind.trimmed());
+    settings_.setValue(KEY_HTTP_SERVER_PROTOCOL, config.protocol.trimmed());
+    settings_.setValue(KEY_HTTP_SERVER_CGI, config.cgi);
     settings_.sync();
 }
 

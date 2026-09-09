@@ -65,6 +65,8 @@ private:
 private:
     void initLlmTab();
     void initLocalSearchTab();
+    void initHttpServerTab();
+    void refreshHttpServerState();
     void applyModernLayout();
     void loadLocalSearchSettings();
     void loadLlmProviders();
@@ -98,6 +100,18 @@ private:
     class QCheckBox* cbLocalSearchEdgeBookmarks_ = nullptr;
     class QCheckBox* cbLocalSearchPinyin_ = nullptr;
     class QComboBox* cbLocalSearchWebEngine_ = nullptr;
+    class QLineEdit* leHttpDirectory_ = nullptr;
+    class QSpinBox* sbHttpPort_ = nullptr;
+    class QLineEdit* leHttpBind_ = nullptr;
+    class QComboBox* cbHttpProtocol_ = nullptr;
+    class QCheckBox* cbHttpCgi_ = nullptr;
+    class QPushButton* btnHttpBrowse_ = nullptr;
+    class QPushButton* btnHttpOpen_ = nullptr;
+    class QPushButton* btnHttpStart_ = nullptr;
+    class QPushButton* btnHttpStop_ = nullptr;
+    class QLabel* labelHttpStatus_ = nullptr;
+    class QLabel* labelHttpAddress_ = nullptr;
+    QString httpPrimaryUrl_;
     bool updatingProviderFields_ = false;
     bool updatingNetworkSearchProviderFields_ = false;
     bool updatingTextSelectionActionFields_ = false;

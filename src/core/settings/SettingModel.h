@@ -29,6 +29,14 @@ struct PaddleOcrConfig {
     QString model;
 };
 
+struct HttpServerConfig {
+    QString directory;
+    int port = 8000;
+    QString bind = QStringLiteral("0.0.0.0");
+    QString protocol = QStringLiteral("HTTP/1.1");
+    bool cgi = false;
+};
+
 enum class TrayNotificationPosition {
     TopLeft = 0,
     TopRight,
@@ -138,6 +146,9 @@ public:
 
     PaddleOcrConfig paddleOcrConfig() const;
     void setPaddleOcrConfig(const PaddleOcrConfig &config);
+
+    HttpServerConfig httpServerConfig() const;
+    void setHttpServerConfig(const HttpServerConfig &config);
 
     QSize notificationWindowSize() const;
     void setNotificationWindowSize(const QSize &size);

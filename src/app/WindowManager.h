@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HttpServerController.h"
 #include "core/settings/SettingModel.h"
 
 #include <QObject>
@@ -23,6 +24,7 @@ public:
     void openGifRecorderWidget(const QRect& captureRect);
 
     SettingModel* setting() { return settingModel_.get(); }
+    HttpServerController* httpServer() const { return httpServer_.get(); }
     bool setScreenshotGlobalKey(const QString& key);
     bool setPinGlobalKey(const QString& key);
     bool setChatGlobalKey(const QString& key);
@@ -46,4 +48,5 @@ private:
 
     ModuleRegistry* modules_ = nullptr;
     std::unique_ptr<SettingModel> settingModel_;
+    std::unique_ptr<HttpServerController> httpServer_;
 };
