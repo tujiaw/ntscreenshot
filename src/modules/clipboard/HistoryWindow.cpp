@@ -1,8 +1,6 @@
 #include "HistoryWindow.h"
 
 #include "core/foundation/TimeUtil.h"
-#include "core/imaging/CodeScanner.h"
-#include "core/imaging/ImageUtil.h"
 #include "core/platform/Util.h"
 #include "core/theme/ThemeIcon.h"
 #include "core/theme/ThemeManager.h"
@@ -12,6 +10,7 @@
 #include <QCloseEvent>
 #include <QCursor>
 #include <QGuiApplication>
+#include <QHash>
 #include <QHideEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -19,6 +18,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPixmap>
 #include <QRegularExpression>
 #include <QResizeEvent>
 #include <QScreen>
@@ -68,6 +68,10 @@ public:
 
     void setHistory(const ClipboardHistory* history) {
         history_ = history;
+    }
+
+    void ClearThumbnails() {
+        thumbCache_.clear();
     }
 
     QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const override {
@@ -122,7 +126,7 @@ public:
                                 rowRect.width() - s(kNumberWidth + kTimeWidth + 10),
                                 rowRect.height() - s(10));
         if (item.kind == ClipKind::Image) {
-            DrawImage(painter, contentRect, item);
+            DrawImage(painter, contentRect, item, historyIndex);
         } else {
             DrawText(painter, contentRect, item.text, option.font, primary);
         }
@@ -138,15 +142,28 @@ public:
 private:
     int s(int value) const { return Scaled(value, scaleFactor_); }
 
-    static void DrawImage(QPainter* painter, const QRect& rect, const ClipItem& item) {
+    void DrawImage(QPainter* painter, const QRect& rect, const ClipItem& item,
+                   int historyIndex) const {
+        // Decode and downscale each image only once, then cache the thumbnail per
+        // history item so scrolling repaints pixmaps instead of re-decoding the
+        // full-resolution PNG (and smooth-scaling it) on every frame. The cache is
+        // cleared whenever the list is rebuilt, which is when indices can change.
+        const auto cached = thumbCache_.constFind(historyIndex);
+        if (cached != thumbCache_.constEnd() && cached->size == rect.size()) {
+            painter->drawPixmap(rect.topLeft(), cached->pixmap);
+            return;
+        }
         QImage image;
         if (!image.loadFromData(item.data)) {
             return;
         }
-        const QImage scaled = image.scaled(rect.size(), Qt::KeepAspectRatio,
-                                           Qt::SmoothTransformation);
-        const QRect target(rect.left(), rect.top(), scaled.width(), scaled.height());
-        painter->drawImage(target, scaled);
+        const QPixmap pixmap = QPixmap::fromImage(
+            image.scaled(rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        if (pixmap.isNull()) {
+            return;
+        }
+        thumbCache_.insert(historyIndex, {pixmap, rect.size()});
+        painter->drawPixmap(rect.topLeft(), pixmap);
     }
 
     static void DrawText(QPainter* painter, const QRect& rect, QString text,
@@ -185,8 +202,14 @@ private:
         }
     }
 
+    struct Thumbnail {
+        QPixmap pixmap;
+        QSize size;
+    };
+
     const ClipboardHistory* history_ = nullptr;
     qreal scaleFactor_ = 1.0;
+    mutable QHash<int, Thumbnail> thumbCache_;
 };
 
 } // namespace
@@ -349,6 +372,7 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
     resized_ = std::move(resized);
     aiConfigured_ = aiConfigured;
     static_cast<HistoryDelegate*>(delegate_)->setHistory(history_);
+    static_cast<HistoryDelegate*>(delegate_)->ClearThumbnails();
 }
 
 void HistoryWindow::SetSavedPosition(const QPoint& position, bool available) {
@@ -446,6 +470,7 @@ size_t HistoryWindow::HistoryIndexForRow(int row) const {
 
 void HistoryWindow::BuildList() {
     list_->clear();
+    static_cast<HistoryDelegate*>(delegate_)->ClearThumbnails();
     if (!history_ || history_->Empty()) {
         emptyTitle_->setText(QStringLiteral("Clipboard is empty"));
         emptyDescription_->setText(
@@ -520,94 +545,6 @@ void HistoryWindow::AiFillSelected() {
     }
 }
 
-QImage HistoryWindow::DecodeHistoryImage(size_t index) const {
-    if (!history_ || index >= history_->Items().size()) {
-        return {};
-    }
-    const ClipItem& item = history_->Items()[index];
-    if (item.kind != ClipKind::Image || item.data.isEmpty()) {
-        return {};
-    }
-    QImage image;
-    if (!image.loadFromData(item.data, "PNG")) {
-        image.loadFromData(item.data);
-    }
-    return image;
-}
-
-void HistoryWindow::ScanSelectedCode() {
-    const size_t index = HistoryIndexForRow(list_->currentRow());
-    const QImage image = DecodeHistoryImage(index);
-    const QString text = CodeScanner::scanToText(image);
-    if (text.isEmpty()) {
-        ShowToast(QStringLiteral("未识别到二维码/条码"), 2000);
-        return;
-    }
-    QApplication::clipboard()->setText(text);
-    ShowToast(QStringLiteral("已复制识别结果"), 2400);
-}
-
-void HistoryWindow::FindSimilarSelected() {
-    const size_t index = HistoryIndexForRow(list_->currentRow());
-    const QImage probe = DecodeHistoryImage(index);
-    if (probe.isNull() || !history_) {
-        return;
-    }
-
-    double bestScore = 0.0;
-    size_t bestIndex = static_cast<size_t>(-1);
-    const auto& items = history_->Items();
-    for (size_t i = 0; i < items.size(); ++i) {
-        if (i == index || items[i].kind != ClipKind::Image) {
-            continue;
-        }
-        const QImage other = DecodeHistoryImage(i);
-        if (other.isNull()) {
-            continue;
-        }
-        const double score = ImageUtil::Similarity(probe, other);
-        if (score > bestScore) {
-            bestScore = score;
-            bestIndex = i;
-        }
-    }
-
-    if (bestIndex == static_cast<size_t>(-1) || bestScore < 0.55) {
-        ShowToast(QStringLiteral("未找到相似图片"), 2000);
-        return;
-    }
-
-    for (int row = 0; row < list_->count(); ++row) {
-        QListWidgetItem* item = list_->item(row);
-        if (!item) {
-            continue;
-        }
-        if (static_cast<size_t>(item->data(Qt::UserRole).toInt()) == bestIndex) {
-            list_->setCurrentItem(item);
-            list_->scrollToItem(item);
-            break;
-        }
-    }
-    ShowToast(QStringLiteral("已定位相似图（相似度 %1%）")
-                  .arg(qRound(bestScore * 100.0)),
-              2400);
-}
-
-void HistoryWindow::ExtractColorsSelected() {
-    const size_t index = HistoryIndexForRow(list_->currentRow());
-    const QVector<QColor> colors = ImageUtil::DominantColors(DecodeHistoryImage(index), 5);
-    if (colors.isEmpty()) {
-        ShowToast(QStringLiteral("未能提取主色"), 2000);
-        return;
-    }
-    QStringList hexes;
-    for (const QColor& c : colors) {
-        hexes.push_back(c.name(QColor::HexRgb).toUpper());
-    }
-    QApplication::clipboard()->setText(hexes.join(QLatin1Char(' ')));
-    ShowToast(QStringLiteral("主色已复制"), 2400);
-}
-
 void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     const size_t index = HistoryIndexForRow(list_->currentRow());
     if (!history_ || index == static_cast<size_t>(-1) || index >= history_->Items().size()) {
@@ -615,22 +552,10 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     }
 
     const bool isText = history_->Items()[index].kind == ClipKind::Text;
-    const bool isImage = history_->Items()[index].kind == ClipKind::Image;
     QMenu menu(this);
     QAction* copyAction = menu.addAction(QStringLiteral("Copy"));
     QAction* aiAction = menu.addAction(QStringLiteral("AI Fill"));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
-    QAction* scanAction = nullptr;
-    QAction* similarAction = nullptr;
-    QAction* colorsAction = nullptr;
-    if (isImage) {
-        menu.addSeparator();
-        QMenu* imageToolsMenu = menu.addMenu(ThemeIcon::icon(QStringLiteral("mosaic.png")),
-                                             QStringLiteral("马赛克 / 图像工具"));
-        scanAction = imageToolsMenu->addAction(QStringLiteral("识别二维码/条码"));
-        similarAction = imageToolsMenu->addAction(QStringLiteral("查找相似图"));
-        colorsAction = imageToolsMenu->addAction(QStringLiteral("提取主色"));
-    }
     menu.addSeparator();
     QAction* deleteAction = menu.addAction(QStringLiteral("Delete"));
     QAction* selected = menu.exec(globalPos);
@@ -638,12 +563,6 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
         CopySelected();
     } else if (selected == aiAction) {
         AiFillSelected();
-    } else if (scanAction && selected == scanAction) {
-        ScanSelectedCode();
-    } else if (similarAction && selected == similarAction) {
-        FindSimilarSelected();
-    } else if (colorsAction && selected == colorsAction) {
-        ExtractColorsSelected();
     } else if (selected == deleteAction) {
         DeleteSelected();
     }
@@ -694,10 +613,11 @@ void HistoryWindow::ApplyTheme() {
             .arg(CssColor(WithAlpha(listMuted, 120))).arg(scaled(4)).arg(scaled(24)));
     const QString buttonStyle =
         QStringLiteral("QToolButton { color: %1; background: transparent; border: none;"
-                       " border-radius: %4px; font-size: %5px; }"
-                       "QToolButton:hover { background: %2; color: %3; }")
+                       " padding: 0px; margin: 0px; border-radius: %4px; font-size: %5px; }"
+                       "QToolButton:hover { background: %2; color: %3; }"
+                       "QToolButton:pressed { background: %6; }")
             .arg(CssColor(muted), CssColor(WithAlpha(text, 20)), CssColor(text))
-            .arg(scaled(4)).arg(scaled(12));
+            .arg(scaled(4)).arg(scaled(14)).arg(CssColor(WithAlpha(text, 40)));
     closeButton_->setStyleSheet(buttonStyle);
     toastLabel_->setStyleSheet(
         QStringLiteral("color: %1; background: %2; padding: %3px %4px; border-radius: %5px;")

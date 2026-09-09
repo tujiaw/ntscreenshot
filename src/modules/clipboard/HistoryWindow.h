@@ -68,12 +68,8 @@ private:
     void CopySelected();
     void DeleteSelected();
     void AiFillSelected();
-    void ScanSelectedCode();
-    void FindSimilarSelected();
-    void ExtractColorsSelected();
     void BuildList();
     void ShowContextMenu(const QPoint& globalPos);
-    QImage DecodeHistoryImage(size_t index) const;
     void ApplyTheme();
     void ShowToast(const QString& text, int timeoutMs);
     int scaled(int value) const;
