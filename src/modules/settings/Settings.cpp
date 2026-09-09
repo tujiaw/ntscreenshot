@@ -1717,6 +1717,19 @@ void Settings::initHttpServerTab()
 
     layout->addLayout(form);
 
+    // 操作按钮固定在上方，状态/日志放在下方
+    auto* actionRow = new QHBoxLayout();
+    actionRow->setSpacing(Util::scaleSize(8));
+    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器打开"), page);
+    btnHttpStart_ = new QPushButton(QStringLiteral("启动"), page);
+    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), page);
+    actionRow->addWidget(btnHttpOpen_);
+    actionRow->addStretch();
+    actionRow->addWidget(btnHttpStart_);
+    actionRow->addWidget(btnHttpStop_);
+    layout->addLayout(actionRow);
+    layout->addSpacing(Util::scaleSize(6));
+
     labelHttpStatus_ = new QLabel(QStringLiteral("已停止"), page);
     labelHttpStatus_->setStyleSheet(
         QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
@@ -1728,17 +1741,6 @@ void Settings::initHttpServerTab()
     labelHttpAddress_->setStyleSheet(
         QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
     layout->addWidget(labelHttpAddress_);
-
-    auto* actionRow = new QHBoxLayout();
-    actionRow->setSpacing(Util::scaleSize(8));
-    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器打开"), page);
-    btnHttpStart_ = new QPushButton(QStringLiteral("启动"), page);
-    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), page);
-    actionRow->addWidget(btnHttpOpen_);
-    actionRow->addStretch();
-    actionRow->addWidget(btnHttpStart_);
-    actionRow->addWidget(btnHttpStop_);
-    layout->addLayout(actionRow);
     layout->addStretch();
 
     const int aboutIndex = ui.tabWidget->indexOf(ui.tab_2);
@@ -1804,8 +1806,8 @@ void Settings::initHttpServerTab()
 
         auto* server = windowManager_->httpServer();
         if (server->start(params)) {
-            labelHttpStatus_->setText(QStringLiteral("正在启动…"));
-            showStatusTip(QStringLiteral("HTTP 服务正在启动"));
+            labelHttpStatus_->setText(QStringLiteral("已启动"));
+            showStatusTip(QStringLiteral("HTTP 服务已启动"));
         } else {
             const QString reason = server->lastError();
             refreshHttpServerState();
@@ -1864,7 +1866,7 @@ void Settings::refreshHttpServerState()
         return;
     }
 
-    labelHttpStatus_->setText(QStringLiteral("运行中"));
+    labelHttpStatus_->setText(QStringLiteral("已启动"));
     labelHttpStatus_->setStyleSheet(
         QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
     const int port = controller->port();
