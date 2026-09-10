@@ -85,6 +85,11 @@ QPushButton[uiRole="danger"]:pressed, QToolButton[uiRole="danger"]:pressed {
     background: @BORDER@;
     border-color: @DANGER@;
 }
+QPushButton[uiRole="danger"]:disabled, QToolButton[uiRole="danger"]:disabled {
+    color: @TEXT_DISABLED@;
+    background: @SURFACE_SUBTLE@;
+    border-color: @BORDER@;
+}
 
 QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox,
 QComboBox, QKeySequenceEdit {
@@ -364,6 +369,58 @@ QLabel#settingsPageSubtitle { color: @TEXT_SECONDARY@; font-size: 12px; }
 QLabel#settingsStatusTip { color: @TEXT_SECONDARY@; font-size: 12px; }
 QLabel#settingsStatusTip[status="success"] { color: @SUCCESS@; }
 QLabel#settingsStatusTip[status="error"] { color: @DANGER@; }
+QWidget#httpServerPage { background: transparent; }
+QLabel#httpServerHint {
+    color: @TEXT_SECONDARY@;
+    font-size: 12px;
+}
+QFrame#httpServerConfigPanel {
+    background: @SURFACE_SUBTLE@;
+    border: 1px solid @BORDER@;
+    border-radius: 10px;
+}
+QFrame#httpServerStatusPanel {
+    background: @SURFACE@;
+    border: 1px solid @BORDER@;
+    border-radius: 10px;
+}
+QLabel#httpServerSectionTitle {
+    color: @TEXT@;
+    font-size: 14px;
+    font-weight: 600;
+}
+QLabel#httpServerFieldLabel {
+    color: @TEXT_SECONDARY@;
+    font-size: 12px;
+    font-weight: 500;
+}
+QLabel#httpServerFieldHelp {
+    color: @TEXT_SECONDARY@;
+    font-size: 12px;
+}
+QPlainTextEdit#httpServerAddress,
+QPlainTextEdit#httpServerAddress:hover,
+QPlainTextEdit#httpServerAddress:focus {
+    color: @TEXT_SECONDARY@;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+}
+QLabel#httpServerStatusDot {
+    background: @TEXT_DISABLED@;
+    border-radius: 4px;
+}
+QLabel#httpServerStatusDot[status="running"] { background: @SUCCESS@; }
+QLabel#httpServerStatusDot[status="error"] { background: @DANGER@; }
+QLabel#httpServerStatusText {
+    color: @TEXT_SECONDARY@;
+    font-weight: 600;
+}
+QLabel#httpServerStatusText[status="running"] { color: @SUCCESS@; }
+QLabel#httpServerStatusText[status="error"] { color: @DANGER@; }
+QPushButton#httpServerOpenButton { padding-left: 8px; padding-right: 8px; }
 QFrame#settingsTitleDivider {
     background: @BORDER@;
     border: none;

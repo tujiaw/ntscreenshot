@@ -15,7 +15,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 $ErrorActionPreference = 'Continue'
-$goodOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $Checker -Root $Root -Tag v0.1.0 2>&1
+$goodOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $Checker -Root $Root -Tag v0.1.1 2>&1
 $ErrorActionPreference = 'Stop'
 if ($LASTEXITCODE -ne 0) {
   throw "Release checker rejected the project version:`n$($goodOutput -join "`n")"

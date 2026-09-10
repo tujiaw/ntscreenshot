@@ -54,6 +54,15 @@ void setStatusIcon(QPushButton *button, bool ok)
 {
     button->setIcon(QIcon(ok ? ":/images/ok.png" : ":/images/remove.png"));
 }
+
+void setStyleProperty(QWidget* widget, const char* name, const QString& value)
+{
+    if (!widget || widget->property(name).toString() == value) return;
+    widget->setProperty(name, value);
+    widget->style()->unpolish(widget);
+    widget->style()->polish(widget);
+    widget->update();
+}
 }
 
 Settings::Settings(WindowManager* windowManager, QWidget *parent)
@@ -341,7 +350,7 @@ void Settings::applyModernLayout()
             break;
         case 5:
             titleLabel->setText(QStringLiteral("HTTP 服务"));
-            subtitleLabel->setText(QStringLiteral("用 python http.server 起一个后台静态服务"));
+            subtitleLabel->setText(QStringLiteral("共享本地目录并管理后台服务"));
             legacyTabs->setCurrentWidget(httpServerPage);
             break;
         case 6:
@@ -1654,93 +1663,141 @@ void Settings::onToolAutoPermissionToggled(bool checked)
 void Settings::initHttpServerTab()
 {
     auto* page = new QWidget(this);
+    page->setObjectName(QStringLiteral("httpServerPage"));
     auto* layout = new QVBoxLayout(page);
-    Util::scaleLayoutMargins(layout, 14, 14, 14, 14);
-    layout->setSpacing(Util::scaleSize(8));
+    Util::scaleLayoutMargins(layout, 14, 12, 14, 14);
+    layout->setSpacing(Util::scaleSize(12));
 
     auto* hint = new QLabel(
-        QStringLiteral("用 python http.server 在本地/局域网共享一个目录的静态文件。\n"
-                       "设置好参数后点「启动」即可；服务在设置窗口关闭后仍会继续运行。"),
+        QStringLiteral("启动后，局域网内设备可访问此目录；关闭设置窗口不会停止服务。"),
         page);
+    hint->setObjectName(QStringLiteral("httpServerHint"));
     hint->setWordWrap(true);
-    hint->setStyleSheet(
-        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
     layout->addWidget(hint);
 
-    auto* form = new QFormLayout();
-    form->setSpacing(Util::scaleSize(8));
+    auto* configPanel = new QFrame(page);
+    configPanel->setObjectName(QStringLiteral("httpServerConfigPanel"));
+    configPanel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    auto* configLayout = new QVBoxLayout(configPanel);
+    Util::scaleLayoutMargins(configLayout, 16, 14, 16, 16);
+    configLayout->setSpacing(Util::scaleSize(12));
+
+    auto* configTitle = new QLabel(QStringLiteral("服务配置"), configPanel);
+    configTitle->setObjectName(QStringLiteral("httpServerSectionTitle"));
+    configLayout->addWidget(configTitle);
+
+    auto makeFieldLabel = [configPanel](const QString& text) {
+        auto* label = new QLabel(text, configPanel);
+        label->setObjectName(QStringLiteral("httpServerFieldLabel"));
+        return label;
+    };
 
     // -d/--directory
+    configLayout->addWidget(makeFieldLabel(QStringLiteral("共享目录")));
     auto* dirRow = new QHBoxLayout();
     dirRow->setSpacing(Util::scaleSize(8));
-    leHttpDirectory_ = new QLineEdit(page);
+    leHttpDirectory_ = new QLineEdit(configPanel);
     leHttpDirectory_->setReadOnly(true);
     leHttpDirectory_->setPlaceholderText(QStringLiteral("选择要共享的目录"));
-    btnHttpBrowse_ = new QPushButton(QStringLiteral("浏览…"), page);
+    leHttpDirectory_->setMinimumHeight(Util::scaleSize(34));
+    btnHttpBrowse_ = new QPushButton(QStringLiteral("选择目录"), configPanel);
+    btnHttpBrowse_->setMinimumHeight(Util::scaleSize(34));
+    btnHttpBrowse_->setFixedWidth(Util::scaleSize(88));
+    UiStyler::setRole(btnHttpBrowse_, UiRole::SecondaryButton);
     dirRow->addWidget(leHttpDirectory_, 1);
     dirRow->addWidget(btnHttpBrowse_);
-    form->addRow(QStringLiteral("共享目录："), dirRow);
+    configLayout->addLayout(dirRow);
 
-    // 绑定地址 + 端口 + 协议：同一行
-    auto* paramRow = new QHBoxLayout();
-    paramRow->setSpacing(Util::scaleSize(6));
-    leHttpBind_ = new QLineEdit(page);
+    // 网络参数使用三列结构，标签和输入控件形成稳定的垂直对齐。
+    auto* parameterGrid = new QGridLayout();
+    parameterGrid->setContentsMargins(0, 0, 0, 0);
+    parameterGrid->setHorizontalSpacing(Util::scaleSize(10));
+    parameterGrid->setVerticalSpacing(Util::scaleSize(6));
+    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("绑定地址")), 0, 0);
+    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("端口")), 0, 1);
+    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("协议")), 0, 2);
+
+    leHttpBind_ = new QLineEdit(configPanel);
     leHttpBind_->setPlaceholderText(QStringLiteral("0.0.0.0 / 127.0.0.1 / ::"));
     leHttpBind_->setToolTip(
         QStringLiteral("python http.server 的 --bind；0.0.0.0 表示局域网内可访问"));
-    sbHttpPort_ = new QSpinBox(page);
+    leHttpBind_->setMinimumHeight(Util::scaleSize(34));
+    sbHttpPort_ = new QSpinBox(configPanel);
     sbHttpPort_->setRange(1, 65535);
     sbHttpPort_->setValue(8000);
     sbHttpPort_->setToolTip(QStringLiteral("python http.server 的 --port"));
-    cbHttpProtocol_ = new QComboBox(page);
+    sbHttpPort_->setMinimumHeight(Util::scaleSize(34));
+    cbHttpProtocol_ = new QComboBox(configPanel);
     cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.1"), QStringLiteral("HTTP/1.1"));
     cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.0"), QStringLiteral("HTTP/1.0"));
     cbHttpProtocol_->setToolTip(QStringLiteral("python http.server 的 --protocol"));
-    cbHttpProtocol_->setMinimumWidth(Util::scaleSize(96));
-    auto addCaption = [page, paramRow](const QString& text) {
-        auto* caption = new QLabel(text, page);
-        caption->setStyleSheet(
-            QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
-        paramRow->addWidget(caption);
-    };
-    addCaption(QStringLiteral("绑定地址："));
-    paramRow->addWidget(leHttpBind_, 1);
-    addCaption(QStringLiteral("端口："));
-    paramRow->addWidget(sbHttpPort_);
-    addCaption(QStringLiteral("协议："));
-    paramRow->addWidget(cbHttpProtocol_);
-    form->addRow(QString(), paramRow);
+    cbHttpProtocol_->setMinimumHeight(Util::scaleSize(34));
+    parameterGrid->addWidget(leHttpBind_, 1, 0);
+    parameterGrid->addWidget(sbHttpPort_, 1, 1);
+    parameterGrid->addWidget(cbHttpProtocol_, 1, 2);
+    parameterGrid->setColumnStretch(0, 3);
+    parameterGrid->setColumnStretch(1, 1);
+    parameterGrid->setColumnStretch(2, 1);
+    configLayout->addLayout(parameterGrid);
 
     // --cgi
-    cbHttpCgi_ = new QCheckBox(QStringLiteral("启用 CGI 脚本（--cgi）"), page);
-    form->addRow(QString(), cbHttpCgi_);
+    auto* cgiRow = new QHBoxLayout();
+    cgiRow->setContentsMargins(0, Util::scaleSize(2), 0, 0);
+    cgiRow->setSpacing(Util::scaleSize(8));
+    cbHttpCgi_ = new QCheckBox(QStringLiteral("启用 CGI 脚本"), configPanel);
+    auto* cgiHint = new QLabel(QStringLiteral("仅在信任共享目录内容时启用"), configPanel);
+    cgiHint->setObjectName(QStringLiteral("httpServerFieldHelp"));
+    cgiRow->addWidget(cbHttpCgi_);
+    cgiRow->addWidget(cgiHint);
+    cgiRow->addStretch();
+    configLayout->addLayout(cgiRow);
+    configPanel->setMinimumHeight(configLayout->sizeHint().height());
+    layout->addWidget(configPanel);
 
-    layout->addLayout(form);
+    auto* statusPanel = new QFrame(page);
+    statusPanel->setObjectName(QStringLiteral("httpServerStatusPanel"));
+    auto* statusLayout = new QVBoxLayout(statusPanel);
+    Util::scaleLayoutMargins(statusLayout, 16, 12, 16, 12);
+    statusLayout->setSpacing(Util::scaleSize(8));
 
-    // 操作按钮固定在上方，状态/日志放在下方
-    auto* actionRow = new QHBoxLayout();
-    actionRow->setSpacing(Util::scaleSize(8));
-    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器打开"), page);
-    btnHttpStart_ = new QPushButton(QStringLiteral("启动"), page);
-    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), page);
-    actionRow->addWidget(btnHttpOpen_);
-    actionRow->addStretch();
-    actionRow->addWidget(btnHttpStart_);
-    actionRow->addWidget(btnHttpStop_);
-    layout->addLayout(actionRow);
-    layout->addSpacing(Util::scaleSize(6));
+    auto* statusRow = new QHBoxLayout();
+    statusRow->setSpacing(Util::scaleSize(8));
+    labelHttpStatusDot_ = new QLabel(statusPanel);
+    labelHttpStatusDot_->setObjectName(QStringLiteral("httpServerStatusDot"));
+    labelHttpStatusDot_->setFixedSize(Util::scaleSize(8), Util::scaleSize(8));
+    labelHttpStatus_ = new QLabel(QStringLiteral("服务已停止"), statusPanel);
+    labelHttpStatus_->setObjectName(QStringLiteral("httpServerStatusText"));
+    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器中打开"), statusPanel);
+    btnHttpOpen_->setObjectName(QStringLiteral("httpServerOpenButton"));
+    btnHttpStart_ = new QPushButton(QStringLiteral("启动服务"), statusPanel);
+    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), statusPanel);
+    for (QPushButton* button : {btnHttpOpen_, btnHttpStart_, btnHttpStop_}) {
+        button->setMinimumHeight(Util::scaleSize(34));
+    }
+    btnHttpOpen_->setMinimumWidth(Util::scaleSize(116));
+    btnHttpStart_->setMinimumWidth(Util::scaleSize(88));
+    btnHttpStop_->setMinimumWidth(Util::scaleSize(68));
+    UiStyler::setRole(btnHttpOpen_, UiRole::GhostButton);
+    UiStyler::setRole(btnHttpStart_, UiRole::PrimaryButton);
+    UiStyler::setRole(btnHttpStop_, UiRole::DangerButton);
+    statusRow->addWidget(labelHttpStatusDot_, 0, Qt::AlignVCenter);
+    statusRow->addWidget(labelHttpStatus_);
+    statusRow->addStretch();
+    statusRow->addWidget(btnHttpOpen_);
+    statusRow->addWidget(btnHttpStop_);
+    statusRow->addWidget(btnHttpStart_);
+    statusLayout->addLayout(statusRow);
 
-    labelHttpStatus_ = new QLabel(QStringLiteral("已停止"), page);
-    labelHttpStatus_->setStyleSheet(
-        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
-    layout->addWidget(labelHttpStatus_);
-
-    labelHttpAddress_ = new QLabel(page);
-    labelHttpAddress_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    labelHttpAddress_->setWordWrap(true);
-    labelHttpAddress_->setStyleSheet(
-        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
-    layout->addWidget(labelHttpAddress_);
+    teHttpAddress_ = new QPlainTextEdit(statusPanel);
+    teHttpAddress_->setObjectName(QStringLiteral("httpServerAddress"));
+    teHttpAddress_->setReadOnly(true);
+    teHttpAddress_->setFrameStyle(QFrame::NoFrame);
+    teHttpAddress_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    teHttpAddress_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    teHttpAddress_->setFixedHeight(Util::scaleSize(68));
+    teHttpAddress_->setPlainText(QStringLiteral("启动后将在这里显示访问地址"));
+    statusLayout->addWidget(teHttpAddress_);
+    layout->addWidget(statusPanel);
     layout->addStretch();
 
     const int aboutIndex = ui.tabWidget->indexOf(ui.tab_2);
@@ -1806,7 +1863,7 @@ void Settings::initHttpServerTab()
 
         auto* server = windowManager_->httpServer();
         if (server->start(params)) {
-            labelHttpStatus_->setText(QStringLiteral("已启动"));
+            labelHttpStatus_->setText(QStringLiteral("服务运行中"));
             showStatusTip(QStringLiteral("HTTP 服务已启动"));
         } else {
             const QString reason = server->lastError();
@@ -1833,6 +1890,8 @@ void Settings::initHttpServerTab()
             [this](const QString& message) {
         refreshHttpServerState();
         labelHttpStatus_->setText(message);
+        setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("error"));
+        setStyleProperty(labelHttpStatus_, "status", QStringLiteral("error"));
         showStatusTip(message, false);
     });
 
@@ -1858,17 +1917,17 @@ void Settings::refreshHttpServerState()
     btnHttpOpen_->setEnabled(running);
 
     if (!running) {
-        labelHttpStatus_->setText(QStringLiteral("已停止"));
-        labelHttpStatus_->setStyleSheet(
-            QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
-        labelHttpAddress_->clear();
+        labelHttpStatus_->setText(QStringLiteral("服务已停止"));
+        setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("stopped"));
+        setStyleProperty(labelHttpStatus_, "status", QStringLiteral("stopped"));
+        teHttpAddress_->setPlainText(QStringLiteral("启动后将在这里显示访问地址"));
         httpPrimaryUrl_.clear();
         return;
     }
 
-    labelHttpStatus_->setText(QStringLiteral("已启动"));
-    labelHttpStatus_->setStyleSheet(
-        QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
+    labelHttpStatus_->setText(QStringLiteral("服务运行中"));
+    setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("running"));
+    setStyleProperty(labelHttpStatus_, "status", QStringLiteral("running"));
     const int port = controller->port();
     QString bind = controller->bind().trimmed();
     if (bind.isEmpty()) {
@@ -1885,6 +1944,6 @@ void Settings::refreshHttpServerState()
     } else {
         urls << QStringLiteral("http://%1:%2/").arg(bind).arg(port);
     }
-    labelHttpAddress_->setText(urls.join(QLatin1Char('\n')));
+    teHttpAddress_->setPlainText(urls.join(QLatin1Char('\n')));
     httpPrimaryUrl_ = urls.constFirst();
 }

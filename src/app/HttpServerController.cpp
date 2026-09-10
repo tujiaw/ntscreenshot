@@ -4,38 +4,82 @@
 #include <QHostAddress>
 #include <QNetworkInterface>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QStandardPaths>
 
 namespace {
 
 constexpr int kProbeTimeoutMs = 3000;
 
-QString probePythonProgram(const QString& candidate)
+// `--protocol` only exists from Python 3.12 on; earlier interpreters reject the
+// flag outright, taking the whole start() down with them. 3.11 is gated off too
+// because it was not verified to accept the flag.
+constexpr int kProtocolMinMajor = 3;
+constexpr int kProtocolMinMinor = 12;
+
+struct PythonInterpreter {
+    QString program;
+    int major = 0;
+    int minor = 0;
+
+    bool isValid() const { return !program.isEmpty(); }
+
+    bool supportsProtocol() const
+    {
+        return major > kProtocolMinMajor
+            || (major == kProtocolMinMajor && minor >= kProtocolMinMinor);
+    }
+};
+
+PythonInterpreter probePythonInterpreter(const QString& candidate)
 {
+    PythonInterpreter interpreter;
     const QString executable = QStandardPaths::findExecutable(candidate);
     if (executable.isEmpty()) {
-        return {};
+        return interpreter;
     }
 
     QProcess process;
     process.start(executable, QStringList{QStringLiteral("--version")});
     if (!process.waitForStarted(kProbeTimeoutMs)) {
-        return {};
+        return interpreter;
     }
     if (!process.waitForFinished(kProbeTimeoutMs)) {
         process.kill();
         process.waitForFinished();
-        return {};
+        return interpreter;
     }
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        return {};
+        return interpreter;
     }
 
+    // Python before 3.4 prints --version to stderr, so both streams are read.
     const QString versionText = QString::fromUtf8(process.readAllStandardOutput())
                                     + QString::fromUtf8(process.readAllStandardError());
-    return versionText.contains(QStringLiteral("Python"), Qt::CaseInsensitive)
-               ? executable
-               : QString();
+    if (!versionText.contains(QStringLiteral("Python"), Qt::CaseInsensitive)) {
+        return interpreter;
+    }
+
+    static const QRegularExpression versionPattern(QStringLiteral(R"(Python\s+(\d+)\.(\d+))"));
+    const QRegularExpressionMatch match = versionPattern.match(versionText);
+    if (match.hasMatch()) {
+        interpreter.major = match.captured(1).toInt();
+        interpreter.minor = match.captured(2).toInt();
+    }
+    interpreter.program = executable;
+    return interpreter;
+}
+
+const PythonInterpreter& cachedPythonInterpreter()
+{
+    static const PythonInterpreter interpreter = []() {
+        PythonInterpreter found = probePythonInterpreter(QStringLiteral("python3"));
+        if (!found.isValid()) {
+            found = probePythonInterpreter(QStringLiteral("python"));
+        }
+        return found;
+    }();
+    return interpreter;
 }
 
 } // namespace
@@ -59,18 +103,30 @@ bool HttpServerController::pythonAvailable() const
 
 QString HttpServerController::pythonProgram() const
 {
-    static const QString program = []() -> QString {
-        const QString python3Path = probePythonProgram(QStringLiteral("python3"));
-        if (!python3Path.isEmpty()) {
-            return python3Path;
-        }
-        const QString pythonPath = probePythonProgram(QStringLiteral("python"));
-        if (!pythonPath.isEmpty()) {
-            return pythonPath;
-        }
-        return {};
-    }();
-    return program;
+    return cachedPythonInterpreter().program;
+}
+
+bool HttpServerController::pythonSupportsProtocol() const
+{
+    return cachedPythonInterpreter().supportsProtocol();
+}
+
+QStringList HttpServerController::buildServerArguments(const Params& params, bool protocolSupported)
+{
+    QStringList args{QStringLiteral("-m"), QStringLiteral("http.server"),
+                     QStringLiteral("-d"), params.directory,
+                     QStringLiteral("-b"), params.bind};
+    if (params.cgi) {
+        args << QStringLiteral("--cgi");
+    }
+    if (protocolSupported && !params.protocol.isEmpty()) {
+        args << QStringLiteral("--protocol") << params.protocol;
+    }
+    // The port is positional and stays last: `-p` is not the port flag, and from
+    // Python 3.12 on it is an alias for --protocol, which would silently leave the
+    // port unset and make the server listen on the default 8000 instead.
+    args << QString::number(params.port);
+    return args;
 }
 
 bool HttpServerController::start(const Params& params)
@@ -106,16 +162,9 @@ bool HttpServerController::start(const Params& params)
     stopping_ = false;
     stderrBuf_.clear();
 
-    QStringList args{QStringLiteral("-m"), QStringLiteral("http.server"),
-                     QStringLiteral("-d"), params_.directory,
-                     QStringLiteral("-p"), QString::number(params_.port),
-                     QStringLiteral("-b"), params_.bind};
-    if (!params_.protocol.isEmpty()) {
-        args << QStringLiteral("--protocol") << params_.protocol;
-    }
-    if (params_.cgi) {
-        args << QStringLiteral("--cgi");
-    }
+    // An interpreter too old for --protocol still serves fine, just with its own
+    // default HTTP version, so the flag is dropped instead of failing the start.
+    const QStringList args = buildServerArguments(params_, pythonSupportsProtocol());
 
     auto* proc = new QProcess(this);
     proc_ = proc;

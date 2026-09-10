@@ -109,8 +109,9 @@ private:
     class QPushButton* btnHttpOpen_ = nullptr;
     class QPushButton* btnHttpStart_ = nullptr;
     class QPushButton* btnHttpStop_ = nullptr;
+    class QLabel* labelHttpStatusDot_ = nullptr;
     class QLabel* labelHttpStatus_ = nullptr;
-    class QLabel* labelHttpAddress_ = nullptr;
+    class QPlainTextEdit* teHttpAddress_ = nullptr;
     QString httpPrimaryUrl_;
     bool updatingProviderFields_ = false;
     bool updatingNetworkSearchProviderFields_ = false;

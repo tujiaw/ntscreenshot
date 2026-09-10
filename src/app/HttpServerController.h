@@ -28,6 +28,13 @@ public:
     bool pythonAvailable() const;
     QString pythonProgram() const;
 
+    // Whether the detected interpreter accepts `--protocol` (Python >= 3.12).
+    bool pythonSupportsProtocol() const;
+
+    // Arguments for `python -m http.server`. Pure and static so tests can cover
+    // it without spawning a process.
+    static QStringList buildServerArguments(const Params& params, bool protocolSupported);
+
     // Synchronous validation failures are reported through lastError(); returns
     // false without touching a running server when already running. Runtime
     // problems (e.g. port already bound) surface later via errorOccurred().

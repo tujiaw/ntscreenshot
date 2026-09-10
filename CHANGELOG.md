@@ -18,6 +18,17 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 - Internal agent planning docs that were not part of the public product surface.
 
+## [0.1.1] - 2026-09-10
+
+### Changed
+
+- Refined the HTTP service settings layout, status presentation, and Windows build-tool discovery.
+
+### Fixed
+
+- Fixed clipped radio indicators and HTTP service configuration being compressed by multi-line addresses.
+- Fixed `python http.server` argument compatibility across supported Python versions.
+
 ## [0.1.0] - 2026-08-27
 
 ### Added

@@ -196,47 +196,58 @@ function Resolve-OpenCvDir([string]$Explicit) {
 
 function Get-VsInstallationPaths {
   # List every VS installation (any edition, including BuildTools) whose
-  # VsDevCmd.bat is present. Uses vswhere when available and falls back to
-  # scanning the well-known installation roots.
-  $installations = [System.Collections.Generic.List[string]]::new()
+  # VsDevCmd.bat is present, newest first. Uses vswhere when available and falls
+  # back to scanning the well-known installation roots.
+  $installations = [System.Collections.Generic.List[object]]::new()
 
   $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
   if (-not (Test-Path $vswhere)) {
     $vswhere = Join-Path $env:ProgramFiles 'Microsoft Visual Studio\Installer\vswhere.exe'
   }
   if (Test-Path $vswhere) {
-    $output = & $vswhere -all -products * -requires Microsoft.Component.MSBuild -property installationPath
-    foreach ($line in @($output)) {
-      if ($line -and (Test-Path (Join-Path $line.Trim() 'Common7\Tools\VsDevCmd.bat'))) {
-        $installations.Add($line.Trim())
-      }
+    # vswhere does not guarantee a newest-first ordering, so sort on the reported
+    # installationVersion explicitly. Taking its first entry as-is can select a
+    # stale BuildTools install, whose old CMake then fails the minimum version check.
+    $instances = & $vswhere -all -products * -requires Microsoft.Component.MSBuild -format json |
+      ConvertFrom-Json
+    foreach ($instance in @($instances)) {
+      if (-not $instance) { continue }
+      $path = $instance.installationPath
+      if (-not $path) { continue }
+      if (-not (Test-Path (Join-Path $path.Trim() 'Common7\Tools\VsDevCmd.bat'))) { continue }
+      $version = $null
+      [void][version]::TryParse($instance.installationVersion, [ref]$version)
+      $installations.Add([pscustomobject]@{ Path = $path.Trim(); Version = $version })
     }
   }
 
   if ($installations.Count -eq 0) {
     # vswhere ships with full Visual Studio but not necessarily with BuildTools-only
-    # installs, so scan the default roots directly as a fallback.
+    # installs, so scan the default roots directly as a fallback. The year in the
+    # install path orders these the same way installationVersion orders the rest.
     foreach ($base in @((Join-Path $env:ProgramFiles 'Microsoft Visual Studio'),
                         (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio'))) {
       if (-not (Test-Path $base)) { continue }
       foreach ($year in (Get-ChildItem -Path $base -Directory -ErrorAction SilentlyContinue)) {
         foreach ($edition in (Get-ChildItem -Path $year.FullName -Directory -ErrorAction SilentlyContinue)) {
-          if (Test-Path (Join-Path $edition.FullName 'Common7\Tools\VsDevCmd.bat')) {
-            $installations.Add($edition.FullName)
-          }
+          if (-not (Test-Path (Join-Path $edition.FullName 'Common7\Tools\VsDevCmd.bat'))) { continue }
+          $version = $null
+          [void][version]::TryParse($year.Name, [ref]$version)
+          $installations.Add([pscustomobject]@{ Path = $edition.FullName; Version = $version })
         }
       }
     }
   }
 
-  return $installations
+  return @($installations |
+      Sort-Object -Property @{Expression = 'Version'; Descending = $true} |
+      Select-Object -ExpandProperty Path)
 }
 
 function Get-VsInstallationPath {
   $installations = @(Get-VsInstallationPaths)
   if ($installations.Count -eq 0) { return '' }
-  # vswhere lists newest first; the fallback scan order prefers full VS over
-  # BuildTools. Either works as long as it exposes VsDevCmd.bat.
+  # Newest installation wins; any of them works as long as it exposes VsDevCmd.bat.
   return $installations[0]
 }
 

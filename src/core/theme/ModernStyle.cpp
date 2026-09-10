@@ -27,25 +27,30 @@ void ModernStyle::drawPrimitive(PrimitiveElement element, const QStyleOption* op
         : option->palette.color(enabled ? QPalette::Active : QPalette::Disabled, QPalette::Mid);
     QColor background = option->palette.color(enabled ? QPalette::Active : QPalette::Disabled,
                                                QPalette::Base);
-    if (hovered && !checked) {
+    if (checked) {
+        background = accent;
+    } else if (hovered) {
         background = accent;
         background.setAlpha(28);
     }
 
     const qreal side = qMin(option->rect.width(), option->rect.height());
-    QRectF circle(option->rect.center().x() - side / 2.0 + 0.5,
-                  option->rect.center().y() - side / 2.0 + 0.5,
-                  side - 1.0, side - 1.0);
+    const qreal penWidth = qMax<qreal>(1.0, side * 0.075);
+    const QPointF center = QRectF(option->rect).center();
+    const qreal radius = qMax<qreal>(0.5, (side - penWidth - 1.0) / 2.0);
+    const QRectF circle(center.x() - radius, center.y() - radius,
+                        radius * 2.0, radius * 2.0);
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(QPen(border, qMax<qreal>(1.0, side * 0.075)));
+    painter->setPen(QPen(border, penWidth));
     painter->setBrush(background);
     painter->drawEllipse(circle);
 
     if (checked) {
         painter->setPen(Qt::NoPen);
-        painter->setBrush(accent);
+        painter->setBrush(option->palette.color(enabled ? QPalette::Active : QPalette::Disabled,
+                                                QPalette::HighlightedText));
         const qreal dotRadius = side * 0.2;
         painter->drawEllipse(circle.center(), dotRadius, dotRadius);
     }
