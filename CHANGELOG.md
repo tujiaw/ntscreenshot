@@ -7,12 +7,17 @@ All notable changes will be documented in this file. The format follows [Keep a 
 ### Added
 
 - User-facing FAQ, bilingual README, GitHub issue templates, and a documentation index.
+- HTTP service settings now warn that the feature requires Python 3 when no interpreter is found, and warn when the chosen port is one browsers refuse to open (such as 22) instead of leaving the page unexplained.
 
 ### Changed
 
 - README now leads with download, features, and support instead of internal release-readiness notes.
 - README now includes a social preview and direct latest-release download links.
 - GitHub Releases now include bilingual download instructions and categorized change notes.
+
+### Fixed
+
+- The HTTP service now reports "running" only after the port actually accepts connections, and start failures (port taken, no permission, missing Python) surface as a dialog with the interpreter's own message instead of a status that flips a moment later and an unreadable traceback.
 
 ### Removed
 

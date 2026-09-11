@@ -122,6 +122,11 @@ public:
         painter->drawText(timeRect, Qt::AlignBottom | Qt::AlignRight,
                           TimeUtil::FormatRelativeTime(item.capturedAt));
 
+        if (item.pinned) {
+            painter->setPen(tokens.accent);
+            painter->drawText(timeRect, Qt::AlignTop | Qt::AlignRight, QStringLiteral("PIN"));
+        }
+
         const QRect contentRect(rowRect.left() + s(kNumberWidth + 2), rowRect.top() + s(5),
                                 rowRect.width() - s(kNumberWidth + kTimeWidth + 10),
                                 rowRect.height() - s(10));
@@ -238,7 +243,23 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     searchEdit_ = new QLineEdit(header_);
     searchEdit_->setObjectName(QStringLiteral("clipSearchEdit"));
     searchEdit_->setPlaceholderText(QStringLiteral("Search"));
-    searchEdit_->setClearButtonEnabled(true);
+    clearSearchButton_ = new QToolButton(searchEdit_);
+    clearSearchButton_->setObjectName(QStringLiteral("clipSearchClearButton"));
+    clearSearchButton_->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+    clearSearchButton_->setIconSize(QSize(scaled(12), scaled(12)));
+    clearSearchButton_->setFixedSize(scaled(18), scaled(18));
+    clearSearchButton_->setAccessibleName(QStringLiteral("Clear search"));
+    clearSearchButton_->setCursor(Qt::PointingHandCursor);
+    clearSearchButton_->hide();
+    auto* searchLayout = new QHBoxLayout(searchEdit_);
+    searchLayout->setContentsMargins(0, 0, scaled(3), 0);
+    searchLayout->addStretch();
+    searchLayout->addWidget(clearSearchButton_, 0, Qt::AlignVCenter);
+    searchEdit_->setTextMargins(0, 0, scaled(22), 0);
+    connect(clearSearchButton_, &QToolButton::clicked, searchEdit_, &QLineEdit::clear);
+    connect(searchEdit_, &QLineEdit::textChanged, this, [this](const QString& text) {
+        clearSearchButton_->setVisible(!text.isEmpty());
+    });
     searchEdit_->setFixedHeight(scaled(kSearchHeight));
     searchEdit_->setFixedWidth(scaled(kPopupWidth / 3));
     headerLayout->addWidget(searchEdit_);
@@ -248,22 +269,20 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     dragHandle_->setAlignment(Qt::AlignCenter);
     dragHandle_->setCursor(Qt::SizeAllCursor);
     dragHandle_->setFixedSize(scaled(24), scaled(24));
-    dragHandle_->setToolTip(QStringLiteral("Drag to move"));
     dragHandle_->move((width() - dragHandle_->width()) / 2,
                       (scaled(kHeaderHeight) - dragHandle_->height()) / 2);
     dragHandle_->raise();
 
-    auto makeHeaderButton = [this](const QString& text, const QString& tooltip,
+    auto makeHeaderButton = [this](const QString& text,
                                    const QString& objectName) {
         auto* button = new QToolButton(header_);
         button->setObjectName(objectName);
         button->setText(text);
-        button->setToolTip(tooltip);
         button->setCursor(Qt::PointingHandCursor);
         button->setFixedSize(scaled(24), scaled(24));
         return button;
     };
-    closeButton_ = makeHeaderButton(QStringLiteral("×"), QStringLiteral("Close"),
+    closeButton_ = makeHeaderButton(QStringLiteral("×"),
                                     QStringLiteral("clipCloseButton"));
     headerLayout->addWidget(closeButton_);
     root->addWidget(header_);
@@ -362,10 +381,11 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
                               AiFillCallback aiFill,
                               MoveCallback moved,
                               ResizeCallback resized,
-                              bool aiConfigured) {
+                              bool aiConfigured, DeleteCallback togglePinned) {
     history_ = history;
     paste_ = std::move(paste);
     remove_ = std::move(remove);
+    togglePinned_ = std::move(togglePinned);
     close_ = std::move(close);
     aiFill_ = std::move(aiFill);
     moved_ = std::move(moved);
@@ -551,15 +571,25 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
         return;
     }
 
-    const bool isText = history_->Items()[index].kind == ClipKind::Text;
+    const ClipItem contextItem = history_->Items()[index];
+    const bool isText = contextItem.kind == ClipKind::Text;
     QMenu menu(this);
+    QAction* pinAction = menu.addAction(history_->Items()[index].pinned
+        ? QStringLiteral("Unpin") : QStringLiteral("Pin to top"));
+    pinAction->setEnabled(static_cast<bool>(togglePinned_));
     QAction* copyAction = menu.addAction(QStringLiteral("Copy"));
     QAction* deleteAction = menu.addAction(QStringLiteral("Delete"));
     menu.addSeparator();
     QAction* aiAction = menu.addAction(QStringLiteral("AI Fill"));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
     QAction* selected = menu.exec(globalPos);
-    if (selected == copyAction) {
+    if (selected == pinAction && togglePinned_) {
+        const auto& items = history_->Items();
+        const auto found = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
+            return ClipboardHistory::SameContent(item, contextItem);
+        });
+        if (found != items.end()) togglePinned_(static_cast<size_t>(std::distance(items.begin(), found)));
+    } else if (selected == copyAction) {
         CopySelected();
     } else if (selected == deleteAction) {
         DeleteSelected();
@@ -619,6 +649,7 @@ void HistoryWindow::ApplyTheme() {
             .arg(CssColor(muted), CssColor(WithAlpha(text, 20)), CssColor(text))
             .arg(scaled(4)).arg(scaled(14)).arg(CssColor(WithAlpha(text, 40)));
     closeButton_->setStyleSheet(buttonStyle);
+    clearSearchButton_->setStyleSheet(buttonStyle);
     toastLabel_->setStyleSheet(
         QStringLiteral("color: %1; background: %2; padding: %3px %4px; border-radius: %5px;")
             .arg(CssColor(palette.color(QPalette::HighlightedText)),

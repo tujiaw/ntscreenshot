@@ -1,3 +1,5 @@
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrentRun>
 #include "Settings.h"
 #include <QDebug>
 #include <QClipboard>
@@ -62,6 +64,33 @@ void setStyleProperty(QWidget* widget, const char* name, const QString& value)
     widget->style()->unpolish(widget);
     widget->style()->polish(widget);
     widget->update();
+}
+
+// A bind failure reaches us as a whole python traceback. The status line has room
+// for one readable sentence, so the frame lines are dropped and the actual
+// exception (the last one left) is what gets shown; the caller keeps the full text
+// for the dialog's details.
+QString summarizeHttpServerError(const QString& message)
+{
+    const QStringList lines = message.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QString summary;
+    for (const QString& line : lines) {
+        const QString trimmed = line.trimmed();
+        if (trimmed.isEmpty()
+            || trimmed.startsWith(QStringLiteral("Traceback"))
+            || trimmed.startsWith(QStringLiteral("File \""))
+            || trimmed.startsWith(QLatin1Char('^'))) {
+            continue;
+        }
+        summary = trimmed;
+    }
+    if (summary.isEmpty()) {
+        summary = message.simplified();
+    }
+    if (summary.size() > 120) {
+        summary = summary.left(117) + QStringLiteral("...");
+    }
+    return summary;
 }
 }
 
@@ -1675,6 +1704,14 @@ void Settings::initHttpServerTab()
     hint->setWordWrap(true);
     layout->addWidget(hint);
 
+    // This page drives `python -m http.server`, so without an interpreter there is
+    // nothing to start. Saying so up front beats a failure on the first click.
+    labelHttpPythonNotice_ = new QLabel(page);
+    labelHttpPythonNotice_->setObjectName(QStringLiteral("httpServerPythonNotice"));
+    labelHttpPythonNotice_->setWordWrap(true);
+    labelHttpPythonNotice_->setVisible(false);
+    layout->addWidget(labelHttpPythonNotice_);
+
     auto* configPanel = new QFrame(page);
     configPanel->setObjectName(QStringLiteral("httpServerConfigPanel"));
     configPanel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -1751,6 +1788,16 @@ void Settings::initHttpServerTab()
     cgiRow->addWidget(cgiHint);
     cgiRow->addStretch();
     configLayout->addLayout(cgiRow);
+
+    // Browsers refuse a fixed set of ports outright, so binding one of them
+    // produces a server that works but that no browser can open. Warning here,
+    // while the port is still being chosen, is what turns that into an
+    // explanation instead of a blank page.
+    labelHttpPortWarning_ = new QLabel(configPanel);
+    labelHttpPortWarning_->setObjectName(QStringLiteral("httpServerPortWarning"));
+    labelHttpPortWarning_->setWordWrap(true);
+    labelHttpPortWarning_->setVisible(false);
+    configLayout->addWidget(labelHttpPortWarning_);
     configPanel->setMinimumHeight(configLayout->sizeHint().height());
     layout->addWidget(configPanel);
 
@@ -1825,6 +1872,24 @@ void Settings::initHttpServerTab()
 
     auto* controller = windowManager_->httpServer();
 
+    connect(sbHttpPort_, QOverload<int>::of(&QSpinBox::valueChanged), this,
+            [this](int) { updateHttpPortWarning(); });
+    updateHttpPortWarning();
+
+    // Discovery waits for external processes; keep it off the UI thread. The
+    // worker owns its controller and never captures this dialog's lifetime.
+    auto* pythonWatcher = new QFutureWatcher<bool>(this);
+    connect(pythonWatcher, &QFutureWatcher<bool>::finished, this, [this, pythonWatcher]() {
+        httpPythonReady_ = pythonWatcher->result();
+        httpPythonProbed_ = true;
+        pythonWatcher->deleteLater();
+        refreshHttpServerState();
+    });
+    pythonWatcher->setFuture(QtConcurrent::run([]() {
+        HttpServerController probe;
+        return probe.pythonAvailable();
+    }));
+
     connect(btnHttpBrowse_, &QPushButton::clicked, this, [this]() {
         const QString path = QFileDialog::getExistingDirectory(
             this, QStringLiteral("选择要共享的目录"), leHttpDirectory_->text());
@@ -1852,6 +1917,29 @@ void Settings::initHttpServerTab()
         params.protocol = cbHttpProtocol_->currentData().toString();
         params.cgi = cbHttpCgi_->isChecked();
 
+        // A restricted port serves fine but no browser will ever open it, so say
+        // why before starting rather than after the user stares at a blank page.
+        if (HttpServerController::isBrowserBlockedPort(params.port)) {
+            QMessageBox box(QMessageBox::Warning,
+                            QStringLiteral("端口 %1 无法用浏览器打开").arg(params.port),
+                            QStringLiteral(
+                                "端口 %1 属于浏览器受限端口（SSH 等系统服务的常用端口），"
+                                "Chrome、Edge、Firefox 会直接拒绝访问并提示 ERR_UNSAFE_PORT。\n\n"
+                                "服务本身可以正常启动，但它只能用 curl 等工具访问。"
+                                "如需在浏览器中打开，请改用 8000、8080 等端口。\n\n"
+                                "仍要在此端口启动吗？")
+                                .arg(params.port),
+                            QMessageBox::NoButton, this);
+            QPushButton* proceed =
+                box.addButton(QStringLiteral("仍然启动"), QMessageBox::AcceptRole);
+            box.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+            box.setDefaultButton(proceed);
+            box.exec();
+            if (box.clickedButton() != proceed) {
+                return;
+            }
+        }
+
         HttpServerConfig cfg;
         cfg.directory = params.directory;
         cfg.port = params.port;
@@ -1862,15 +1950,22 @@ void Settings::initHttpServerTab()
         emit windowManager_->sigSettingChanged();
 
         auto* server = windowManager_->httpServer();
+        // start() waits for the port to actually accept connections, so this can
+        // block for a moment; showing the intermediate state keeps the window from
+        // looking frozen while it does.
+        labelHttpStatus_->setText(QStringLiteral("正在启动…"));
+        setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("starting"));
+        setStyleProperty(labelHttpStatus_, "status", QStringLiteral("starting"));
+        labelHttpStatus_->repaint();
+
         if (server->start(params)) {
-            labelHttpStatus_->setText(QStringLiteral("服务运行中"));
             showStatusTip(QStringLiteral("HTTP 服务已启动"));
-        } else {
-            const QString reason = server->lastError();
-            refreshHttpServerState();
-            showStatusTip(reason, false);
-            QMessageBox::warning(this, QStringLiteral("无法启动 HTTP 服务"), reason);
+            return;
         }
+
+        const QString reason = server->lastError();
+        refreshHttpServerState();
+        showHttpServerError(QStringLiteral("无法启动 HTTP 服务"), reason);
     });
 
     connect(btnHttpStop_, &QPushButton::clicked, this, [this]() {
@@ -1888,14 +1983,51 @@ void Settings::initHttpServerTab()
             [this](bool) { refreshHttpServerState(); });
     connect(controller, &HttpServerController::errorOccurred, this,
             [this](const QString& message) {
+        // Surfaces failures that happen after a successful start (the server
+        // dying later). Failures during start() come back through lastError() and
+        // are reported by the click handler instead, so they are not shown twice.
         refreshHttpServerState();
-        labelHttpStatus_->setText(message);
-        setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("error"));
-        setStyleProperty(labelHttpStatus_, "status", QStringLiteral("error"));
-        showStatusTip(message, false);
+        showHttpServerError(QStringLiteral("HTTP 服务已停止"), message);
     });
 
     refreshHttpServerState();
+}
+
+void Settings::updateHttpPortWarning()
+{
+    if (!labelHttpPortWarning_ || !sbHttpPort_) {
+        return;
+    }
+    const int port = sbHttpPort_->value();
+    const bool blocked = HttpServerController::isBrowserBlockedPort(port);
+    labelHttpPortWarning_->setVisible(blocked);
+    if (blocked) {
+        labelHttpPortWarning_->setText(
+            QStringLiteral("端口 %1 是浏览器受限端口（SSH 等系统服务的常用端口），"
+                           "Chrome/Edge/Firefox 会拒绝访问并提示 ERR_UNSAFE_PORT。"
+                           "服务可以启动，但只有 curl 等工具能访问；建议改用 8000、8080 等端口。")
+                .arg(port));
+    }
+}
+
+void Settings::showHttpServerError(const QString& title, const QString& detail)
+{
+    const QString summary =
+        detail.trimmed().isEmpty() ? QStringLiteral("HTTP 服务启动失败。") : summarizeHttpServerError(detail);
+    if (labelHttpStatus_) {
+        labelHttpStatus_->setText(summary);
+        setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("error"));
+        setStyleProperty(labelHttpStatus_, "status", QStringLiteral("error"));
+    }
+    showStatusTip(summary, false);
+
+    QMessageBox box(QMessageBox::Warning, title, summary, QMessageBox::Ok, this);
+    if (summary != detail.trimmed()) {
+        // The traceback is what actually explains the failure, so it stays one
+        // click away instead of being pasted into the status line.
+        box.setDetailedText(detail);
+    }
+    box.exec();
 }
 
 void Settings::refreshHttpServerState()
@@ -1906,13 +2038,26 @@ void Settings::refreshHttpServerState()
     }
 
     const bool running = controller->isRunning();
+    // Keep Start disabled until discovery finishes, avoiding a synchronous
+    // cache initialization wait on the UI thread.
+    const bool pythonMissing = httpPythonProbed_ && !httpPythonReady_;
+    if (labelHttpPythonNotice_) {
+        labelHttpPythonNotice_->setVisible(pythonMissing);
+        if (pythonMissing) {
+            labelHttpPythonNotice_->setText(QStringLiteral(
+                "此功能需要安装 Python 3：未检测到可用的 Python 解释器，HTTP 服务无法启动。"
+                "请从 https://www.python.org/downloads/ 安装，安装时勾选 “Add python.exe to PATH”，"
+                "完成后重新打开本程序。"));
+        }
+    }
+
     leHttpDirectory_->setEnabled(!running);
     btnHttpBrowse_->setEnabled(!running);
     sbHttpPort_->setEnabled(!running);
     leHttpBind_->setEnabled(!running);
     cbHttpProtocol_->setEnabled(!running);
     cbHttpCgi_->setEnabled(!running);
-    btnHttpStart_->setEnabled(!running);
+    btnHttpStart_->setEnabled(!running && httpPythonProbed_ && !pythonMissing);
     btnHttpStop_->setEnabled(running);
     btnHttpOpen_->setEnabled(running);
 

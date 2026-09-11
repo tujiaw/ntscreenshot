@@ -29,8 +29,8 @@ std::vector<ClipItem> ClipboardStore::Load(size_t maxItems) {
 
     QSqlQuery query(QSqlDatabase::database(kConnectionName));
     query.prepare(QStringLiteral(
-        "SELECT kind, captured_at, text, dib, width, height "
-        "FROM clips ORDER BY sort_order ASC, id ASC LIMIT ?"));
+        "SELECT kind, captured_at, text, dib, width, height, pinned "
+        "FROM clips WHERE pinned = 1 OR id IN (SELECT id FROM clips WHERE pinned = 0 ORDER BY sort_order ASC, id ASC LIMIT ?) ORDER BY pinned DESC, sort_order ASC, id ASC"));
     query.addBindValue(static_cast<qint64>(maxItems));
     if (!query.exec()) {
         return items;
@@ -44,6 +44,7 @@ std::vector<ClipItem> ClipboardStore::Load(size_t maxItems) {
         item.data = query.value(3).toByteArray();
         item.width = query.value(4).toInt();
         item.height = query.value(5).toInt();
+        item.pinned = query.value(6).toBool();
 
         if (item.kind == ClipKind::Text && item.text.isEmpty()) {
             continue;
@@ -74,15 +75,16 @@ bool ClipboardStore::Save(const std::vector<ClipItem>& items, size_t maxItems) {
 
     QSqlQuery insert(db);
     if (!insert.prepare(QStringLiteral(
-            "INSERT INTO clips (kind, captured_at, text, dib, width, height, content_hash, sort_order) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"))) {
+            "INSERT INTO clips (kind, captured_at, text, dib, width, height, content_hash, sort_order, pinned) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"))) {
         db.rollback();
         return false;
     }
 
-    const size_t count = items.size() < maxItems ? items.size() : maxItems;
-    for (size_t i = 0; i < count; ++i) {
+    size_t unpinnedCount = 0;
+    for (size_t i = 0; i < items.size(); ++i) {
         const ClipItem& item = items[i];
+        if (!item.pinned && unpinnedCount++ >= maxItems) continue;
         const int kind = item.kind == ClipKind::Image ? 1 : 0;
         const qint64 captured = item.capturedAt.toMSecsSinceEpoch();
         const QString text = item.kind == ClipKind::Text ? item.text : QString();
@@ -99,6 +101,7 @@ bool ClipboardStore::Save(const std::vector<ClipItem>& items, size_t maxItems) {
         insert.addBindValue(item.height);
         insert.addBindValue(QLatin1String(""));
         insert.addBindValue(static_cast<qint64>(i));
+        insert.addBindValue(item.pinned ? 1 : 0);
         if (!insert.exec()) {
             db.rollback();
             return false;
@@ -208,7 +211,7 @@ bool ClipboardStore::EnsureSchema() {
             "value_text TEXT,"
             "updated_at INTEGER NOT NULL DEFAULT 0)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_clips_sort ON clips(sort_order ASC, id ASC)"),
-        QStringLiteral("PRAGMA user_version=2"),
+
     };
     for (const QString& statement : statements) {
         QSqlQuery query(db);
@@ -216,7 +219,19 @@ bool ClipboardStore::EnsureSchema() {
             return false;
         }
     }
-    return true;
+    QSqlQuery columns(db);
+    if (!columns.exec(QStringLiteral("PRAGMA table_info(clips)"))) return false;
+    bool hasPinned = false;
+    while (columns.next()) {
+        if (columns.value(1).toString() == QStringLiteral("pinned")) hasPinned = true;
+    }
+    columns.finish();
+    if (!hasPinned) {
+        QSqlQuery migration(db);
+        if (!migration.exec(QStringLiteral("ALTER TABLE clips ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"))) return false;
+    }
+    QSqlQuery version(db);
+    return version.exec(QStringLiteral("PRAGMA user_version=3"));
 }
 
 void ClipboardStore::Close() {

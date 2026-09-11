@@ -752,20 +752,27 @@ void ClipboardLiteManager::EnsurePopup() {
             RefreshPopupIfVisible();
         }
     };
+    auto togglePinned = [this](size_t index) {
+        if (history_.TogglePinned(index)) {
+            MarkHistoryDirty();
+            SyncHistoryStore();
+            RefreshPopupIfVisible();
+        }
+    };
     auto close = [this]() {};
     auto aiFill = [this](size_t index) { StartAiFill(index); };
     auto moved = [this](const QPoint& position) { SavePopupPosition(position); };
     auto resized = [this](const QSize& size) { SavePopupSize(size); };
     const bool configured = aiFillSettings_.IsConfigured();
     if (popup_) {
-        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured);
+        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
         popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
         popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
         return;
     }
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
-    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured);
+    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
     popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
     popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
 }

@@ -24,6 +24,7 @@ public:
 
     void ReplaceItems(std::vector<ClipItem> items) {
         items_ = std::move(items);
+        std::stable_partition(items_.begin(), items_.end(), [](const ClipItem& item) { return item.pinned; });
         Trim();
     }
 
@@ -40,6 +41,17 @@ public:
             return false;
         }
         items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
+        return true;
+    }
+
+    bool TogglePinned(size_t index) {
+        if (index >= items_.size()) return false;
+        ClipItem item = std::move(items_[index]);
+        items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
+        item.pinned = !item.pinned;
+        const auto position = item.pinned ? items_.begin() : FirstUnpinned();
+        items_.insert(position, std::move(item));
+        Trim();
         return true;
     }
 
@@ -65,11 +77,11 @@ public:
             return item.kind == ClipKind::Text && item.text == text;
         });
         if (it != items_.end()) {
-            if (promoteExisting) {
+            if (promoteExisting && !it->pinned) {
                 ClipItem existing = std::move(*it);
                 existing.capturedAt = QDateTime::currentDateTime();
                 items_.erase(it);
-                items_.insert(items_.begin(), std::move(existing));
+                items_.insert(FirstUnpinned(), std::move(existing));
             }
             return true;
         }
@@ -78,7 +90,7 @@ public:
         item.kind = ClipKind::Text;
         item.capturedAt = QDateTime::currentDateTime();
         item.text = std::move(text);
-        items_.insert(items_.begin(), std::move(item));
+        items_.insert(FirstUnpinned(), std::move(item));
         Trim();
         return true;
     }
@@ -108,16 +120,16 @@ public:
             });
         }
         if (matchIt != items_.end()) {
-            if (promoteExisting) {
+            if (promoteExisting && !matchIt->pinned) {
                 ClipItem existing = std::move(*matchIt);
                 existing.capturedAt = QDateTime::currentDateTime();
                 items_.erase(matchIt);
-                items_.insert(items_.begin(), std::move(existing));
+                items_.insert(FirstUnpinned(), std::move(existing));
             }
             return true;
         }
 
-        items_.insert(items_.begin(), std::move(item));
+        items_.insert(FirstUnpinned(), std::move(item));
         Trim();
         return true;
     }
@@ -167,9 +179,14 @@ public:
     }
 
 private:
+    std::vector<ClipItem>::iterator FirstUnpinned() {
+        return std::find_if(items_.begin(), items_.end(), [](const ClipItem& item) { return !item.pinned; });
+    }
+
     void Trim() {
-        if (items_.size() > maxItems_) {
-            items_.resize(maxItems_);
+        const size_t pinnedCount = static_cast<size_t>(std::distance(items_.begin(), FirstUnpinned()));
+        if (items_.size() - pinnedCount > maxItems_) {
+            items_.resize(pinnedCount + maxItems_);
         }
     }
 

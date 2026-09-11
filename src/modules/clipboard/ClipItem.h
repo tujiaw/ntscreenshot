@@ -19,5 +19,6 @@ struct ClipItem {
     QByteArray data;   // PNG bytes for image items
     int width = 0;
     int height = 0;
+    bool pinned = false;
     quint64 pixelHash = 0;   // FNV-1a hash of decoded pixels (0 = unknown)
 };

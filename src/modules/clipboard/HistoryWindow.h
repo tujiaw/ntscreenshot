@@ -35,7 +35,8 @@ public:
                    AiFillCallback aiFill,
                    MoveCallback moved,
                    ResizeCallback resized,
-                   bool aiConfigured);
+                   bool aiConfigured,
+                   DeleteCallback togglePinned = {});
     void SetSavedPosition(const QPoint& position, bool available);
     void SetSavedSize(const QSize& size, bool available, qreal savedScaleFactor = 1.0);
 
@@ -77,6 +78,7 @@ private:
     const ClipboardHistory* history_ = nullptr;
     PasteCallback paste_;
     DeleteCallback remove_;
+    DeleteCallback togglePinned_;
     CloseCallback close_;
     AiFillCallback aiFill_;
     MoveCallback moved_;
@@ -88,6 +90,7 @@ private:
     QWidget* header_ = nullptr;
     QLabel* dragHandle_ = nullptr;
     QToolButton* closeButton_ = nullptr;
+    QToolButton* clearSearchButton_ = nullptr;
     QLineEdit* searchEdit_ = nullptr;
     QWidget* body_ = nullptr;
     QListWidget* list_ = nullptr;

@@ -374,6 +374,18 @@ QLabel#httpServerHint {
     color: @TEXT_SECONDARY@;
     font-size: 12px;
 }
+QLabel#httpServerPythonNotice {
+    color: @DANGER@;
+    background: @SURFACE_SUBTLE@;
+    border: 1px solid @DANGER@;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+QLabel#httpServerPortWarning {
+    color: @WARNING@;
+    font-size: 12px;
+}
 QFrame#httpServerConfigPanel {
     background: @SURFACE_SUBTLE@;
     border: 1px solid @BORDER@;
@@ -414,12 +426,14 @@ QLabel#httpServerStatusDot {
 }
 QLabel#httpServerStatusDot[status="running"] { background: @SUCCESS@; }
 QLabel#httpServerStatusDot[status="error"] { background: @DANGER@; }
+QLabel#httpServerStatusDot[status="starting"] { background: @WARNING@; }
 QLabel#httpServerStatusText {
     color: @TEXT_SECONDARY@;
     font-weight: 600;
 }
 QLabel#httpServerStatusText[status="running"] { color: @SUCCESS@; }
 QLabel#httpServerStatusText[status="error"] { color: @DANGER@; }
+QLabel#httpServerStatusText[status="starting"] { color: @WARNING@; }
 QPushButton#httpServerOpenButton { padding-left: 8px; padding-right: 8px; }
 QFrame#settingsTitleDivider {
     background: @BORDER@;

@@ -35,9 +35,16 @@ public:
     // it without spawning a process.
     static QStringList buildServerArguments(const Params& params, bool protocolSupported);
 
-    // Synchronous validation failures are reported through lastError(); returns
-    // false without touching a running server when already running. Runtime
-    // problems (e.g. port already bound) surface later via errorOccurred().
+    // Ports Chrome, Edge and Firefox refuse to open (Chromium's kRestrictedPorts,
+    // `net/base/port_util.cc`). A server bound to one of them runs fine and is
+    // reachable with curl, but every browser answers ERR_UNSAFE_PORT.
+    static bool isBrowserBlockedPort(int port);
+
+    // Synchronous failures (no Python, bad directory, port out of range, the
+    // server dying or never binding) are reported through lastError() and return
+    // false. Returns false without touching a running server when already
+    // running. Problems that appear after a successful start surface later via
+    // errorOccurred().
     bool start(const Params& params);
     void stop();
 
@@ -54,12 +61,16 @@ signals:
     void errorOccurred(const QString& message);
 
 private:
-    void resetState();
-
     QProcess* proc_ = nullptr;
     Params params_;
     bool running_ = false;
+    // start() keeps the caller waiting while it confirms the listener, so the
+    // signals that fire in the meantime have to know a failure is already on its
+    // way back through lastError_ instead of raising errorOccurred as well.
+    bool starting_ = false;
     bool stopping_ = false;
     QByteArray stderrBuf_;
+    QByteArray stdoutBuf_;
+    QString startFailure_;
     QString lastError_;
 };

@@ -4,9 +4,9 @@ function(nt_add_qt_test test_name target_name)
             COMMAND ${CMAKE_COMMAND} -E env
                 "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
                 "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
-                $<TARGET_FILE:${target_name}>)
+                $<TARGET_FILE:${target_name}> ${ARGN})
     else()
-        add_test(NAME ${test_name} COMMAND ${target_name})
+        add_test(NAME ${test_name} COMMAND ${target_name} ${ARGN})
     endif()
 endfunction()
 
@@ -86,3 +86,18 @@ if(WIN32)
             -Root "${CMAKE_SOURCE_DIR}"
     )
 endif()
+
+if(WIN32)
+    add_executable(clipboard_history_tests
+        clipboard/ClipboardHistoryTest.cpp
+        ${NT_SOURCE_DIR}/modules/clipboard/ClipboardStore.cpp)
+    target_include_directories(clipboard_history_tests PRIVATE ${NT_SOURCE_DIR})
+    target_link_libraries(clipboard_history_tests PRIVATE Qt6::Core Qt6::Sql)
+    if(MSVC)
+        target_compile_options(clipboard_history_tests PRIVATE /utf-8)
+    endif()
+    nt_add_qt_test(clipboard_history_contract clipboard_history_tests)
+endif()
+
+nt_add_qt_test(http_server_startup http_server_tests --integration)
+set_tests_properties(http_server_startup PROPERTIES SKIP_RETURN_CODE 77)

@@ -67,6 +67,8 @@ private:
     void initLocalSearchTab();
     void initHttpServerTab();
     void refreshHttpServerState();
+    void updateHttpPortWarning();
+    void showHttpServerError(const QString& title, const QString& detail);
     void applyModernLayout();
     void loadLocalSearchSettings();
     void loadLlmProviders();
@@ -112,7 +114,13 @@ private:
     class QLabel* labelHttpStatusDot_ = nullptr;
     class QLabel* labelHttpStatus_ = nullptr;
     class QPlainTextEdit* teHttpAddress_ = nullptr;
+    class QLabel* labelHttpPythonNotice_ = nullptr;
+    class QLabel* labelHttpPortWarning_ = nullptr;
     QString httpPrimaryUrl_;
+    // Probing for python spawns short-lived processes, so the first check is
+    // performed on a worker. Start stays disabled until the result arrives.
+    bool httpPythonProbed_ = false;
+    bool httpPythonReady_ = false;
     bool updatingProviderFields_ = false;
     bool updatingNetworkSearchProviderFields_ = false;
     bool updatingTextSelectionActionFields_ = false;
