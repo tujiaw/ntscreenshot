@@ -31,7 +31,8 @@ public:
         }
 
         // 搜索引擎优先 Google，被墙（连接失败/超时）时回退到必应中国。
-        const QString googleResult = browser_->read(googleSearchUrl(value), 20000, abort);
+        // Google 用短超时探测：被墙时快速失败并回退，而不是等满默认 25s。
+        const QString googleResult = browser_->read(googleSearchUrl(value), 20000, abort, 6000);
         if (!looksLikeSearchFailure(googleResult)) {
             return googleResult;
         }

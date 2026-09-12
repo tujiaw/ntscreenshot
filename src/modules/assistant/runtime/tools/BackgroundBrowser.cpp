@@ -135,8 +135,8 @@ public:
 class Request final : public QObject {
 public:
     Request(QObject *owner, std::shared_ptr<Result> result, const QUrl &url,
-            const QString &script, int maxResultChars)
-        : QObject(owner), result_(std::move(result)), script_(script), maxResultChars_(maxResultChars)
+            const QString &script, int maxResultChars, int timeoutMs)
+        : QObject(owner), result_(std::move(result)), script_(script), maxResultChars_(maxResultChars), timeoutMs_(timeoutMs)
     {
         // Unnamed profiles are off the record. Destroy the page before its profile.
         profile_ = new QWebEngineProfile(this);
@@ -161,7 +161,7 @@ public:
 
         timer_.setInterval(50);
         connect(&timer_, &QTimer::timeout, this, [this] {
-            if (result_->cancelled || elapsed_.elapsed() >= 25000)
+            if (result_->cancelled || elapsed_.elapsed() >= timeoutMs_)
                 finish(QStringLiteral("网页访问已取消或超时"));
         });
 
@@ -219,14 +219,15 @@ private:
     QElapsedTimer elapsed_;
     QString script_;
     int maxResultChars_ = 64000;
+    int timeoutMs_ = 25000;
     bool finished_ = false;
     bool extracting_ = false;
 };
 }
 
-QString BackgroundBrowser::read(const QUrl &url, int maxChars, ToolAbort *abort)
+QString BackgroundBrowser::read(const QUrl &url, int maxChars, ToolAbort *abort, int timeoutMs)
 {
-    return run(url, contentExtractionScript(qBound(1024, maxChars, 64000)), 64000, abort);
+    return run(url, contentExtractionScript(qBound(1024, maxChars, 64000)), 64000, abort, timeoutMs);
 }
 
 QString BackgroundBrowser::readArticle(const QUrl &url, ToolAbort *abort)
@@ -242,7 +243,7 @@ QString BackgroundBrowser::evaluate(const QUrl &url, const QString &script, Tool
     return run(url, wrapScript(script), 64000, abort);
 }
 
-QString BackgroundBrowser::run(const QUrl &url, const QString &script, int maxResultChars, ToolAbort *abort)
+QString BackgroundBrowser::run(const QUrl &url, const QString &script, int maxResultChars, ToolAbort *abort, int timeoutMs)
 {
     if (!url.isValid() || url.host().isEmpty() ||
         (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")))
@@ -250,14 +251,14 @@ QString BackgroundBrowser::run(const QUrl &url, const QString &script, int maxRe
     if (QThread::currentThread() == thread())
         return QStringLiteral("浏览工具必须从 Agent 工作线程调用");
     auto result = std::make_shared<Result>();
-    QMetaObject::invokeMethod(this, [this, result, url, script, maxResultChars] {
-        if (!result->cancelled) new Request(this, result, url, script, maxResultChars);
+    QMetaObject::invokeMethod(this, [this, result, url, script, maxResultChars, timeoutMs] {
+        if (!result->cancelled) new Request(this, result, url, script, maxResultChars, timeoutMs);
     }, Qt::QueuedConnection);
     QElapsedTimer elapsed;
     elapsed.start();
     QMutexLocker lock(&result->mutex);
     while (!result->done) {
-        if ((abort && abort->isAborted()) || elapsed.elapsed() >= 27000) {
+        if ((abort && abort->isAborted()) || elapsed.elapsed() >= timeoutMs + 2000) {
             result->cancelled = true;
             return QStringLiteral("网页访问已取消或超时");
         }

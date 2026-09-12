@@ -11,10 +11,10 @@ class ToolAbort;
 class BackgroundBrowser : public QObject {
 public:
     using QObject::QObject;
-    QString read(const QUrl &url, int maxChars, ToolAbort *abort);
+    QString read(const QUrl &url, int maxChars, ToolAbort *abort, int timeoutMs = 25000);
     QString readArticle(const QUrl &url, ToolAbort *abort);
     QString evaluate(const QUrl &url, const QString &script, ToolAbort *abort);
 private:
-    QString run(const QUrl &url, const QString &script, int maxResultChars, ToolAbort *abort);
+    QString run(const QUrl &url, const QString &script, int maxResultChars, ToolAbort *abort, int timeoutMs = 25000);
 };
 }
