@@ -22,6 +22,7 @@ public:
 
     void setPlaceholderText(const QString &text);
     void setPending(bool pending);
+    bool webEnabled() const;
     void quoteText(const QString &text);
     void quoteImage(const QPixmap &image, const QString &displayName = QStringLiteral("image.png"));
     void clearQuotedImage();
@@ -29,6 +30,7 @@ public:
 signals:
     void sigSendRequested(const QString &text, const QList<QPixmap> &images);
     void sigStopRequested();
+    void sigWebEnabledChanged(bool enabled);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -68,6 +70,7 @@ private:
     QPlainTextEdit *inputEdit_;
     QToolButton *addButton_;
     QToolButton *modelButton_;
+    QToolButton *webButton_ = nullptr;
     QPushButton *sendButton_;
     QList<QuotedReferenceItem> quotedReferences_;
     bool pending_;

@@ -21,7 +21,6 @@ public:
     QStringList toolNames() const;
 
     QJsonArray definitions() const;
-    bool requiresConfirmation(const QString &name) const;
     QString execute(const QString &name, const QString &argumentsJson,
                     LlmTools::ToolAbort *abort = nullptr) const;
 

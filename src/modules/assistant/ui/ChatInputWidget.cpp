@@ -260,6 +260,18 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
 
     toolbarLayout->addWidget(addButton_);
     toolbarLayout->addWidget(modelButton_);
+    webButton_ = new QToolButton(surface);
+    webButton_->setObjectName(QStringLiteral("chatInputGhostButton"));
+    webButton_->setText(QStringLiteral("联网：开"));
+    webButton_->setCheckable(true);
+    webButton_->setChecked(true);
+    webButton_->setCursor(Qt::PointingHandCursor);
+    webButton_->setToolTip(QStringLiteral("允许模型在后台搜索和读取网页，无需搜索 API Key"));
+    connect(webButton_, &QToolButton::toggled, this, [this](bool enabled) {
+        webButton_->setText(enabled ? QStringLiteral("联网：开") : QStringLiteral("联网：关"));
+        emit sigWebEnabledChanged(enabled);
+    });
+    toolbarLayout->addWidget(webButton_);
     toolbarLayout->addStretch();
     toolbarLayout->addWidget(sendButton_);
     surfaceLayout->addLayout(toolbarLayout);
@@ -279,7 +291,13 @@ void ChatInputWidget::setPlaceholderText(const QString &text)
 void ChatInputWidget::setPending(bool pending)
 {
     pending_ = pending;
+    webButton_->setEnabled(!pending);
     updateSendButtonState();
+}
+
+bool ChatInputWidget::webEnabled() const
+{
+    return webButton_->isChecked();
 }
 
 void ChatInputWidget::quoteText(const QString &text)

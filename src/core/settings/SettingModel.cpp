@@ -6,7 +6,6 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QStandardPaths>
-#include "modules/assistant/runtime/tools/LlmTool.h"
 #include "core/platform/Util.h"
 
 #ifdef Q_OS_WIN
@@ -72,15 +71,9 @@ static const QString KEY_HTTP_SERVER_CGI      = "HttpServer/CGI";
 // [LLM] 节 —— LLM 全局设置
 static const QString KEY_LLM_ACTIVE_PROVIDER = "LLM/ACTIVE_PROVIDER";
 static const QString KEY_LLM_PROVIDERS_COUNT = "LLM/PROVIDERS_COUNT";
-static const QString KEY_WEB_SEARCH_ENABLED = "LLM/WebSearch/ENABLED";
-static const QString KEY_WEB_SEARCH_PROVIDER = "LLM/WebSearch/PROVIDER";
-static const QString KEY_WEB_SEARCH_API_KEY = "LLM/WebSearch/API_KEY";
 
 static const QString KEY_TEXT_SELECTION_ACTIONS_COUNT = "LLM/TextSelectionActions/COUNT";
 static const QString KEY_LLM_IMAGE_TOKEN_SAVING = "LLM/IMAGE_TOKEN_SAVING";
-static const QString KEY_LLM_DISABLED_TOOLS = "LLM/DISABLED_TOOLS";
-static const QString KEY_LLM_TOOL_AUTO_PERMISSION = "LLM/TOOL_AUTO_PERMISSION";
-static const QString KEY_LLM_ENABLED_TOOLS_LEGACY = "LLM/ENABLED_TOOLS";
 
 static const double DEFAULT_LLM_TEMPERATURE = 0.7;
 static const QSize  DEFAULT_NOTIFY_SIZE(420, 300);
@@ -181,12 +174,8 @@ void SettingModel::revertDefault()
     defaultProvider.temperature = DEFAULT_LLM_TEMPERATURE;
     setLlmProviders({defaultProvider});
     setLlmActiveProviderIndex(0);
-    setWebSearchEnabled(false);
-    setWebSearchProvider(QStringLiteral("tavily"));
-    setWebSearchApiKey(QString());
     setTextSelectionActions(defaultTextSelectionActions());
     setLlmImageTokenSavingEnabled(true);
-    setLlmDisabledTools({});
     setPaddleOcrConfig({false, DEFAULT_OCR_JOB_URL, QString(), DEFAULT_OCR_MODEL});
     settings_.sync();
 }
@@ -670,47 +659,6 @@ void SettingModel::setTextSelectionActions(const QList<TextSelectionActionConfig
     settings_.sync();
 }
 
-QString SettingModel::webSearchProvider() const
-{
-    return settings_.value(KEY_WEB_SEARCH_PROVIDER, QStringLiteral("tavily")).toString().trimmed();
-}
-
-void SettingModel::setWebSearchProvider(const QString &provider)
-{
-    settings_.setValue(KEY_WEB_SEARCH_PROVIDER, provider.trimmed().isEmpty()
-        ? QStringLiteral("tavily")
-        : provider.trimmed());
-    settings_.sync();
-}
-
-QString SettingModel::webSearchApiKey() const
-{
-    const QString apiKey = settings_.value(KEY_WEB_SEARCH_API_KEY).toString().trimmed();
-    if (!apiKey.isEmpty()) {
-        return apiKey;
-    }
-
-    // 兼容旧版“可编辑服务商列表”配置，仅迁移第一家的 API KEY。
-    return settings_.value(QStringLiteral("LLM/NetworkSearchProvider/0/API_KEY")).toString().trimmed();
-}
-
-void SettingModel::setWebSearchApiKey(const QString &apiKey)
-{
-    settings_.setValue(KEY_WEB_SEARCH_API_KEY, apiKey.trimmed());
-    settings_.sync();
-}
-
-bool SettingModel::webSearchEnabled() const
-{
-    return settings_.value(KEY_WEB_SEARCH_ENABLED, false).toBool();
-}
-
-void SettingModel::setWebSearchEnabled(bool enabled)
-{
-    settings_.setValue(KEY_WEB_SEARCH_ENABLED, enabled);
-    settings_.sync();
-}
-
 bool SettingModel::llmImageTokenSavingEnabled() const
 {
     return settings_.value(KEY_LLM_IMAGE_TOKEN_SAVING, true).toBool();
@@ -820,55 +768,5 @@ TrayNotificationPosition SettingModel::trayNotificationPosition() const
 void SettingModel::setTrayNotificationPosition(TrayNotificationPosition position)
 {
     settings_.setValue(KEY_NOTIFY_POS, static_cast<int>(position));
-    settings_.sync();
-}
-
-QStringList SettingModel::llmDisabledTools() const
-{
-    const QVariant value = settings_.value(KEY_LLM_DISABLED_TOOLS);
-    if (value.isValid()) {
-        return value.toStringList();
-    }
-
-    const QVariant legacyValue = settings_.value(KEY_LLM_ENABLED_TOOLS_LEGACY);
-    if (!legacyValue.isValid()) {
-        QStringList disabledTools;
-        const QList<LlmTools::ToolMeta> metas = LlmTools::builtinToolMetas();
-        disabledTools.reserve(metas.size());
-        for (const auto &meta : metas) {
-            disabledTools.append(meta.name);
-        }
-        return disabledTools;
-    }
-
-    const QStringList legacyEnabledTools = legacyValue.toStringList();
-    if (legacyEnabledTools.isEmpty()) {
-        return {};
-    }
-
-    QStringList disabledTools;
-    const QList<LlmTools::ToolMeta> metas = LlmTools::builtinToolMetas();
-    for (const auto &meta : metas) {
-        if (!legacyEnabledTools.contains(meta.name)) {
-            disabledTools.append(meta.name);
-        }
-    }
-    return disabledTools;
-}
-
-void SettingModel::setLlmDisabledTools(const QStringList &names)
-{
-    settings_.setValue(KEY_LLM_DISABLED_TOOLS, names);
-    settings_.sync();
-}
-
-bool SettingModel::llmToolAutoPermission() const
-{
-    return settings_.value(KEY_LLM_TOOL_AUTO_PERMISSION, false).toBool();
-}
-
-void SettingModel::setLlmToolAutoPermission(bool enabled)
-{
-    settings_.setValue(KEY_LLM_TOOL_AUTO_PERMISSION, enabled);
     settings_.sync();
 }

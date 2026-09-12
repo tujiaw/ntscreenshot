@@ -50,17 +50,12 @@ private:
     void onLlmProviderFieldChanged();
     void onAddLlmProvider();
     void onDelLlmProvider();
-    void onWebSearchEnabledToggled(bool checked);
     void onTextSelectionEnabledToggled(bool checked);
-    void onNetworkSearchProviderSelected(int index);
-    void onNetworkSearchProviderFieldChanged();
     void onImageTokenSavingToggled(bool checked);
     void onTextSelectionActionSelected(int row);
     void onTextSelectionActionFieldChanged();
     void onAddTextSelectionAction();
     void onDelTextSelectionAction();
-    void onToolCheckChanged();
-    void onToolAutoPermissionToggled(bool checked);
 
 private:
     void initLlmTab();
@@ -72,9 +67,7 @@ private:
     void applyModernLayout();
     void loadLocalSearchSettings();
     void loadLlmProviders();
-    void loadNetworkSearchProviders();
     void loadTextSelectionActions(int preferredRow = -1);
-    void loadToolSettings();
 
 private:
     Q_DISABLE_COPY(Settings)
@@ -82,15 +75,10 @@ private:
     WindowManager* windowManager_ = nullptr;
     class QComboBox*   cbTheme_;
     class QComboBox*   cbLlmProviders_;
-    class QComboBox*   cbNetworkSearchProviders_;
     class QLineEdit*   leLlmProviderName_;
-    class QCheckBox*   cbWebSearchEnabled_;
     class QCheckBox*   cbTextSelectionEnabled_;
-    class QLineEdit*   leNetworkSearchApiKey_;
     class QCheckBox*   cbImageTokenSaving_;
     class QListWidget* listTextSelectionActions_;
-    class QListWidget* listToolItems_;
-    class QCheckBox*   cbToolAutoPermission_;
     class QLineEdit*   leTextSelectionActionLabel_;
     class QPlainTextEdit* teTextSelectionActionPrompt_;
     class QPushButton* btnDelTextSelectionAction_;
@@ -122,8 +110,6 @@ private:
     bool httpPythonProbed_ = false;
     bool httpPythonReady_ = false;
     bool updatingProviderFields_ = false;
-    bool updatingNetworkSearchProviderFields_ = false;
     bool updatingTextSelectionActionFields_ = false;
-    bool updatingToolCheckBoxes_ = false;
     QTimer* statusTipTimer_ = nullptr;
 };

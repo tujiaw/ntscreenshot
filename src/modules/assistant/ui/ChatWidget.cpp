@@ -20,7 +20,6 @@
 #include <QStyle>
 #include <QDesktopServices>
 #include <QList>
-#include <QMessageBox>
 #include <QPixmap>
 #include <QUrl>
 #include <QVariantMap>
@@ -31,6 +30,8 @@
 #include "modules/assistant/runtime/agent/Agent.h"
 #include "modules/assistant/runtime/agent/AgentToolRegistry.h"
 #include "modules/assistant/runtime/tools/LlmTool.h"
+#include "modules/assistant/runtime/tools/BrowserTool.h"
+#include "modules/assistant/runtime/tools/WebTools.h"
 #include "modules/assistant/ui/ChatSessionStore.h"
 #include "core/theme/OverlayTheme.h"
 #include "core/platform/Util.h"
@@ -315,6 +316,8 @@ ChatWidget::~ChatWidget()
         agent_->stop();
         saveSession();
         agent_->disconnect(this);
+        delete agent_;
+        agent_ = nullptr;
     }
 }
 
@@ -552,6 +555,8 @@ void ChatWidget::initializeChatUi()
     contentLayout_->addWidget(inputWidget_);
 
     agent_ = new Agent::AgentRunner(settings_, this);
+    backgroundBrowser_ = new LlmTools::BackgroundBrowser(this);
+    connect(inputWidget_, &ChatInputWidget::sigWebEnabledChanged, this, [this] { refreshToolRegistry(); });
     refreshToolRegistry();
     agent_->setMaxIterations(10);
 
@@ -564,7 +569,6 @@ void ChatWidget::initializeChatUi()
     connect(agent_, &Agent::AgentRunner::sigToolExecuting, this, &ChatWidget::onToolExecuting);
     connect(agent_, &Agent::AgentRunner::sigToolExecuted, this, &ChatWidget::onToolExecuted);
     connect(agent_, &Agent::AgentRunner::sigAssistantPrefixFinalized, this, &ChatWidget::onAssistantPrefixFinalized);
-    connect(agent_, &Agent::AgentRunner::sigToolConfirmRequested, this, &ChatWidget::onToolConfirmRequested);
     connect(agent_, &Agent::AgentRunner::sigSessionChanged, this, &ChatWidget::saveSession);
     loadSession();
 }
@@ -578,16 +582,14 @@ void ChatWidget::refreshToolRegistry()
         return;
     }
 
+    // Reaching the network is the assistant's only capability, so the registry
+    // holds the WebEngine browser tools or nothing at all.
     Agent::ToolRegistry *registry = new Agent::ToolRegistry(this);
-    SettingModel *setting = settings_;
-    QStringList disabledTools = setting->llmDisabledTools();
-    disabledTools.removeAll(QStringLiteral("web_search"));
-    const QList<QSharedPointer<LlmTools::LlmTool>> allTools =
-        LlmTools::createBuiltinTools(setting, disabledTools, setting->webSearchEnabled());
-    for (const auto &tool : allTools) {
-        if (tool && !tool->disabled()) {
-            registry->registerTool(tool);
-        }
+    if (inputWidget_->webEnabled()) {
+        registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::BrowserTool(backgroundBrowser_, true)));
+        registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::BrowserTool(backgroundBrowser_, false)));
+        registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::RunJavaScriptTool(backgroundBrowser_)));
+        registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::ReadArticleTool(backgroundBrowser_)));
     }
 
     Agent::ToolRegistry *oldRegistry = toolRegistry_;
@@ -1036,24 +1038,6 @@ void ChatWidget::onAssistantPrefixFinalized(const QString &text)
     updateChatMessage(streamingMessageId_, kRoleAssistant, useText, nullptr, true, true);
     streamingMessageId_.clear();
     streamingMessageText_.clear();
-}
-
-void ChatWidget::onToolConfirmRequested(const QString &name, const QString &args)
-{
-    if (!agent_) {
-        return;
-    }
-    QString preview = args.trimmed();
-    if (preview.size() > 800) {
-        preview = preview.left(800) + QStringLiteral("...");
-    }
-    const auto answer = QMessageBox::question(
-        this,
-        QStringLiteral("允许工具执行"),
-        QStringLiteral("Agent 请求执行工具 `%1`。\n\n参数：\n%2").arg(name, preview),
-        QMessageBox::Yes | QMessageBox::No,
-        QMessageBox::No);
-    agent_->resolveToolConfirmation(answer == QMessageBox::Yes);
 }
 
 void ChatWidget::saveSession()

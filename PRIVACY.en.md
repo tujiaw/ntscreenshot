@@ -2,7 +2,7 @@
 
 [简体中文](PRIVACY.md)
 
-Last updated: 2026-08-29
+Last updated: 2026-09-12
 
 ntscreenshot is a local desktop application. The project does not operate a central account or telemetry service.
 
@@ -28,6 +28,8 @@ Capture, pinning, annotation, clipboard, and local search do not require an ntsc
 - OCR uploads
 - URL fetching
 - GitHub image uploads
+
+The conversation's Web toggle is off by default. When enabled, the assistant can send search terms to Bing and load selected websites and their subresources through background WebEngine pages. Extracted content is returned to your configured model provider. No search API key is required. Each visit uses a temporary, off-the-record profile without persistent browser cookies or cache. Pages and profiles are released on completion, cancellation, timeout, or conversation closure. Tool results may remain in conversation history.
 
 Those requests follow the selected provider's terms. Review the destination and avoid sending confidential content.
 

@@ -46,15 +46,6 @@ QJsonArray ToolRegistry::definitions() const
     return defs;
 }
 
-bool ToolRegistry::requiresConfirmation(const QString &name) const
-{
-    auto it = tools_.constFind(name);
-    if (it == tools_.constEnd() || !it.value()) {
-        return false;
-    }
-    return it.value()->requiresConfirmation();
-}
-
 QString ToolRegistry::execute(const QString &name, const QString &argumentsJson,
                               LlmTools::ToolAbort *abort) const
 {
@@ -69,7 +60,9 @@ QString ToolRegistry::execute(const QString &name, const QString &argumentsJson,
         return QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: %2").arg(name, errorText);
     }
 
-    return LlmTools::truncateText(it.value()->execute(arguments, abort), LlmTools::kToolOutputMaxChars);
+    // Keep the executing tool alive if the UI replaces the registry after Stop.
+    const auto tool = it.value();
+    return LlmTools::truncateText(tool->execute(arguments, abort), LlmTools::kToolOutputMaxChars);
 }
 
 } // namespace Agent

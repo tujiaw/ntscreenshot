@@ -37,7 +37,6 @@ public:
     void resetConversation();
     void stop();
     bool isRunning() const;
-    void resolveToolConfirmation(bool allowed);
 
     QJsonArray conversationSnapshot() const;
     QString summarySnapshot() const;
@@ -51,7 +50,6 @@ signals:
     void sigAssistantPrefixFinalized(const QString &text);
     void sigToolExecuting(const QString &name, const QString &args);
     void sigToolExecuted(const QString &name, const QString &result);
-    void sigToolConfirmRequested(const QString &name, const QString &args);
     void sigError(const QString &text);
     void sigStateChanged(bool running);
     void sigIterationChanged(int current, int max);
@@ -73,13 +71,11 @@ private:
     void doRun(const QString &userMessage);
     void doRunWithImages(const QString &text, const QList<QPixmap> &images);
     void doRetry();
-    void ensureSkillPrompt();
     void handleWorkerToolCalls(const QJsonArray &toolCalls, const QString &textContent,
                                const QString &reasoningContent);
     void beginToolBatch(const QList<ToolCall> &calls);
     void processNextPendingTool();
-    void continuePendingTool(bool allowed);
-    void executeCurrentTool(bool allowed);
+    void executeCurrentTool();
     void afterAllTools();
     void runFinalAnswerWithoutTools();
     void finishWorkerRun();
@@ -93,10 +89,7 @@ private:
     int currentIteration_ = 0;
     bool running_ = false;
     bool stopped_ = false;
-    bool skillPromptCached_ = false;
-    bool awaitingConfirm_ = false;
     std::atomic<Phase> phase_{Phase::Idle};
-    QString cachedSkillPrompt_;
     QString pendingTextContent_;
     QString pendingReasoningContent_;
     QList<ToolCall> pendingCalls_;

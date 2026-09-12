@@ -6,6 +6,8 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Added
 
+- A conversation Web toggle beside the model selector enables background WebEngine search and dynamic webpage reading, with per-request temporary profiles, cancellation, timeouts, and cleanup on conversation closure.
+
 - User-facing FAQ, bilingual README, GitHub issue templates, and a documentation index.
 - HTTP service settings now warn that the feature requires Python 3 when no interpreter is found, and warn when the chosen port is one browsers refuse to open (such as 22) instead of leaving the page unexplained.
 
@@ -21,6 +23,7 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Removed
 
+- The assistant's local system tools — file read/write/edit, directory listing, Python execution, and shell/PowerShell commands — along with the Tavily search tool that was never wired into a conversation. The built-in WebEngine browser is now its only capability, so the model can search and read the web and nothing else. The "工具管理" and "网络搜索" settings pages and the "allow tool execution" confirmation prompt went with them.
 - Internal agent planning docs that were not part of the public product surface.
 
 ## [0.1.1] - 2026-09-10

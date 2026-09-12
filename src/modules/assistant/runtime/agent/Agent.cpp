@@ -1,7 +1,6 @@
 #include "Agent.h"
 #include "core/settings/SettingModel.h"
 #include "modules/assistant/runtime/agent/OpenAI.h"
-#include "modules/assistant/runtime/skills/SkillManager.h"
 #include "modules/assistant/runtime/tools/ToolAbort.h"
 
 #include <QDebug>
@@ -200,7 +199,7 @@ void AgentRunner::setupChat()
     connect(chat_, &OpenAIChat::sigToolCallsReceived, workerContext_,
             [this](const QJsonArray &toolCalls, const QString &textContent, const QString &reasoningContent) {
         handleWorkerToolCalls(toolCalls, textContent, reasoningContent);
-    });
+    }, Qt::QueuedConnection);
     connect(chat_, &OpenAIChat::sigResponse, this, [this](const QString &text) {
         if (phase_.load() == Phase::ExecutingTools) {
             return;
@@ -215,7 +214,6 @@ void AgentRunner::setupChat()
     connect(chat_, &OpenAIChat::sigError, this, [this](const QString &text) {
         running_ = false;
         phase_.store(Phase::Idle);
-        awaitingConfirm_ = false;
         qDebug() << "[Agent] Error from OpenAIChat:" << text.left(200);
         emit sigError(text);
         emit sigStateChanged(false);
@@ -275,9 +273,6 @@ void AgentRunner::resetConversation()
 {
     stopped_ = true;
     running_ = false;
-    awaitingConfirm_ = false;
-    skillPromptCached_ = false;
-    cachedSkillPrompt_.clear();
     pendingCalls_.clear();
     pendingCallIndex_ = 0;
     phase_.store(Phase::Idle);
@@ -301,7 +296,7 @@ void AgentRunner::resetConversation()
 
 void AgentRunner::stop()
 {
-    if (!running_ && !awaitingConfirm_) return;
+    if (!running_) return;
     qDebug() << "[Agent] Stop requested (iteration" << currentIteration_ << "/" << maxIterations_ << ")";
     stopped_ = true;
     running_ = false;
@@ -320,13 +315,6 @@ void AgentRunner::stop()
 bool AgentRunner::isRunning() const
 {
     return running_;
-}
-
-void AgentRunner::resolveToolConfirmation(bool allowed)
-{
-    QMetaObject::invokeMethod(workerContext_, [this, allowed]() {
-        continuePendingTool(allowed);
-    }, Qt::QueuedConnection);
 }
 
 QJsonArray AgentRunner::conversationSnapshot() const
@@ -365,19 +353,9 @@ void AgentRunner::restoreSession(const QJsonArray &messages, const QString &summ
     }, Qt::BlockingQueuedConnection);
 }
 
-void AgentRunner::ensureSkillPrompt()
-{
-    if (!skillPromptCached_) {
-        cachedSkillPrompt_ = LlmSkills::SkillManager::buildPrompt(QString());
-        skillPromptCached_ = true;
-    }
-    chat_->setSkillPrompt(cachedSkillPrompt_);
-}
-
 void AgentRunner::doRun(const QString &userMessage)
 {
     qDebug() << "[Agent] Worker: doRun";
-    ensureSkillPrompt();
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -387,7 +365,6 @@ void AgentRunner::doRun(const QString &userMessage)
 void AgentRunner::doRunWithImages(const QString &text, const QList<QPixmap> &images)
 {
     qDebug() << "[Agent] Worker: doRunWithImages — images:" << images.size();
-    ensureSkillPrompt();
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -397,7 +374,6 @@ void AgentRunner::doRunWithImages(const QString &text, const QList<QPixmap> &ima
 void AgentRunner::doRetry()
 {
     qDebug() << "[Agent] Worker: doRetry — resending last conversation";
-    ensureSkillPrompt();
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -454,7 +430,6 @@ void AgentRunner::beginToolBatch(const QList<ToolCall> &calls)
 void AgentRunner::processNextPendingTool()
 {
     if (stopped_) {
-        awaitingConfirm_ = false;
         while (pendingCallIndex_ < pendingCalls_.size() && chat_) {
             const ToolCall call = pendingCalls_.at(pendingCallIndex_);
             QJsonObject toolMsg;
@@ -479,30 +454,10 @@ void AgentRunner::processNextPendingTool()
         emit sigToolExecuting(call.name, call.arguments);
     });
 
-    if (registry_ && registry_->requiresConfirmation(call.name)
-        && !(settings_ && settings_->llmToolAutoPermission())) {
-        awaitingConfirm_ = true;
-        emit sigToolConfirmRequested(call.name, call.arguments);
-        return;
-    }
-
-    executeCurrentTool(true);
+    executeCurrentTool();
 }
 
-void AgentRunner::continuePendingTool(bool allowed)
-{
-    if (!awaitingConfirm_) {
-        return;
-    }
-    awaitingConfirm_ = false;
-    if (stopped_) {
-        processNextPendingTool();
-        return;
-    }
-    executeCurrentTool(allowed);
-}
-
-void AgentRunner::executeCurrentTool(bool allowed)
+void AgentRunner::executeCurrentTool()
 {
     if (pendingCallIndex_ >= pendingCalls_.size()) {
         afterAllTools();
@@ -511,9 +466,7 @@ void AgentRunner::executeCurrentTool(bool allowed)
 
     const ToolCall call = pendingCalls_.at(pendingCallIndex_);
     QString result;
-    if (!allowed) {
-        result = QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: 用户拒绝了此次工具执行").arg(call.name);
-    } else if (!registry_ || !registry_->hasTool(call.name)) {
+    if (!registry_ || !registry_->hasTool(call.name)) {
         result = QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: no matching tool in registry").arg(call.name);
     } else {
         toolAbort_ = QSharedPointer<LlmTools::ToolAbort>::create();
@@ -575,7 +528,6 @@ void AgentRunner::runFinalAnswerWithoutTools()
 void AgentRunner::finishWorkerRun()
 {
     phase_.store(Phase::Idle);
-    awaitingConfirm_ = false;
     pendingCalls_.clear();
     QMetaObject::invokeMethod(this, [this]() {
         running_ = false;

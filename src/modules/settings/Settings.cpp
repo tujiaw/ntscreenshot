@@ -39,7 +39,6 @@
 #include "core/theme/DarkStyle.h"
 #include "core/theme/ThemeManager.h"
 #include "core/theme/UiStyler.h"
-#include "modules/assistant/runtime/tools/LlmTool.h"
 #include "core/settings/SettingModel.h"
 #include "core/platform/Util.h"
 #include "app/WindowManager.h"
@@ -99,15 +98,10 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     , windowManager_(windowManager)
     , cbTheme_(nullptr)
     , cbLlmProviders_(nullptr)
-    , cbNetworkSearchProviders_(nullptr)
     , leLlmProviderName_(nullptr)
-    , cbWebSearchEnabled_(nullptr)
     , cbTextSelectionEnabled_(nullptr)
-    , leNetworkSearchApiKey_(nullptr)
     , cbImageTokenSaving_(nullptr)
     , listTextSelectionActions_(nullptr)
-    , listToolItems_(nullptr)
-    , cbToolAutoPermission_(nullptr)
     , leTextSelectionActionLabel_(nullptr)
     , teTextSelectionActionPrompt_(nullptr)
     , btnDelTextSelectionAction_(nullptr)
@@ -282,7 +276,7 @@ void Settings::applyModernLayout()
     navigation->setFocusPolicy(Qt::NoFocus);
     navigation->addItems({QStringLiteral("常规"), QStringLiteral("截图与输出"),
                           QStringLiteral("本地搜索"), QStringLiteral("AI 助手"),
-                          QStringLiteral("工具与划词"), QStringLiteral("HTTP 服务"),
+                          QStringLiteral("划词"), QStringLiteral("HTTP 服务"),
                           QStringLiteral("路径记录"),
                           QStringLiteral("关于")});
 
@@ -355,26 +349,22 @@ void Settings::applyModernLayout()
             break;
         case 3:
             titleLabel->setText(QStringLiteral("AI 助手"));
-            subtitleLabel->setText(QStringLiteral("配置模型、网络搜索和对话窗口"));
+            subtitleLabel->setText(QStringLiteral("配置模型与对话窗口"));
             legacyTabs->setCurrentWidget(llmHostPage);
             if (llmTabs) {
                 llmTabs->setCurrentIndex(0);
-                for (int index : {0, 1, 3}) {
+                for (int index : {0, 2}) {
                     subPages.append({llmTabs->tabText(index),
                                      [=] { llmTabs->setCurrentIndex(index); }});
                 }
             }
             break;
         case 4:
-            titleLabel->setText(QStringLiteral("工具与划词"));
-            subtitleLabel->setText(QStringLiteral("配置划词操作与 Agent 工具"));
+            titleLabel->setText(QStringLiteral("划词"));
+            subtitleLabel->setText(QStringLiteral("配置划词操作"));
             legacyTabs->setCurrentWidget(llmHostPage);
             if (llmTabs) {
-                llmTabs->setCurrentIndex(2);
-                for (int index : {2, 4}) {
-                    subPages.append({llmTabs->tabText(index),
-                                     [=] { llmTabs->setCurrentIndex(index); }});
-                }
+                llmTabs->setCurrentIndex(1);
             }
             break;
         case 5:
@@ -479,13 +469,11 @@ void Settings::readData()
 
     qInfo() << "Settings::readData: loading providers and actions...";
     loadLlmProviders();
-    loadNetworkSearchProviders();
     if (cbTextSelectionEnabled_) {
         const QSignalBlocker blocker(cbTextSelectionEnabled_);
         cbTextSelectionEnabled_->setChecked(setting->textSelectionEnabled());
     }
     loadTextSelectionActions();
-    loadToolSettings();
     loadLocalSearchSettings();
     qInfo() << "Settings::readData: done";
 }
@@ -1106,37 +1094,6 @@ void Settings::initLlmTab()
     generalVLayout->addStretch();
     qInfo() << "Settings::initLlmTab: provider page built";
 
-    QWidget* networkSearchPage = new QWidget();
-    QVBoxLayout* networkSearchPanelLayout = new QVBoxLayout(networkSearchPage);
-    networkSearchPanelLayout->setContentsMargins(10, 10, 10, 10);
-    networkSearchPanelLayout->setSpacing(8);
-
-    cbWebSearchEnabled_ = new QCheckBox(QStringLiteral("启用网络搜索"), networkSearchPage);
-    networkSearchPanelLayout->addWidget(cbWebSearchEnabled_);
-
-    QHBoxLayout* networkSelectorRow = new QHBoxLayout();
-    networkSelectorRow->setSpacing(5);
-    cbNetworkSearchProviders_ = new QComboBox(networkSearchPage);
-    cbNetworkSearchProviders_->addItem(QStringLiteral("Tavily"), QStringLiteral("tavily"));
-    networkSelectorRow->addWidget(cbNetworkSearchProviders_, 1);
-
-    QFormLayout* networkSearchLayout = new QFormLayout();
-    networkSearchLayout->setSpacing(8);
-    leNetworkSearchApiKey_ = new QLineEdit(networkSearchPage);
-    leNetworkSearchApiKey_->setEchoMode(QLineEdit::PasswordEchoOnEdit);
-    networkSearchLayout->addRow(QStringLiteral("搜索服务商:"), networkSelectorRow);
-    networkSearchLayout->addRow(QStringLiteral("API KEY:"), leNetworkSearchApiKey_);
-    networkSearchPanelLayout->addLayout(networkSearchLayout);
-
-    QLabel *networkSearchHint = new QLabel(
-        QStringLiteral("目前仅支持 Tavily，调用参数由程序内置：search_depth=advanced。"),
-        networkSearchPage);
-    networkSearchHint->setWordWrap(true);
-    networkSearchHint->setStyleSheet(
-        QStringLiteral("color:%1; font-size:12px;").arg(ThemeManager::tokens().textSecondary.name()));
-    networkSearchPanelLayout->addWidget(networkSearchHint);
-    networkSearchPanelLayout->addStretch();
-
     connect(cbLlmProviders_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &Settings::onLlmProviderSelected);
     connect(btnAddProvider, &QPushButton::clicked, this, &Settings::onAddLlmProvider);
@@ -1147,13 +1104,6 @@ void Settings::initLlmTab()
     connect(ui.leLlmModel,      &QLineEdit::textChanged,   this, &Settings::onLlmProviderFieldChanged);
     connect(ui.dsbLlmTemperature, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &Settings::onLlmProviderFieldChanged);
-    connect(cbWebSearchEnabled_, &QCheckBox::toggled,
-            this, &Settings::onWebSearchEnabledToggled);
-    connect(cbNetworkSearchProviders_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &Settings::onNetworkSearchProviderSelected);
-    connect(leNetworkSearchApiKey_, &QLineEdit::textChanged,
-            this, &Settings::onNetworkSearchProviderFieldChanged);
-    qInfo() << "Settings::initLlmTab: network page built";
 
     // --- Tab 2: Text Selection Actions ---
     QWidget* textSelectionPage = new QWidget();
@@ -1263,51 +1213,9 @@ void Settings::initLlmTab()
     qInfo() << "Settings::initLlmTab: notification page built";
 
     tabWidget->addTab(generalPage, QStringLiteral("厂商配置"));
-    tabWidget->addTab(networkSearchPage, QStringLiteral("网络搜索"));
     tabWidget->addTab(textSelectionPage, QStringLiteral("划词设置"));
     tabWidget->addTab(notificationPage, QStringLiteral("对话窗口"));
     qInfo() << "Settings::initLlmTab: first tabs added";
-
-    // --- Tab 4: Tool Management ---
-    QWidget* toolPage = new QWidget();
-    QVBoxLayout* toolPageLayout = new QVBoxLayout(toolPage);
-    toolPageLayout->setContentsMargins(10, 10, 10, 10);
-    toolPageLayout->setSpacing(8);
-
-    toolPageLayout->addWidget(new QLabel(QStringLiteral("勾选启用 Agent 可使用的工具："), toolPage));
-
-    listToolItems_ = new QListWidget(toolPage);
-    listToolItems_->setAlternatingRowColors(true);
-    listToolItems_->setUniformItemSizes(false);
-    listToolItems_->setSelectionMode(QAbstractItemView::NoSelection);
-    listToolItems_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    listToolItems_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    listToolItems_->setWordWrap(true);
-    listToolItems_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    const QList<LlmTools::ToolMeta> allToolMeta = LlmTools::builtinToolMetas();
-    qInfo() << "Settings::initLlmTab: tool metadata loaded" << allToolMeta.size();
-    for (const auto &meta : allToolMeta) {
-        auto *item = new QListWidgetItem(
-            QStringLiteral("%1: %2").arg(meta.name, meta.description),
-            listToolItems_);
-        item->setData(Qt::UserRole, meta.name);
-        item->setToolTip(meta.description);
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
-        item->setCheckState(Qt::Unchecked);
-    }
-    connect(listToolItems_, &QListWidget::itemChanged, this, [this](QListWidgetItem *) {
-        onToolCheckChanged();
-    });
-    toolPageLayout->addWidget(listToolItems_, 1);
-
-    cbToolAutoPermission_ = new QCheckBox(QStringLiteral("自动授权（执行工具时不再弹出确认）"), toolPage);
-    cbToolAutoPermission_->setChecked(false);
-    connect(cbToolAutoPermission_, &QCheckBox::toggled, this, &Settings::onToolAutoPermissionToggled);
-    toolPageLayout->addWidget(cbToolAutoPermission_);
-
-    tabWidget->addTab(toolPage, QStringLiteral("工具管理"));
-    qInfo() << "Settings::initLlmTab: tool tab added";
 
     const int notificationTabIndex = ui.tabWidget->indexOf(ui.tab_notification);
     if (notificationTabIndex >= 0) {
@@ -1342,23 +1250,6 @@ void Settings::loadLlmProviders()
     }
 
     updatingProviderFields_ = false;
-}
-
-void Settings::loadNetworkSearchProviders()
-{
-    updatingNetworkSearchProviderFields_ = true;
-
-    auto *setting = windowManager_->setting();
-    const bool enabled = setting->webSearchEnabled();
-    cbWebSearchEnabled_->setChecked(enabled);
-    cbNetworkSearchProviders_->setEnabled(enabled);
-    leNetworkSearchApiKey_->setEnabled(enabled);
-    const QString provider = setting->webSearchProvider();
-    const int providerIndex = cbNetworkSearchProviders_->findData(provider);
-    cbNetworkSearchProviders_->setCurrentIndex(providerIndex >= 0 ? providerIndex : 0);
-    leNetworkSearchApiKey_->setText(setting->webSearchApiKey());
-
-    updatingNetworkSearchProviderFields_ = false;
 }
 
 void Settings::onLlmProviderSelected(int index)
@@ -1419,42 +1310,6 @@ void Settings::onAddLlmProvider()
     setting->setLlmActiveProviderIndex(providers.size() - 1);
     loadLlmProviders();
     showStatusTip(QStringLiteral("已添加新厂商"));
-}
-
-void Settings::onWebSearchEnabledToggled(bool checked)
-{
-    if (updatingNetworkSearchProviderFields_) {
-        return;
-    }
-
-    windowManager_->setting()->setWebSearchEnabled(checked);
-    cbNetworkSearchProviders_->setEnabled(checked);
-    leNetworkSearchApiKey_->setEnabled(checked);
-    showStatusTip(checked ? QStringLiteral("已启用网络搜索") : QStringLiteral("已关闭网络搜索"));
-}
-
-void Settings::onNetworkSearchProviderSelected(int index)
-{
-    if (updatingNetworkSearchProviderFields_) {
-        return;
-    }
-
-    if (index < 0) {
-        return;
-    }
-
-    windowManager_->setting()->setWebSearchProvider(
-        cbNetworkSearchProviders_->itemData(index).toString());
-}
-
-void Settings::onNetworkSearchProviderFieldChanged()
-{
-    if (updatingNetworkSearchProviderFields_) {
-        return;
-    }
-
-    windowManager_->setting()->setWebSearchApiKey(
-        leNetworkSearchApiKey_->text().trimmed());
 }
 
 void Settings::onDelLlmProvider()
@@ -1644,49 +1499,6 @@ void Settings::onChatWindowSettingChanged()
     setting->setNotificationWindowSize(QSize(ui.sbNotifyWidth->value(), ui.sbNotifyHeight->value()));
     setting->setTrayNotificationPosition(static_cast<TrayNotificationPosition>(ui.cbNotifyPosition->currentIndex()));
     showStatusTip(QStringLiteral("对话窗口设置已更新"));
-}
-
-void Settings::loadToolSettings()
-{
-    if (!listToolItems_) return;
-
-    const QStringList disabledTools = windowManager_->setting()->llmDisabledTools();
-    updatingToolCheckBoxes_ = true;
-    for (int i = 0; i < listToolItems_->count(); ++i) {
-        QListWidgetItem *item = listToolItems_->item(i);
-        if (!item) {
-            continue;
-        }
-        const QString toolName = item->data(Qt::UserRole).toString();
-        item->setCheckState(disabledTools.contains(toolName) ? Qt::Unchecked : Qt::Checked);
-    }
-    updatingToolCheckBoxes_ = false;
-    if (cbToolAutoPermission_) {
-        const QSignalBlocker blocker(cbToolAutoPermission_);
-        cbToolAutoPermission_->setChecked(windowManager_->setting()->llmToolAutoPermission());
-    }
-}
-
-void Settings::onToolCheckChanged()
-{
-    if (updatingToolCheckBoxes_) return;
-
-    QStringList disabledTools;
-    if (!listToolItems_) {
-        return;
-    }
-    for (int i = 0; i < listToolItems_->count(); ++i) {
-        QListWidgetItem *item = listToolItems_->item(i);
-        if (item && item->checkState() != Qt::Checked) {
-            disabledTools.append(item->data(Qt::UserRole).toString());
-        }
-    }
-    windowManager_->setting()->setLlmDisabledTools(disabledTools);
-}
-
-void Settings::onToolAutoPermissionToggled(bool checked)
-{
-    windowManager_->setting()->setLlmToolAutoPermission(checked);
 }
 
 void Settings::initHttpServerTab()

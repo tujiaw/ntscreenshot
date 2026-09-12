@@ -48,7 +48,6 @@
         <file>html/chat-renderer.js</file>
         <file>html/chat-bridge.js</file>
         <file>html/chat.js</file>
-        <file>scripts/python_tool_worker.py</file>
         <file>icons/bing.ico</file>
         <file>icons/google.ico</file>
         <file>icons/baidu.ico</file>

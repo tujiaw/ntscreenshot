@@ -23,13 +23,12 @@ $legacyAppIncludes = @(
 )
 
 $legacyCrossModuleIncludes = @(
-  'modules/settings/Settings.cpp->assistant',
   'modules/settings/Settings.cpp->local_search'
 )
 
-$legacyCoreIncludes = @(
-  'settings/SettingModel.cpp->modules/assistant/runtime/tools/LlmTool.h'
-)
+# No core-to-module include is tolerated today. The list stays in place so a
+# future exception has to be recorded here explicitly.
+$legacyCoreIncludes = @()
 
 $violations = [System.Collections.Generic.List[string]]::new()
 $sourceFiles = Get-ChildItem $SourceRoot -Recurse -File -Include '*.cpp', '*.h' |

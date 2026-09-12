@@ -21,6 +21,7 @@ class QResizeEvent;
 class QVBoxLayout;
 class QWidget;
 class SettingModel;
+namespace LlmTools { class BackgroundBrowser; }
 
 class ChatWidget : public FramelessWidget
 {
@@ -67,7 +68,6 @@ private slots:
     void onToolExecuting(const QString &name, const QString &args);
     void onToolExecuted(const QString &name, const QString &result);
     void onAssistantPrefixFinalized(const QString &text);
-    void onToolConfirmRequested(const QString &name, const QString &args);
     void saveSession();
     void loadSession();
 
@@ -108,6 +108,7 @@ private:
     bool pinned_;
     Agent::AgentRunner *agent_;
     Agent::ToolRegistry *toolRegistry_;
+    LlmTools::BackgroundBrowser *backgroundBrowser_ = nullptr;
     ChatWebBridge *webBridge_;
     bool webReady_;
     QVariantList messages_;

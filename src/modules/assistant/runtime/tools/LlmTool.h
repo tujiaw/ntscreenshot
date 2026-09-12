@@ -1,18 +1,9 @@
 #pragma once
 
 #include <QJsonObject>
-#include <QList>
-#include <QSharedPointer>
 #include <QString>
 
-class SettingModel;
-
 namespace LlmTools {
-
-struct ToolMeta {
-    QString name;
-    QString description;
-};
 
 class ToolAbort;
 
@@ -26,7 +17,6 @@ public:
     virtual QJsonObject parameters() const = 0;
     virtual QString execute(const QJsonObject &arguments) const = 0;
     virtual QString execute(const QJsonObject &arguments, ToolAbort *abort) const;
-    virtual bool requiresConfirmation() const;
 
     QJsonObject definition() const;
     bool disabled() const;
@@ -38,10 +28,5 @@ protected:
 private:
     bool disabled_ = false;
 };
-
-QList<QSharedPointer<LlmTool>> createBuiltinTools(::SettingModel* settings,
-                                                  const QStringList &disabledToolNames = {},
-                                                  bool includeWebSearch = false);
-QList<ToolMeta> builtinToolMetas(bool includeWebSearch = false);
 
 } // namespace LlmTools

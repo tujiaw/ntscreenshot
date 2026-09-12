@@ -127,19 +127,8 @@ public:
 
     QList<TextSelectionActionConfig> textSelectionActions() const;
     void setTextSelectionActions(const QList<TextSelectionActionConfig> &actions);
-    QString webSearchProvider() const;
-    void setWebSearchProvider(const QString &provider);
-    QString webSearchApiKey() const;
-    void setWebSearchApiKey(const QString &apiKey);
-    bool webSearchEnabled() const;
-    void setWebSearchEnabled(bool enabled);
     bool llmImageTokenSavingEnabled() const;
     void setLlmImageTokenSavingEnabled(bool enabled);
-
-    QStringList llmDisabledTools() const;
-    void setLlmDisabledTools(const QStringList &names);
-    bool llmToolAutoPermission() const;
-    void setLlmToolAutoPermission(bool enabled);
 
     GitHubImageBedConfig gitHubImageBedConfig() const;
     void setGitHubImageBedConfig(const GitHubImageBedConfig &config);

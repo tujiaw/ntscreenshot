@@ -51,7 +51,7 @@ app  --> modules --> shared --> core
 
 `app/main.cpp` 是依赖组合根。`WindowManager`、`SettingModel` 等应用服务由组合根创建，并通过模块构造函数逐层注入；业务源码禁止新增 `instance()`、`GetInstance()` 或 `Singleton<T>`。确实需要进程级状态的平台实现应限制在对应 `.cpp` 内部，不向模块暴露全局访问入口。
 
-目前少量截图和设置代码仍通过显式构造参数依赖 `WindowManager`，全局设置迁移逻辑也仍引用 AI 工具元数据。这些边界由架构检查白名单明确记录，后续可继续收窄为模块 contracts；新增模块不应复制这种跨层依赖。
+目前少量截图和设置代码仍通过显式构造参数依赖 `WindowManager`。这些边界由架构检查白名单明确记录，后续可继续收窄为模块 contracts；新增模块不应复制这种跨层依赖。`core` 对 `modules` 已无任何依赖，白名单为空。
 
 ## 模块生命周期
 

@@ -10,6 +10,17 @@ function(nt_add_qt_test test_name target_name)
     endif()
 endfunction()
 
+add_executable(background_browser_tests
+    assistant/BackgroundBrowserTest.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/BackgroundBrowser.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp)
+target_include_directories(background_browser_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(background_browser_tests PRIVATE Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
+if(MSVC)
+    target_compile_options(background_browser_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(background_browser_contract background_browser_tests)
+
 add_executable(local_search_tests
     local_search/SearchIndexStoreTest.cpp
     ${NT_SOURCE_DIR}/modules/local_search/infrastructure/SearchIndexStore.cpp
