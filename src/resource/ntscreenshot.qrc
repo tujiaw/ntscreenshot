@@ -34,6 +34,15 @@
         <file>images/ctx_copy.png</file>
         <file>images/ctx_folder.png</file>
         <file>images/ctx_terminal.png</file>
+        <file>images/chrome.png</file>
+        <file>images/web.png</file>
+        <file>images/open_external.png</file>
+        <file>images/home.png</file>
+        <file>images/back.png</file>
+        <file>images/forward.png</file>
+        <file>images/refresh.png</file>
+        <file>images/collapse.png</file>
+        <file>html/browser-home.html</file>
         <file>html/chat.html</file>
         <file>html/chat.css</file>
         <file>html/chat-message.css</file>

@@ -21,6 +21,18 @@ if(MSVC)
 endif()
 nt_add_qt_test(background_browser_contract background_browser_tests)
 
+add_executable(browser_panel_tests
+    assistant/BrowserPanelTest.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/ui/BrowserPanel.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp)
+target_include_directories(browser_panel_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(browser_panel_tests PRIVATE Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
+if(MSVC)
+    target_compile_options(browser_panel_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(browser_panel_contract browser_panel_tests)
+set_tests_properties(browser_panel_contract PROPERTIES TIMEOUT 100)
+
 add_executable(local_search_tests
     local_search/SearchIndexStoreTest.cpp
     ${NT_SOURCE_DIR}/modules/local_search/infrastructure/SearchIndexStore.cpp

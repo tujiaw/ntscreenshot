@@ -78,6 +78,14 @@ public:
     void setChatGlobalKey(const QString &key);
     QString chatGlobalKey() const;
 
+    // 对话窗口的界面状态：记住“联网 / 浏览器”开关，以及左右两栏的宽度。
+    bool chatUseBrowser() const;
+    void setChatUseBrowser(bool useBrowser);
+    int chatPaneWidth() const;
+    void setChatPaneWidth(int width);
+    int chatBrowserPaneWidth() const;
+    void setChatBrowserPaneWidth(int width);
+
     void setLocalSearchGlobalKey(const QString& key);
     QString localSearchGlobalKey() const;
     void setLocalSearchRoots(const QStringList& roots);

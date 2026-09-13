@@ -263,6 +263,30 @@ QToolButton#chatInputGhostButton:hover {
 QToolButton#chatInputGhostButton:pressed {
     background: rgba(15, 23, 42, 0.08);
 }
+/* 联网 / 浏览器 二选一开关：选中态用强调色，便于一眼看出当前模式 */
+QToolButton#chatInputGhostButton:checked {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563EB;
+}
+/* 联网 / 浏览器图标开关：正方形且无内边距，图标才能占满按钮 */
+QToolButton#chatInputToggleButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0px;
+}
+QToolButton#chatInputToggleButton:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+QToolButton#chatInputToggleButton:pressed {
+    background: rgba(15, 23, 42, 0.08);
+}
+QToolButton#chatInputToggleButton:checked {
+    background: rgba(37, 99, 235, 0.12);
+}
+QToolButton#chatInputToggleButton:disabled {
+    background: transparent;
+}
 QPushButton#chatInputSendButton {
     background: transparent;
     border: none;

@@ -29,11 +29,13 @@ Capture, pinning, annotation, clipboard, and local search do not require an ntsc
 - URL fetching
 - GitHub image uploads
 
-The conversation's Web toggle is off by default. When enabled, the assistant can send search terms to Bing and load selected websites and their subresources through background WebEngine pages. Extracted content is returned to your configured model provider. No search API key is required. Each visit uses a temporary, off-the-record profile without persistent browser cookies or cache. Pages and profiles are released on completion, cancellation, timeout, or conversation closure. Tool results may remain in conversation history.
+When Web is enabled, the assistant can send search terms to Google (falling back to Bing) and load selected websites and their subresources through background WebEngine pages. Extracted content is returned to your configured model provider. No search API key is required. Each background visit uses a temporary, off-the-record profile. Pages and profiles are released on completion, cancellation, timeout, or conversation closure. Tool results may remain in conversation history.
+
+`browser_use` operates the visible browser on the right. It retains an off-the-record login session for the conversation, destroys it on conversation closure, and shares no cookies with background readers or other conversations. With Web enabled, AI can read pages, click controls, and fill ordinary forms. Authenticated page content may be sent to your model provider and retained in conversation history. Detected password or verification challenges pause automation and request human takeover. You can also pause AI by interacting directly with the page. While paused, AI performs no page reading and no automated actions, and resumes once the page leaves the challenge. Detection does not cover every website. Enter credentials directly into the website or local authentication dialog, not the AI conversation. Some websites prohibit embedded-browser authentication; external-browser sessions are not automatically transferred back.
 
 Those requests follow the selected provider's terms. Review the destination and avoid sending confidential content.
 
-When the assistant and its tools are enabled, a model may request local file operations, URL access, Python, shell, or PowerShell using the current OS account. Use trusted providers, review tool calls, and run as a standard user.
+Assistant tools can access websites. Local file operations, Python, shell, and PowerShell tools are not currently provided. Use trusted model providers and review website actions involving submission, sending, or account changes.
 
 ## Credentials
 

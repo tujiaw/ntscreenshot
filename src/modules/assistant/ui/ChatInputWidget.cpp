@@ -17,6 +17,7 @@
 #include <QMenu>
 #include <QMimeData>
 #include <QIcon>
+#include <QPainter>
 #include <QPixmap>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -38,6 +39,12 @@
 namespace {
 
 constexpr int kChatInputToolbarIconPx = 20;
+// 联网 / 浏览器两个开关：图标铺满整个按钮，不留任何内边距
+// （modernstyle.qss 里必须保持 padding: 0px，否则会被全局规则的
+// padding: 4px 10px 挤成中间一小块）。
+constexpr int kChatInputTogglePx = 18;
+// 两个开关之间额外留的间隔（工具栏本身的 spacing 是两个 18px 图标挨在一起时不够用）
+constexpr int kChatInputToggleGapPx = 10;
 constexpr int kChatInputMinVisibleLines = 1;
 constexpr int kChatInputMaxVisibleLines = 6;
 
@@ -52,6 +59,49 @@ QIcon chatStopIcon()
 {
     return ThemeIcon::icon(QStringLiteral("stop.png"), IconTone::OnAccent,
                            kChatInputToolbarIconPx);
+}
+
+// 图标 PNG 四周留了透明边，直接缩放会在按钮里显得小一圈。先裁到不透明区域，
+// 图片才能铺满按钮。
+QPixmap trimTransparentBorder(const QPixmap &source)
+{
+    const QImage image = source.toImage();
+    if (image.isNull()) {
+        return source;
+    }
+    int left = image.width(), top = image.height(), right = -1, bottom = -1;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qAlpha(image.pixel(x, y)) > 8) {
+                left = qMin(left, x);
+                right = qMax(right, x);
+                top = qMin(top, y);
+                bottom = qMax(bottom, y);
+            }
+        }
+    }
+    if (right < left || bottom < top) {
+        return source;
+    }
+    return source.copy(left, top, right - left + 1, bottom - top + 1);
+}
+
+// 开关图标的配色跟随勾选状态：开启用强调色，关闭用次要色。
+QIcon chatToggleIcon(const QString &name, bool enabled)
+{
+    QPixmap pixmap = trimTransparentBorder(QPixmap(QStringLiteral(":/images/") + name));
+    if (pixmap.isNull()) {
+        return QIcon();
+    }
+    const int side = Util::scaleSize(kChatInputTogglePx);
+    pixmap = pixmap.scaled(side, side, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    const ThemeTokens &tokens = ThemeManager::tokens();
+    QPainter painter(&pixmap);
+    painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    painter.fillRect(pixmap.rect(), enabled ? tokens.accent : tokens.textSecondary);
+    painter.end();
+    return QIcon(pixmap);
 }
 
 } // namespace
@@ -260,18 +310,41 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
 
     toolbarLayout->addWidget(addButton_);
     toolbarLayout->addWidget(modelButton_);
+    // 联网与浏览器操作互斥：两个图标按钮并排，开启一个会自动关闭另一个。
     webButton_ = new QToolButton(surface);
-    webButton_->setObjectName(QStringLiteral("chatInputGhostButton"));
-    webButton_->setText(QStringLiteral("联网：开"));
+    webButton_->setObjectName(QStringLiteral("chatInputToggleButton"));
     webButton_->setCheckable(true);
-    webButton_->setChecked(true);
     webButton_->setCursor(Qt::PointingHandCursor);
-    webButton_->setToolTip(QStringLiteral("允许模型在后台搜索和读取网页，无需搜索 API Key"));
+    webButton_->setIconSize(QSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx)));
+    webButton_->setFixedSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx));
+
+    browserButton_ = new QToolButton(surface);
+    browserButton_->setObjectName(QStringLiteral("chatInputToggleButton"));
+    browserButton_->setCheckable(true);
+    browserButton_->setCursor(Qt::PointingHandCursor);
+    browserButton_->setIconSize(QSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx)));
+    browserButton_->setFixedSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx));
+
     connect(webButton_, &QToolButton::toggled, this, [this](bool enabled) {
-        webButton_->setText(enabled ? QStringLiteral("联网：开") : QStringLiteral("联网：关"));
+        if (enabled && browserButton_->isChecked()) {
+            browserButton_->setChecked(false);  // 与“浏览器”二选一
+        }
+        refreshToggleButtons();
         emit sigWebEnabledChanged(enabled);
     });
+    connect(browserButton_, &QToolButton::toggled, this, [this](bool enabled) {
+        if (enabled && webButton_->isChecked()) {
+            webButton_->setChecked(false);  // 与“联网”二选一
+        }
+        refreshToggleButtons();
+        emit sigBrowserEnabledChanged(enabled);
+    });
+    webButton_->setChecked(true);  // 在信号接好之后设置，保证图标配色与互斥状态一致
+    refreshToggleButtons();
+
     toolbarLayout->addWidget(webButton_);
+    toolbarLayout->addSpacing(Util::scaleSize(kChatInputToggleGapPx));
+    toolbarLayout->addWidget(browserButton_);
     toolbarLayout->addStretch();
     toolbarLayout->addWidget(sendButton_);
     surfaceLayout->addLayout(toolbarLayout);
@@ -291,13 +364,37 @@ void ChatInputWidget::setPlaceholderText(const QString &text)
 void ChatInputWidget::setPending(bool pending)
 {
     pending_ = pending;
-    webButton_->setEnabled(!pending);
+    if (webButton_) {
+        webButton_->setEnabled(!pending);
+    }
+    if (browserButton_) {
+        browserButton_->setEnabled(!pending);
+    }
     updateSendButtonState();
 }
 
 bool ChatInputWidget::webEnabled() const
 {
-    return webButton_->isChecked();
+    return webButton_ && webButton_->isChecked();
+}
+
+void ChatInputWidget::setWebEnabled(bool enabled)
+{
+    if (webButton_) {
+        webButton_->setChecked(enabled);
+    }
+}
+
+bool ChatInputWidget::browserEnabled() const
+{
+    return browserButton_ && browserButton_->isChecked();
+}
+
+void ChatInputWidget::setBrowserEnabled(bool enabled)
+{
+    if (browserButton_) {
+        browserButton_->setChecked(enabled);
+    }
 }
 
 void ChatInputWidget::quoteText(const QString &text)
@@ -529,6 +626,34 @@ void ChatInputWidget::updateSendButtonState()
     sendButton_->setEnabled(
         !trimmedInputText().isEmpty() ||
         !quotedReferences_.isEmpty());
+}
+
+void ChatInputWidget::refreshToggleButtons()
+{
+    if (webButton_) {
+        const bool enabled = webButton_->isChecked();
+        webButton_->setIcon(chatToggleIcon(QStringLiteral("web.png"), enabled));
+        webButton_->setToolTip(enabled
+            ? QStringLiteral("联网已开启：模型可搜索、读取网页（点击关闭）")
+            : QStringLiteral("联网已关闭：点击允许模型搜索、读取网页（与浏览器二选一）"));
+    }
+    if (browserButton_) {
+        const bool enabled = browserButton_->isChecked();
+        browserButton_->setIcon(chatToggleIcon(QStringLiteral("chrome.png"), enabled));
+        browserButton_->setToolTip(enabled
+            ? QStringLiteral("浏览器已开启：模型可操作右侧浏览器（点击关闭）")
+            : QStringLiteral("浏览器已关闭：点击允许模型操作右侧浏览器（与联网二选一）"));
+    }
+}
+
+void ChatInputWidget::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
+        // 图标按主题重着色，换肤后要重新取一遍。
+        refreshToggleButtons();
+        updateSendButtonState();
+    }
 }
 
 void ChatInputWidget::refreshModelButton()

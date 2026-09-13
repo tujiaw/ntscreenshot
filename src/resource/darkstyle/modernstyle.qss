@@ -556,6 +556,19 @@ QToolButton#chatQuoteRemoveButton:pressed { background: @BORDER@; }
 QLineEdit#chatInputEditor, QPlainTextEdit#chatInputEditor { background: transparent; border: none; }
 QToolButton#chatInputGhostButton { background: transparent; border: none; }
 QToolButton#chatInputGhostButton:hover { background: @SURFACE_SUBTLE@; }
+/* 联网 / 浏览器 二选一开关：选中态用强调色，便于一眼看出当前模式 */
+QToolButton#chatInputGhostButton:checked { background: @ACCENT_SUBTLE@; color: @ACCENT@; }
+/* 联网 / 浏览器图标开关：正方形且无内边距，图标才能占满按钮 */
+/* 开关只显示图标本身，任何状态下都不画背景（开启/关闭靠图标配色区分） */
+QToolButton#chatInputToggleButton,
+QToolButton#chatInputToggleButton:hover,
+QToolButton#chatInputToggleButton:pressed,
+QToolButton#chatInputToggleButton:checked,
+QToolButton#chatInputToggleButton:disabled {
+    background: transparent;
+    border: none;
+    padding: 0px;
+}
 QPushButton#chatInputSendButton {
     color: #FFFFFF; background: @ACCENT@; border: none;
     border-radius: 13px; padding: 0px;

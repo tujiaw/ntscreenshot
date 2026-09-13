@@ -6,6 +6,8 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Added
 
+- A visible browser panel beside the AI conversation with an address bar, back / forward / reload / home controls, and a built-in start page that introduces browser use. It keeps one off-the-record login session per conversation and exposes structured browser-use actions, handing control to you automatically when a page asks for a password or verification code. Manual interaction pauses automation, and AI resumes on its own once the page leaves the challenge; stopping is handled by the chat input's stop button. The chat window remembers the last Web / browser choice and the pane widths. Browser contract tests cover DOM actions, authentication handoff, cookie isolation, cancellation, and closure.
+
 - A conversation Web toggle beside the model selector enables background WebEngine search and dynamic webpage reading, with per-request temporary profiles, cancellation, timeouts, and cleanup on conversation closure.
 
 - User-facing FAQ, bilingual README, GitHub issue templates, and a documentation index.

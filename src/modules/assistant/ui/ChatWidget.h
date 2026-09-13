@@ -17,7 +17,10 @@ class ToolRegistry;
 class QWebEngineView;
 class ChatWebBridge;
 class ChatInputWidget;
+class BrowserPanel;
 class QResizeEvent;
+class QShowEvent;
+class QSplitter;
 class QVBoxLayout;
 class QWidget;
 class SettingModel;
@@ -49,6 +52,7 @@ protected:
     void changeEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void closeAnimation();
@@ -102,9 +106,20 @@ private:
     QLabel *titleLabel_;
     QWebEngineView *messageView_;
     ChatInputWidget *inputWidget_;
+    QSplitter *splitter_ = nullptr;
+    BrowserPanel *browserPanel_ = nullptr;
+    // 上次左右两栏的宽度；再次打开时沿用，用户拖过分栏则以拖后的宽度为准。
+    // -1 表示本次运行还没有记录，回退到默认宽度。
+    int browserPaneWidth_ = -1;
+    int chatPaneWidth_ = -1;
+    // 首次显示时恢复上次的“联网 / 浏览器”选择，只做一次。
+    bool restoredInputMode_ = false;
+    // 恢复布局期间为 true：此时窗口几何已经恢复好，打开浏览器不能再加宽窗口。
+    bool restoringLayout_ = false;
     QPushButton *closeBtn_;
     QPushButton *pinBtn_;
     QPushButton *clearBtn_;
+    QPushButton *maxBtn_ = nullptr;
     bool pinned_;
     Agent::AgentRunner *agent_;
     Agent::ToolRegistry *toolRegistry_;

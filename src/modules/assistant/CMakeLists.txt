@@ -1,4 +1,5 @@
 target_sources(ntscreenshot PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui/BrowserPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/tools/BackgroundBrowser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AssistantModule.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/agent/Agent.cpp

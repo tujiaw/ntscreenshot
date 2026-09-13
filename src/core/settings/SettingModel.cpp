@@ -19,6 +19,10 @@ static const QString KEY_SCREENSHOT     = "SCREENSHOT_GLOBAL_KEY";
 static const QString KEY_PIN            = "PIN_GLOBAL_KEY";
 static const QString KEY_TEXT_SELECTION = "TEXT_SELECTION_GLOBAL_KEY";
 static const QString KEY_CHAT           = "CHAT_GLOBAL_KEY";
+// [Chat] 节 —— 对话窗口的界面状态
+static const QString KEY_CHAT_USE_BROWSER = "CHAT/USE_BROWSER";
+static const QString KEY_CHAT_PANE_WIDTH  = "CHAT/PANE_WIDTH";
+static const QString KEY_CHAT_BROWSER_WIDTH = "CHAT/BROWSER_WIDTH";
 static const QString KEY_LOCAL_SEARCH   = "LOCAL_SEARCH/GLOBAL_KEY";
 static const QString KEY_LOCAL_SEARCH_DEFAULT_VERSION = "LOCAL_SEARCH/HOTKEY_DEFAULT_VERSION";
 static const QString KEY_LOCAL_SEARCH_ROOTS = "LOCAL_SEARCH/ROOTS";
@@ -277,6 +281,39 @@ void SettingModel::setChatGlobalKey(const QString &key)
 QString SettingModel::chatGlobalKey() const
 {
     return settings_.value(KEY_CHAT, QString()).toString();
+}
+
+// 对话窗口上次选的是“浏览器”（true）还是“联网”（false）。两者互斥，一个 bool 就够。
+bool SettingModel::chatUseBrowser() const
+{
+    return settings_.value(KEY_CHAT_USE_BROWSER, false).toBool();
+}
+
+void SettingModel::setChatUseBrowser(bool useBrowser)
+{
+    settings_.setValue(KEY_CHAT_USE_BROWSER, useBrowser);
+}
+
+// 左栏（对话）宽度。返回 0 表示还没存过，调用方按当前布局决定。
+int SettingModel::chatPaneWidth() const
+{
+    return qMax(0, settings_.value(KEY_CHAT_PANE_WIDTH, 0).toInt());
+}
+
+void SettingModel::setChatPaneWidth(int width)
+{
+    if (width > 0) settings_.setValue(KEY_CHAT_PANE_WIDTH, width);
+}
+
+// 右栏（浏览器）宽度。返回 0 表示还没存过，调用方回退到默认宽度。
+int SettingModel::chatBrowserPaneWidth() const
+{
+    return qMax(0, settings_.value(KEY_CHAT_BROWSER_WIDTH, 0).toInt());
+}
+
+void SettingModel::setChatBrowserPaneWidth(int width)
+{
+    if (width > 0) settings_.setValue(KEY_CHAT_BROWSER_WIDTH, width);
 }
 
 void SettingModel::setLocalSearchGlobalKey(const QString& key)

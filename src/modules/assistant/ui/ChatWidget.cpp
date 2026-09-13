@@ -1,6 +1,14 @@
 #include "modules/assistant/ui/ChatWidget.h"
 
 #include <QHBoxLayout>
+#include <QPointer>
+#include <QShowEvent>
+#include <QSplitter>
+#include <QTimer>
+#include <QApplication>
+#include <QScreen>
+#include "modules/assistant/ui/BrowserPanel.h"
+#include "modules/assistant/runtime/tools/BrowserUseTool.h"
 #include <QSizePolicy>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -234,6 +242,21 @@ ChatWidget::ChatWidget(
     clearBtn_->setToolTip(QStringLiteral("清空历史"));
     connect(clearBtn_, &QPushButton::clicked, this, &ChatWidget::onClearHistoryRequested);
 
+    maxBtn_ = new QPushButton(titleBar_);
+    maxBtn_->setObjectName(QStringLiteral("chatMaximizeButton"));
+    maxBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
+    maxBtn_->setCursor(Qt::PointingHandCursor);
+    maxBtn_->setToolTip(QStringLiteral("最大化"));
+    maxBtn_->setText(QString());
+    maxBtn_->setIconSize(QSize(Util::scaleSize(18), Util::scaleSize(18)));
+    connect(maxBtn_, &QPushButton::clicked, this, [this] {
+        if (isMaximized()) {
+            showNormal();
+        } else {
+            showMaximized();
+        }
+    });
+
     closeBtn_ = new QPushButton(QStringLiteral("✕"), titleBar_);
     closeBtn_->setObjectName(QStringLiteral("notificationCloseButton"));
     closeBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
@@ -247,6 +270,7 @@ ChatWidget::ChatWidget(
     titleLayout->addStretch();
     titleLayout->addWidget(pinBtn_, 0, Qt::AlignVCenter);
     titleLayout->addWidget(clearBtn_, 0, Qt::AlignVCenter);
+    titleLayout->addWidget(maxBtn_, 0, Qt::AlignVCenter);
     titleLayout->addWidget(closeBtn_, 0, Qt::AlignVCenter);
 
     setTitle(titleBar_);
@@ -326,6 +350,9 @@ void ChatWidget::changeEvent(QEvent *event)
     if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
         refreshTitleBarButtons();
         update();
+    } else if (event->type() == QEvent::WindowStateChange) {
+        refreshTitleBarButtons();
+        update();
     }
     QWidget::changeEvent(event);
 }
@@ -337,6 +364,37 @@ void ChatWidget::resizeEvent(QResizeEvent *event)
     if (queuePanel_ && queuePanel_->isVisible()) {
         updateQueueDisplay();
     }
+}
+
+void ChatWidget::showEvent(QShowEvent *event)
+{
+    FramelessWidget::showEvent(event);
+    // 恢复上次的“联网 / 浏览器”选择。放在首次显示时做而不是构造函数里：
+    // 外层是先 new 出窗口再 restoreGeometry，构造期恢复会被随后的几何恢复覆盖掉。
+    if (restoredInputMode_ || !inputWidget_ || !settings_) {
+        return;
+    }
+    restoredInputMode_ = true;
+    if (!settings_->chatUseBrowser()) {
+        return;  // 默认就是“联网”，无需处理
+    }
+    restoringLayout_ = true;
+    inputWidget_->setBrowserEnabled(true);
+    restoringLayout_ = false;
+
+    // showEvent 里分栏还没排过版，setSizes 不一定吃得进去；
+    // 等第一轮事件循环结束、布局激活之后再摆一次两栏宽度。
+    const int chatWidth = chatPaneWidth_;
+    const int browserWidth = browserPaneWidth_;
+    if (chatWidth <= 0 || browserWidth <= 0) {
+        return;
+    }
+    QPointer<ChatWidget> guard(this);
+    QTimer::singleShot(0, this, [guard, chatWidth, browserWidth] {
+        if (guard && guard->splitter_ && guard->browserPanel_ && guard->browserPanel_->isVisible()) {
+            guard->splitter_->setSizes({chatWidth, browserWidth});
+        }
+    });
 }
 
 bool ChatWidget::eventFilter(QObject *watched, QEvent *event)
@@ -378,6 +436,12 @@ void ChatWidget::paintEvent(QPaintEvent *event)
     Q_UNUSED(event);
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+
+    // 最大化时铺满整个窗口，避免圆角在半透明背景上留下透明空隙。
+    if (isMaximized()) {
+        painter.fillRect(rect(), opaqueColor(OverlayTheme::notificationBackgroundColor()));
+        return;
+    }
 
     const int radius = chatCornerRadiusPx();
     // 先将整个窗口清为透明，再叠加圆角背景。
@@ -513,7 +577,35 @@ void ChatWidget::initializeChatUi()
         return;
     }
 
-    messageView_ = new QWebEngineView(contentWidget_);
+    // 恢复上次的两栏宽度；存过 0 或没存过时保持 -1，走默认宽度。
+    if (settings_) {
+        if (const int width = settings_->chatPaneWidth(); width > 0) chatPaneWidth_ = width;
+        if (const int width = settings_->chatBrowserPaneWidth(); width > 0) browserPaneWidth_ = width;
+    }
+
+    auto *splitter = new QSplitter(Qt::Horizontal, contentWidget_);
+    splitter_ = splitter;
+    splitter->setChildrenCollapsible(false);
+    auto *chatPane = new QWidget(splitter);
+    auto *chatLayout = new QVBoxLayout(chatPane);
+    chatLayout->setContentsMargins(0,0,0,0);
+    browserPanel_ = new BrowserPanel(splitter);
+    splitter->addWidget(chatPane);
+    splitter->addWidget(browserPanel_);
+    splitter->setStretchFactor(0, 1);
+    splitter->setStretchFactor(1, 1);
+    browserPanel_->hide();
+    contentLayout_->addWidget(splitter, 1);
+    // 分栏被拖动时记住两栏宽度；面板隐藏时左栏铺满整个分栏，那种“宽度”没有意义。
+    connect(splitter, &QSplitter::splitterMoved, this, [this, splitter] {
+        if (!browserPanel_ || !browserPanel_->isVisible() || !settings_) return;
+        const QList<int> sizes = splitter->sizes();
+        settings_->setChatPaneWidth(sizes.value(0));
+        settings_->setChatBrowserPaneWidth(sizes.value(1));
+    });
+    refreshTitleBarButtons();
+
+    messageView_ = new QWebEngineView(chatPane);
     messageView_->setObjectName(QStringLiteral("notificationChatView"));
     messageView_->setPage(new ExternalLinkPage(messageView_));
     // 允许 HTML 消息区域使用 WebEngine 标准右键菜单，例如复制、全选、链接操作等。
@@ -538,7 +630,7 @@ void ChatWidget::initializeChatUi()
     } else {
         messageView_->setHtml(QStringLiteral("<html><body>Failed to load chat.html</body></html>"));
     }
-    contentLayout_->addWidget(messageView_, 1);
+    chatLayout->addWidget(messageView_, 1);
 
     // 队列预览面板（有待发送消息时显示，紧靠输入框上方）
     queuePanel_ = new QWidget(contentWidget_);
@@ -546,17 +638,84 @@ void ChatWidget::initializeChatUi()
     queueLayout->setContentsMargins(Util::scaleSize(10), Util::scaleSize(5), Util::scaleSize(10), Util::scaleSize(2));
     queueLayout->setSpacing(Util::scaleSize(2));
     queuePanel_->setVisible(false);
-    contentLayout_->addWidget(queuePanel_);
+    chatLayout->addWidget(queuePanel_);
 
     inputWidget_ = new ChatInputWidget(settings_, contentWidget_);
     // inputWidget_->setPlaceholderText("问问AI");
     connect(inputWidget_, &ChatInputWidget::sigSendRequested, this, &ChatWidget::onSendRequested);
     connect(inputWidget_, &ChatInputWidget::sigStopRequested, this, &ChatWidget::onStopRequested);
-    contentLayout_->addWidget(inputWidget_);
+    chatLayout->addWidget(inputWidget_);
 
     agent_ = new Agent::AgentRunner(settings_, this);
     backgroundBrowser_ = new LlmTools::BackgroundBrowser(this);
-    connect(inputWidget_, &ChatInputWidget::sigWebEnabledChanged, this, [this] { refreshToolRegistry(); });
+    // 打开浏览器时窗口整体加宽，关闭时再收回去：对话区域宽度全程不变，
+    // 不会出现“关掉浏览器后对话区域横向铺满”的情况。
+    connect(inputWidget_, &ChatInputWidget::sigBrowserEnabledChanged, this, [this, splitter](bool visible) {
+        const int minBrowserWidth = Util::scaleSize(320);
+        // 两个面板之间会多出一个分栏手柄，增删面板时窗口宽度要把它的宽度算进去。
+        const int handle = splitter->handleWidth();
+        const QList<int> sizes = splitter->sizes();
+        if (visible) {
+            int browserWidth = browserPaneWidth_ > 0 ? browserPaneWidth_ : Util::scaleSize(480);
+            const QRect available = screen() ? screen()->availableGeometry() : QRect();
+            if (!isMaximized() && available.isValid()) {
+                // 只向右扩展到屏幕边界，空间不足时压缩浏览器而不是挤压对话区域。
+                const int room = available.right() - x() + 1 - width() - handle;
+                browserWidth = qBound(minBrowserWidth, browserWidth, qMax(minBrowserWidth, room));
+            }
+            // 对话区域当前宽度：面板隐藏时它占满整个分栏。
+            // 启动恢复时优先用上次记住的宽度，让两栏都回到关闭前的样子。
+            const int chatWidth = (restoringLayout_ && chatPaneWidth_ > 0)
+                ? chatPaneWidth_ : qMax(1, sizes.value(0));
+            browserPanel_->setVisible(true);
+            if (restoringLayout_) {
+                // 窗口几何已经由 restoreGeometry 恢复过了，这里只摆好两栏，
+                // 不能再走加宽逻辑，否则每启动一次窗口就宽一截。
+                splitter->setSizes({chatWidth, browserWidth});
+            } else if (isMaximized()) {
+                splitter->setSizes({qMax(1, splitter->width() - browserWidth - handle), browserWidth});
+            } else {
+                resize(width() + browserWidth + handle, height());
+                if (available.isValid()) {
+                    move(qBound(available.left(), x(),
+                                qMax(available.left(), available.right() - width() + 1)), y());
+                }
+                splitter->setSizes({chatWidth, browserWidth});
+            }
+            browserPaneWidth_ = browserWidth;
+            if (settings_) {
+                settings_->setChatUseBrowser(true);
+                settings_->setChatBrowserPaneWidth(browserWidth);
+                if (chatWidth > 0) settings_->setChatPaneWidth(chatWidth);
+            }
+        } else {
+            const int browserWidth = sizes.value(1);
+            browserPanel_->setVisible(false);
+            if (browserWidth > 0) {
+                browserPaneWidth_ = browserWidth;
+                if (!isMaximized()) {  // 收回浏览器占用的宽度，对话区域宽度保持不变
+                    resize(qMax(minimumWidth(), width() - browserWidth - handle), height());
+                }
+                if (settings_) {
+                    settings_->setChatBrowserPaneWidth(browserWidth);
+                    if (sizes.value(0) > 0) settings_->setChatPaneWidth(sizes.value(0));
+                }
+            }
+            if (settings_) settings_->setChatUseBrowser(false);
+        }
+        refreshToolRegistry();
+    });
+    connect(inputWidget_, &ChatInputWidget::sigWebEnabledChanged, this, [this](bool) {
+        refreshToolRegistry();  // 两个按钮的互斥已在 ChatInputWidget 内处理
+    });
+    connect(browserPanel_, &BrowserPanel::activityRequested, this, [this]{ inputWidget_->setBrowserEnabled(true); });
+    connect(browserPanel_, &BrowserPanel::attentionRequired, this, [this](const QString &reason){
+        inputWidget_->setBrowserEnabled(true);
+        appendChatMessage(kRoleAssistant, reason);
+        QApplication::alert(this);
+    });
+    connect(browserPanel_, &BrowserPanel::collapseRequested, this, [this]{ inputWidget_->setBrowserEnabled(false); });
+    connect(inputWidget_, &ChatInputWidget::sigStopRequested, browserPanel_, &BrowserPanel::cancel);
     refreshToolRegistry();
     agent_->setMaxIterations(10);
 
@@ -575,16 +734,19 @@ void ChatWidget::initializeChatUi()
 
 void ChatWidget::refreshToolRegistry()
 {
-    if (!agent_) {
+    if (!agent_ || !inputWidget_) {
         return;
     }
     if (chatRequestPending_) {
         return;
     }
 
-    // Reaching the network is the assistant's only capability, so the registry
-    // holds the WebEngine browser tools or nothing at all.
+    // 联网（后台搜索/读取）与浏览器操作（右侧可见浏览器）二选一，互斥。
+    // 前者只注册后台浏览器工具，后者只注册 browser_use 工具。
     Agent::ToolRegistry *registry = new Agent::ToolRegistry(this);
+    if (inputWidget_->browserEnabled()) {
+        registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::BrowserUseTool(browserPanel_)));
+    }
     if (inputWidget_->webEnabled()) {
         registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::BrowserTool(backgroundBrowser_, true)));
         registry->registerTool(QSharedPointer<LlmTools::LlmTool>(new LlmTools::BrowserTool(backgroundBrowser_, false)));
@@ -645,7 +807,7 @@ QString ChatWidget::pixmapToDataUrl(const QPixmap &image) const
 
 bool ChatWidget::isDraggableTitleArea(const QPoint &pos) const
 {
-    if (!closeBtn_ || !pinBtn_ || !clearBtn_) {
+    if (!closeBtn_ || !pinBtn_ || !clearBtn_ || !maxBtn_) {
         return false;
     }
 
@@ -656,7 +818,8 @@ bool ChatWidget::isDraggableTitleArea(const QPoint &pos) const
 
     if (closeBtn_->geometry().contains(pos) ||
         pinBtn_->geometry().contains(pos) ||
-        clearBtn_->geometry().contains(pos)) {
+        clearBtn_->geometry().contains(pos) ||
+        maxBtn_->geometry().contains(pos)) {
         return false;
     }
 
@@ -699,7 +862,7 @@ void ChatWidget::applyPinnedState(bool pinned)
 
 void ChatWidget::refreshTitleBarButtons()
 {
-    if (!pinBtn_ || !clearBtn_ || !closeBtn_) {
+    if (!pinBtn_ || !clearBtn_ || !closeBtn_ || !maxBtn_) {
         return;
     }
 
@@ -736,6 +899,17 @@ void ChatWidget::refreshTitleBarButtons()
         normalBg,
         dark ? "rgba(248,113,113,0.48)" : "rgba(220,38,38,0.18)",
         dark ? "rgba(239,68,68,0.18)" : "rgba(239,68,68,0.10)"));
+
+    maxBtn_->setIcon(colorizedIcon(isMaximized()
+        ? QStringLiteral(":/images/icon_window_restore.png")
+        : QStringLiteral(":/images/icon_window_maximize.png"), iconColor));
+    maxBtn_->setToolTip(isMaximized() ? QStringLiteral("还原") : QStringLiteral("最大化"));
+    maxBtn_->setStyleSheet(buildTitleButtonStyle(
+        QStringLiteral("chatMaximizeButton"),
+        normalBorder,
+        normalBg,
+        hoverBorder,
+        hoverBg));
 }
 
 QVariantMap ChatWidget::buildMessagePayload(const QString &messageId, const QString &role, const QString &text, const QList<QPixmap> *images, bool completed, bool hideBubbleActions, const QVariantMap *usage) const

@@ -50,6 +50,10 @@ Open Settings from the tray. Startup, light / dark theme, capture / pin / chat h
 
 Off by default. Add your own endpoint in Settings, then open chat with the hotkey. No key means no network calls.
 
+Enable **Web** beside the model selector to allow search, page reading, and `browser_use` actions. The **浏览器** button in the title bar shows a browser panel to the right of chat, with an address bar, back / forward / reload, a Home button that returns to the built-in start page, AI clicks, ordinary form filling, and scrolling. Its temporary login session lasts for the conversation and is cleared when the conversation closes.
+
+Password, verification-code, and QR login challenges pause automation and explain why in the conversation. Finish them in the panel and AI picks the task back up on its own; you can also pause AI by interacting with the page directly, and it resumes once the page leaves the challenge. Use the stop button in the chat input to cancel the current AI request. Authentication detection cannot cover every site. Some services prohibit embedded-browser login; external-browser sessions do not automatically transfer back. Background search and the browser panel use separate sessions.
+
 ![AI chat](ai-chat.png)
 
 ## 30-second start
