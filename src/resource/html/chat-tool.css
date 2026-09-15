@@ -171,6 +171,41 @@
   word-break: break-word;
 }
 
+.chat-tool-card-full-result {
+  display: inline-block;
+  margin: 6px 10px 8px;
+  color: var(--link);
+  cursor: help;
+}
+
+.chat-tool-card-full-result:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.chat-tool-result-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: min(560px, calc(100vw - 16px));
+  max-height: min(60vh, 460px);
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.chat-tool-result-tooltip pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .chat-tool-card-divider {
   height: 1px;
   background: var(--line);

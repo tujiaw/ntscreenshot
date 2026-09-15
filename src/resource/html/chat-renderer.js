@@ -619,6 +619,47 @@
   const TOOL_ARGS_MAX = 800;
   const TOOL_RESULT_MAX = 1000;
   const TOOL_SUMMARY_LINE_MAX = 96;
+  const toolResultCache = new Map();
+  let nextToolResultId = 0;
+  let toolResultTooltip = null;
+
+  function hideToolResultTooltip() {
+    if (toolResultTooltip) {
+      toolResultTooltip.remove();
+      toolResultTooltip = null;
+    }
+  }
+
+  function showToolResultTooltip(trigger, id) {
+    const result = toolResultCache.get(id);
+    if (result === undefined) {
+      return;
+    }
+    hideToolResultTooltip();
+    const tip = document.createElement('div');
+    tip.className = 'chat-tool-result-tooltip';
+    tip.setAttribute('role', 'tooltip');
+    const content = document.createElement('pre');
+    content.textContent = result;
+    tip.appendChild(content);
+    tip.addEventListener('mouseleave', function (e) {
+      if (e.relatedTarget !== trigger) hideToolResultTooltip();
+    });
+    document.body.appendChild(tip);
+    toolResultTooltip = tip;
+    const rect = trigger.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - tip.offsetWidth - 8)) + 'px';
+    const below = window.innerHeight - rect.bottom;
+    tip.style.top = (below >= Math.min(tip.offsetHeight, 160)
+      ? Math.min(rect.bottom, window.innerHeight - tip.offsetHeight - 8)
+      : Math.max(8, rect.top - tip.offsetHeight)) + 'px';
+  }
+
+  function clearToolResultCache() {
+    hideToolResultTooltip();
+    toolResultCache.clear();
+    nextToolResultId = 0;
+  }
 
   function truncateToolText(s, max) {
     const t = String(s || '');
@@ -685,6 +726,7 @@
   }
 
   function clearToolActivity() {
+    clearToolResultCache();
     if (state.toolActivityHost && state.toolActivityHost.parentNode) {
       state.toolActivityHost.parentNode.removeChild(state.toolActivityHost);
     }
@@ -791,8 +833,7 @@
       const resultRaw = String(data.result || '');
       const resultOneLine = resultRaw.replace(/\s+/g, ' ').trim();
       const sumLine = buildToolSummaryLine(toolName, resultOneLine);
-      const fullHint = resultOneLine.length ? toolName + ' · ' + resultOneLine : toolName;
-      setToolCardSummary(card, sumLine, fullHint);
+      setToolCardSummary(card, sumLine, sumLine);
 
       const details = card.querySelector('.chat-tool-card-details');
       if (!details) {
@@ -813,6 +854,24 @@
       resPre.className = 'chat-tool-card-body chat-tool-card-result';
       resPre.textContent = truncateToolText(data.result, TOOL_RESULT_MAX);
       details.appendChild(resPre);
+
+      const resultId = String(++nextToolResultId);
+      toolResultCache.set(resultId, resultRaw);
+      const detail = document.createElement('span');
+      detail.className = 'chat-tool-card-full-result';
+      detail.textContent = '详细结果 · 悬停查看全文';
+      detail.setAttribute('tabindex', '0');
+      detail.addEventListener('mouseenter', function () {
+        showToolResultTooltip(detail, resultId);
+      });
+      detail.addEventListener('focus', function () {
+        showToolResultTooltip(detail, resultId);
+      });
+      detail.addEventListener('mouseleave', function (e) {
+        if (e.relatedTarget !== toolResultTooltip && !detail.matches(':focus')) hideToolResultTooltip();
+      });
+      detail.addEventListener('blur', hideToolResultTooltip);
+      details.appendChild(detail);
 
       scrollPageToBottom();
     }
@@ -973,6 +1032,7 @@
   function hydrateMessages(raw) {
     const messages = helpers.parseMessage(raw);
     resetPendingMessageUpdates();
+    clearToolResultCache();
     state.messageList.innerHTML = '';
     state.toolActivityHost = null;
     state.pendingNode = null;
@@ -989,6 +1049,7 @@
 
   function clearMessages() {
     resetPendingMessageUpdates();
+    clearToolResultCache();
     state.messageList.innerHTML = '';
     state.toolActivityHost = null;
     state.pendingNode = null;

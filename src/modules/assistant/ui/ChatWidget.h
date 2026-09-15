@@ -108,8 +108,7 @@ private:
     ChatInputWidget *inputWidget_;
     QSplitter *splitter_ = nullptr;
     BrowserPanel *browserPanel_ = nullptr;
-    // 上次左右两栏的宽度；再次打开时沿用，用户拖过分栏则以拖后的宽度为准。
-    // -1 表示本次运行还没有记录，回退到默认宽度。
+    // 首次显示恢复浏览器模式时，在布局激活后再次应用展开时算出的 2:3 宽度。
     int browserPaneWidth_ = -1;
     int chatPaneWidth_ = -1;
     // 首次显示时恢复上次的“联网 / 浏览器”选择，只做一次。

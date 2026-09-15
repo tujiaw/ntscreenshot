@@ -22,7 +22,7 @@ public:
 
     QJsonArray definitions() const;
     QString execute(const QString &name, const QString &argumentsJson,
-                    LlmTools::ToolAbort *abort = nullptr) const;
+                    LlmTools::ToolAbort *abort = nullptr, QString *fullResult = nullptr) const;
 
 signals:
     void sigToolRegistered(const QString &name);

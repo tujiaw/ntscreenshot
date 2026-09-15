@@ -577,12 +577,6 @@ void ChatWidget::initializeChatUi()
         return;
     }
 
-    // 恢复上次的两栏宽度；存过 0 或没存过时保持 -1，走默认宽度。
-    if (settings_) {
-        if (const int width = settings_->chatPaneWidth(); width > 0) chatPaneWidth_ = width;
-        if (const int width = settings_->chatBrowserPaneWidth(); width > 0) browserPaneWidth_ = width;
-    }
-
     auto *splitter = new QSplitter(Qt::Horizontal, contentWidget_);
     splitter_ = splitter;
     splitter->setChildrenCollapsible(false);
@@ -592,17 +586,10 @@ void ChatWidget::initializeChatUi()
     browserPanel_ = new BrowserPanel(splitter);
     splitter->addWidget(chatPane);
     splitter->addWidget(browserPanel_);
-    splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 1);
+    splitter->setStretchFactor(0, 2);
+    splitter->setStretchFactor(1, 3);
     browserPanel_->hide();
     contentLayout_->addWidget(splitter, 1);
-    // 分栏被拖动时记住两栏宽度；面板隐藏时左栏铺满整个分栏，那种“宽度”没有意义。
-    connect(splitter, &QSplitter::splitterMoved, this, [this, splitter] {
-        if (!browserPanel_ || !browserPanel_->isVisible() || !settings_) return;
-        const QList<int> sizes = splitter->sizes();
-        settings_->setChatPaneWidth(sizes.value(0));
-        settings_->setChatBrowserPaneWidth(sizes.value(1));
-    });
     refreshTitleBarButtons();
 
     messageView_ = new QWebEngineView(chatPane);
@@ -656,17 +643,19 @@ void ChatWidget::initializeChatUi()
         const int handle = splitter->handleWidth();
         const QList<int> sizes = splitter->sizes();
         if (visible) {
-            int browserWidth = browserPaneWidth_ > 0 ? browserPaneWidth_ : Util::scaleSize(480);
+            // 每次展开都从对话:浏览器 = 2:3 开始；展开后仍可拖动手柄。
+            const int availablePaneWidth = qMax(1, splitter->width() - handle);
+            const int chatWidth = restoringLayout_ ? qMax(1, availablePaneWidth * 2 / 5)
+                : qMax(1, sizes.value(0));
+            int browserWidth = (restoringLayout_ || isMaximized())
+                ? qMax(minBrowserWidth, availablePaneWidth * 3 / 5)
+                : qMax(minBrowserWidth, chatWidth * 3 / 2);
             const QRect available = screen() ? screen()->availableGeometry() : QRect();
-            if (!isMaximized() && available.isValid()) {
+            if (!restoringLayout_ && !isMaximized() && available.isValid()) {
                 // 只向右扩展到屏幕边界，空间不足时压缩浏览器而不是挤压对话区域。
                 const int room = available.right() - x() + 1 - width() - handle;
                 browserWidth = qBound(minBrowserWidth, browserWidth, qMax(minBrowserWidth, room));
             }
-            // 对话区域当前宽度：面板隐藏时它占满整个分栏。
-            // 启动恢复时优先用上次记住的宽度，让两栏都回到关闭前的样子。
-            const int chatWidth = (restoringLayout_ && chatPaneWidth_ > 0)
-                ? chatPaneWidth_ : qMax(1, sizes.value(0));
             browserPanel_->setVisible(true);
             if (restoringLayout_) {
                 // 窗口几何已经由 restoreGeometry 恢复过了，这里只摆好两栏，
@@ -683,22 +672,16 @@ void ChatWidget::initializeChatUi()
                 splitter->setSizes({chatWidth, browserWidth});
             }
             browserPaneWidth_ = browserWidth;
+            chatPaneWidth_ = chatWidth;
             if (settings_) {
                 settings_->setChatUseBrowser(true);
-                settings_->setChatBrowserPaneWidth(browserWidth);
-                if (chatWidth > 0) settings_->setChatPaneWidth(chatWidth);
             }
         } else {
             const int browserWidth = sizes.value(1);
             browserPanel_->setVisible(false);
             if (browserWidth > 0) {
-                browserPaneWidth_ = browserWidth;
                 if (!isMaximized()) {  // 收回浏览器占用的宽度，对话区域宽度保持不变
                     resize(qMax(minimumWidth(), width() - browserWidth - handle), height());
-                }
-                if (settings_) {
-                    settings_->setChatBrowserPaneWidth(browserWidth);
-                    if (sizes.value(0) > 0) settings_->setChatPaneWidth(sizes.value(0));
                 }
             }
             if (settings_) settings_->setChatUseBrowser(false);

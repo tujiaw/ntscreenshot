@@ -466,16 +466,18 @@ void AgentRunner::executeCurrentTool()
 
     const ToolCall call = pendingCalls_.at(pendingCallIndex_);
     QString result;
+    QString fullResult;
     if (!registry_ || !registry_->hasTool(call.name)) {
         result = QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: no matching tool in registry").arg(call.name);
+        fullResult = result;
     } else {
         toolAbort_ = QSharedPointer<LlmTools::ToolAbort>::create();
-        result = registry_->execute(call.name, call.arguments, toolAbort_.data());
+        result = registry_->execute(call.name, call.arguments, toolAbort_.data(), &fullResult);
         toolAbort_.reset();
     }
 
-    QMetaObject::invokeMethod(this, [this, call, result]() {
-        emit sigToolExecuted(call.name, result);
+    QMetaObject::invokeMethod(this, [this, call, fullResult]() {
+        emit sigToolExecuted(call.name, fullResult);
     });
 
     QJsonObject toolMsg;

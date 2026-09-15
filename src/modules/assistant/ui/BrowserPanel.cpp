@@ -58,9 +58,10 @@ bool browserIsDarkTheme()
     return QApplication::palette().color(QPalette::Window).lightness() < 128;
 }
 
-constexpr int kNavIconPx = 22;
-// header 内导航按钮与地址栏的统一高度。
-constexpr int kNavHeightPx = 32;
+constexpr int kNavIconPx = 18;
+constexpr int kNavButtonPx = 28;
+// 地址栏保留足够高度，避免全局输入框样式裁切文字。
+constexpr int kAddressHeightPx = 32;
 
 QString browserForegroundColor()
 {
@@ -244,7 +245,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
         b->setToolTip(tip);
         b->setIcon(browserNavIcon(iconFile));
         b->setIconSize(QSize(kNavIconPx, kNavIconPx));
-        b->setFixedSize(kNavHeightPx, kNavHeightPx);
+        b->setFixedSize(kNavButtonPx, kNavButtonPx);
         return b;
     };
     auto *collapse = navButton(QStringLiteral("collapse.png"), QStringLiteral("收起浏览器，恢复对话窗口宽度"));
@@ -254,7 +255,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
     auto *home = navButton(QStringLiteral("home.png"), QStringLiteral("回到主页"));
     address_ = new QLineEdit(this);
     address_->setPlaceholderText(QStringLiteral("输入网址"));
-    address_->setFixedHeight(kNavHeightPx);
+    address_->setFixedHeight(kAddressHeightPx);
     // 全局 QLineEdit 样式带 4px 上下内边距 + 1px 边框，配上 28px 的固定高度会把
     // 文字裁掉一半；这里收紧内边距，让 32px 里的可用高度足够放下 14px 的字。
     address_->setStyleSheet(QStringLiteral("QLineEdit{padding:2px 10px;}"));

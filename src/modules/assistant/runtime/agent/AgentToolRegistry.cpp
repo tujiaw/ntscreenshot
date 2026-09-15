@@ -47,22 +47,26 @@ QJsonArray ToolRegistry::definitions() const
 }
 
 QString ToolRegistry::execute(const QString &name, const QString &argumentsJson,
-                              LlmTools::ToolAbort *abort) const
+                              LlmTools::ToolAbort *abort, QString *fullResult) const
 {
+    const auto finish = [fullResult](const QString &text) {
+        if (fullResult) *fullResult = text;
+        return LlmTools::truncateText(text, LlmTools::kToolOutputMaxChars);
+    };
     auto it = tools_.constFind(name);
     if (it == tools_.constEnd() || !it.value()) {
-        return QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: unregistered tool").arg(name);
+        return finish(QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: unregistered tool").arg(name));
     }
 
     QString errorText;
     const QJsonObject arguments = LlmTools::parseArgumentsJson(argumentsJson, &errorText);
     if (!errorText.isEmpty()) {
-        return QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: %2").arg(name, errorText);
+        return finish(QStringLiteral("# Tool Error\n\n- Tool: `%1`\n- Error: %2").arg(name, errorText));
     }
 
     // Keep the executing tool alive if the UI replaces the registry after Stop.
     const auto tool = it.value();
-    return LlmTools::truncateText(tool->execute(arguments, abort), LlmTools::kToolOutputMaxChars);
+    return finish(tool->execute(arguments, abort));
 }
 
 } // namespace Agent

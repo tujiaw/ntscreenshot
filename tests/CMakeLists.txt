@@ -87,6 +87,21 @@ if(MSVC)
 endif()
 
 nt_add_qt_test(conversation_history_contract assistant_history_tests)
+
+add_executable(assistant_tool_result_tests
+    assistant/ToolResultCacheTest.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/agent/AgentToolRegistry.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/LlmTool.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/LlmToolUtils.cpp
+    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp
+)
+target_include_directories(assistant_tool_result_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(assistant_tool_result_tests PRIVATE Qt6::Core)
+if(MSVC)
+    target_compile_options(assistant_tool_result_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(tool_result_full_text_contract assistant_tool_result_tests)
+
 nt_add_qt_test(ui_theme_contract ui_theme_tests)
 nt_add_qt_test(modern_style_contract modern_style_tests)
 set_tests_properties(modern_style_contract PROPERTIES
