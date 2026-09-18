@@ -19,6 +19,7 @@ public:
     ~BrowserPanel() override;
     QString execute(const QJsonObject &args, LlmTools::ToolAbort *abort);
     void cancel();
+    void clearSnapshotCache();
     void takeOver(const QString &reason);
     void resume();
 signals:

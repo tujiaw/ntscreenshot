@@ -284,7 +284,7 @@ QToolButton#chatInputToggleButton:pressed {
 QToolButton#chatInputToggleButton:checked {
     background: rgba(37, 99, 235, 0.12);
 }
-QToolButton#chatInputToggleButton:disabled {
+QToolButton#chatInputToggleButton:disabled:!checked {
     background: transparent;
 }
 QPushButton#chatInputSendButton {

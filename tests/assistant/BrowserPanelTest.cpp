@@ -36,6 +36,11 @@ int main(int argc, char **argv)
                     body = "<html><body>LOGIN_SECRET<input type=password value=NEVER_EXPOSE><button onclick=\"document.cookie='session=ok; path=/';location.href='/account'\">Sign in</button></body></html>";
                 else if (request.contains("GET /account "))
                     body = request.contains("session=ok") ? "<html><body>ACCOUNT_READY<a href='/'>Home</a></body></html>" : "<html><body>NO_SESSION</body></html>";
+                else if (request.contains("GET /long ")) {
+                    body = "<html><body><p id=long>" + QByteArray(14000,'x') + "</p><p>NEEDLE_TARGET</p>";
+                    for (int i=0;i<45;++i) body += "<button>Item " + QByteArray::number(i) + "</button>";
+                    body += "</body></html>";
+                }
                 else
                     body = "<html><title>Browser use test</title><body><h1>Browser workspace</h1><input id=name placeholder=Name>"
                         "<button onclick=\"document.getElementById('result').innerText='Hello '+document.getElementById('name').value\">Apply</button>"
@@ -68,7 +73,8 @@ int main(int argc, char **argv)
     const QString oldSnapshot = snapshot.value("snapshot").toString();
     snapshot = read({{"action","click"},{"snapshot",oldSnapshot},{"element",2}});
     check(snapshot.value("content").toString().contains("Hello Ada"),"fill and click did not update page");
-    check(read({{"action","click"},{"snapshot",oldSnapshot},{"element",2}}).contains("error"),"stale snapshot accepted");
+    snapshot = read({{"action","click"},{"snapshot",oldSnapshot},{"element",2}});
+    check(snapshot.contains("error") && snapshot.contains("snapshot") && !snapshot.value("actionExecuted").toBool(),"stale snapshot must include recovery snapshot without acting");
     snapshot = read({{"action","select"},{"snapshot",snapshot.value("snapshot")},{"element",3},{"text","b"}});
     check(snapshot.contains("snapshot"),"select failed");
     auto *view = panel->findChild<QWebEngineView *>();
@@ -77,6 +83,43 @@ int main(int argc, char **argv)
     QEventLoop selectedLoop;
     view->page()->runJavaScript("document.querySelector('select').value",[&](const QVariant &v){ selected = v.toString() == "b"; selectedLoop.quit(); });
     selectedLoop.exec(); check(selected,"select value not applied");
+    auto js = [&](const QString &source) {
+        QEventLoop loop;
+        view->page()->runJavaScript(source,[&](const QVariant &){loop.quit();});
+        loop.exec();
+    };
+    js("document.getElementById('result').textContent='Unrelated update'");
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",2}});
+    check(!snapshot.contains("error"),"unrelated DOM update invalidated target");
+    js("document.querySelector('button').textContent='Delete everything'");
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",2}});
+    check(snapshot.value("code") == "target_changed" && snapshot.contains("snapshot"),"changed target meaning was not rejected with recovery snapshot");
+    js("document.querySelector('button').outerHTML='<button>Replacement</button>'");
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",2}});
+    check(snapshot.value("code") == "target_unavailable","replaced target was accepted");
+
+    snapshot = read({{"action","open"},{"url",base+"/long"}});
+    check(snapshot.value("content").toString().size() <= 2500,"summary exceeds budget");
+    snapshot = read({{"action","read"},{"mode","full"}});
+    check(snapshot.value("content").toString().size() == 6000 && snapshot.value("nextOffset").toInt() == 6000,"full text pagination failed");
+    check(snapshot.value("elements").toArray().size() == 30 && snapshot.value("nextElementOffset").toInt() == 30,"element page limit failed");
+    const QString fullContent = snapshot.value("content").toString();
+    snapshot = read({{"action","read"},{"mode","full"},{"since",snapshot.value("snapshot")}});
+    check(snapshot.value("contentUnchanged").toBool() && !snapshot.contains("content"),"unchanged text was resent");
+    js("document.getElementById('long').firstChild.replaceData(10,1,'CHANGED')");
+    snapshot = read({{"action","read"},{"mode","full"},{"since",snapshot.value("snapshot")}});
+    const QJsonObject patch = snapshot.value("contentPatch").toObject();
+    QString patched = fullContent;
+    patched.replace(patch.value("start").toInt(),patch.value("deleteCount").toInt(),patch.value("text").toString());
+    const auto fresh = read({{"action","read"},{"mode","full"}});
+    check(!patch.isEmpty() && patched == fresh.value("content").toString(),"incremental patch cannot reconstruct content");
+    snapshot = read({{"action","read"},{"mode","full"},{"offset",6000},{"elementOffset",30}});
+    check(snapshot.value("elements").toArray().size() == 15 && snapshot.value("nextElementOffset").isNull(),"remaining elements are inaccessible");
+    snapshot = read({{"action","read"},{"mode","focused"},{"query","NEEDLE_TARGET"}});
+    check(snapshot.value("content").toString() == "NEEDLE_TARGET","focused read returned unrelated text");
+    panel->clearSnapshotCache();
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",1}});
+    check(snapshot.value("code") == "stale_snapshot" && snapshot.contains("snapshot"),"clearing conversation did not invalidate browser cache");
 
     // 认证页应自动暂停并把控制权交给用户，用户完成登录后无需任何按钮，AI 自动继续。
     int attention = 0;

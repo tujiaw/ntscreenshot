@@ -165,13 +165,101 @@ const char script[] = R"JS(
  if (ntNeedsUser())
    return JSON.stringify({needsUser:true});
  let state = globalThis.__ntBrowserState;
+ const label = e => (e.getAttribute('aria-label') || (e.labels && Array.from(e.labels).map(l=>l.innerText).join(' ')) || e.innerText || e.placeholder || e.name || '').trim();
+ const fingerprint = e => JSON.stringify([e.tagName,e.type,e.id,e.name,e.getAttribute('href'),
+   label(e),e.getAttribute('role'),e.getAttribute('aria-disabled'),e.readOnly,e.value,e.getAttribute('onclick'),
+   e.form && e.form.action,e.closest('article,li,tr,[role=row]')?.innerText,
+   e instanceof HTMLSelectElement ? Array.from(e.options).map(o=>[o.value,o.text,o.disabled]) : null]);
+ const inViewport = e => {
+   const r = e.getBoundingClientRect();
+   return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+ };
+ // Cache only page text; mutations invalidate this cache, not unrelated element handles.
+ let cache = globalThis.__ntBrowserTextCache;
+ if (!cache || cache.url !== location.href) {
+   if (cache) cache.observer.disconnect();
+   cache = {url:location.href,dirty:true};
+   cache.observer = new MutationObserver(()=>{cache.dirty=true;});
+   cache.observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});
+   globalThis.__ntBrowserTextCache = cache;
+ }
+ const snapshot = (error, code) => {
+   const mode = error ? 'summary' : (args.mode || 'summary');
+   if (!['summary','focused','full'].includes(mode)) return JSON.stringify({error:'不支持的读取模式',code:'invalid_mode'});
+   const query = String(args.query || '').trim().toLowerCase();
+   if (mode === 'focused' && !query) return JSON.stringify({error:'focused 模式需要 query',code:'invalid_query'});
+   const offset = Number.isInteger(args.offset) && args.offset >= 0 && !error ? args.offset : 0;
+   const root = document.body || document.documentElement;
+   if (cache.width !== innerWidth || cache.height !== innerHeight) cache.dirty = true;
+   if (cache.dirty) {
+     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+     const chunks = []; let length = 0;
+     while (walker.nextNode() && length < 200000) {
+       const node = walker.currentNode, parent = node.parentElement;
+       if (!parent || parent.closest('script,style,noscript,input,textarea,[contenteditable]') || !ntVisible(parent)) continue;
+       const value = node.textContent.trim();
+       if (value) { const text = value.slice(0,200000-length); chunks.push({text,parent}); length += text.length + 1; }
+     }
+     cache.chunks = chunks;
+     cache.truncated = length >= 200000;
+     cache.width = innerWidth; cache.height = innerHeight;
+     cache.dirty = false;
+   }
+   const chunks = cache.chunks.filter(c => mode === 'full' ||
+     (mode === 'focused' ? c.text.toLowerCase().includes(query) : inViewport(c.parent)));
+   const text = chunks.map(c=> {
+     if (mode !== 'focused') return c.text;
+     const match = c.text.toLowerCase().indexOf(query);
+     return c.text.slice(Math.max(0,match-240),match+query.length+600);
+   }).join('\n');
+   const content = text.slice(offset, offset + (mode === 'summary' ? 2500 : 6000));
+   const candidates = Array.from(root.querySelectorAll('a[href],button,input,textarea,select,[role=button]'))
+     .filter(e=>ntVisible(e) && (mode === 'full' || (mode === 'focused' ? label(e).toLowerCase().includes(query) : inViewport(e))));
+   const elementOffset = Number.isInteger(args.elementOffset) && args.elementOffset >= 0 && !error ? args.elementOffset : 0;
+   const elements = candidates.slice(elementOffset,elementOffset+30);
+   const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+   const result = {snapshot:id,url:location.href.slice(0,2048),urlTruncated:location.href.length>2048,title:document.title.slice(0,200),mode,content,
+     contentLength:text.length,sourceTruncated:cache.truncated,
+     nextOffset:offset + content.length < text.length ? offset + content.length : null,
+     elements:elements.map((e,i)=>({element:i+1,tag:e.tagName.toLowerCase(),type:e.type || '',
+       label:label(e).slice(0,100),disabled:!!(e.disabled || e.getAttribute('aria-disabled') === 'true'),
+       options:e instanceof HTMLSelectElement ? Array.from(e.options).slice(0,40).map(o=>({text:o.text.slice(0,60),value:o.value})) : undefined}))};
+   if (error) { result.error=error; result.code=code; result.actionExecuted=false; }
+   for (const row of result.elements) {
+     if (row.options) {
+       const total = elements[row.element-1].options.length;
+       while (row.options.length && JSON.stringify(row).length > 2000) row.options.pop();
+       row.optionsOmitted = total - row.options.length;
+     }
+   }
+   // Keep JSON below the shared tool-output limit, including large select option lists.
+   while (result.elements.length && JSON.stringify(result).length > 17000) { result.elements.pop(); elements.pop(); }
+   result.elementsOmitted = candidates.length - elements.length;
+   result.nextElementOffset = elementOffset + elements.length < candidates.length ? elementOffset + elements.length : null;
+   const viewKey = JSON.stringify([mode,mode === 'focused' ? query : '',offset]);
+   if (!error && args.since && state && args.since === state.id && state.url === location.href && state.viewKey === viewKey) {
+     if (state.content === content) { delete result.content; result.contentUnchanged=true; result.baseSnapshot=state.id; }
+     else {
+       let start=0, end=0;
+       while (start < state.content.length && start < content.length && state.content[start] === content[start]) ++start;
+       while (end < state.content.length-start && end < content.length-start && state.content[state.content.length-1-end] === content[content.length-1-end]) ++end;
+       const patch = {start,deleteCount:state.content.length-start-end,text:content.slice(start,content.length-end)};
+       if (JSON.stringify(patch).length + 100 < content.length) { delete result.content; result.contentPatch=patch; result.baseSnapshot=state.id; }
+     }
+   }
+   state = {id,url:location.href,elements,fingerprints:elements.map(fingerprint),usable:true,content,viewKey};
+   globalThis.__ntBrowserState = state;
+   return JSON.stringify(result);
+ };
  if (['click','fill','select'].includes(args.action)) {
-   if (!state || args.snapshot !== state.id || state.url !== location.href || state.dirty)
-     return JSON.stringify({error:'页面已变化，请重新 read 获取元素编号'});
+   if (!state || !state.usable || args.snapshot !== state.id || state.url !== location.href)
+     return snapshot('元素快照已失效，已附最新快照；请使用新编号决定下一步','stale_snapshot');
    const e = state.elements[args.element - 1];
-   if (!e || !e.isConnected || !ntVisible(e) || e.disabled)
-     return JSON.stringify({error:'元素不可操作，请重新 read'});
+   if (!Number.isInteger(args.element) || !e || !e.isConnected || !ntVisible(e) || e.disabled || e.closest('[inert]') || e.getAttribute('aria-disabled') === 'true')
+     return snapshot('目标元素已不可操作，已附最新快照','target_unavailable');
    if (ntSensitive(e) || e.matches('input[type=file]')) return JSON.stringify({needsUser:true});
+   if (fingerprint(e) !== state.fingerprints[args.element - 1])
+     return snapshot('目标元素含义已变化，已附最新快照；尚未执行操作','target_changed');
    if (args.action === 'click') { e.click(); }
    else if (args.action === 'select') {
      if (!(e instanceof HTMLSelectElement) || !Array.from(e.options).some(o => o.value === args.text))
@@ -186,32 +274,15 @@ const char script[] = R"JS(
      Object.getOwnPropertyDescriptor(proto,'value').set.call(e, args.text || '');
      e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));
    }
-   if (state.observer) state.observer.disconnect();
-   globalThis.__ntBrowserState = null;
+   state.usable = false;
+   cache.dirty = true;
    return JSON.stringify({acted:true});
  }
  if (args.action === 'scroll') {
    window.scrollBy(0,(args.text === 'up' ? -1 : 1)*innerHeight*0.8);
    return JSON.stringify({acted:true});
  }
- const elements = Array.from(document.querySelectorAll('a[href],button,input,textarea,select,[role=button]')).filter(ntVisible).slice(0,160);
- const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
- if (state && state.observer) state.observer.disconnect();
- state = {id,elements,url:location.href,dirty:false};
- state.observer = new MutationObserver(() => {state.dirty = true;});
- state.observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});
- globalThis.__ntBrowserState = state;
- const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
- const text = []; let length = 0;
- while (walker.nextNode() && length < 18000) {
-   const node = walker.currentNode, parent = node.parentElement;
-   if (!parent || parent.closest('script,style,noscript,input,textarea,[contenteditable]') || !ntVisible(parent)) continue;
-   const value = node.textContent.trim(); if (value) { text.push(value); length += value.length + 1; }
- }
- return JSON.stringify({snapshot:id,url:location.href,title:document.title,content:text.join('\n').slice(0,18000),
-   elements:elements.map((e,i)=>({element:i+1,tag:e.tagName.toLowerCase(),type:e.type || '',
-     label:(e.innerText || e.getAttribute('aria-label') || e.placeholder || e.name || '').slice(0,180),
-     options:e instanceof HTMLSelectElement ? Array.from(e.options).slice(0,40).map(o=>({text:o.text,value:o.value})) : undefined}))});
+ return snapshot();
 })()
 )JS";
 }
@@ -467,7 +538,7 @@ void BrowserPanel::observe()
         if (object.value("needsUser").toBool()) {
             takeOver(QStringLiteral("检测到密码、验证码或认证页面，请你在右侧完成；完成后 AI 会自动继续。"));
         } else if (object.value("acted").toBool()) {
-            request_->args = QJsonObject{{"action","read"}};
+            request_->args = QJsonObject{{"action","read"},{"since",request_->args.value("snapshot")}};
             settled_.start(); settleMs_ = 350;
         } else if (!object.isEmpty()) {
             finish(result);
@@ -523,6 +594,14 @@ void BrowserPanel::cancel()
     view_->stop();
     // 取消后不再挂起，否则用户的下一条指令会被卡在“等待接管”上。
     manual_ = false;
+}
+
+void BrowserPanel::clearSnapshotCache()
+{
+    view_->page()->runJavaScript(QStringLiteral(
+        "if(globalThis.__ntBrowserTextCache) globalThis.__ntBrowserTextCache.observer.disconnect();"
+        "delete globalThis.__ntBrowserTextCache; delete globalThis.__ntBrowserState;"),
+        QWebEngineScript::ApplicationWorld);
 }
 
 // notifyUser 用于失败、超时等终态：面板底部已经没有状态栏，这些结果改成发一条

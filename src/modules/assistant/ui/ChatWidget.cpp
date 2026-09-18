@@ -309,6 +309,7 @@ void ChatWidget::onClearHistoryRequested()
     if (agent_) {
         agent_->resetConversation();
     }
+    if (browserPanel_) browserPanel_->clearSnapshotCache();
 
     messages_.clear();
     messageQueue_.clear();

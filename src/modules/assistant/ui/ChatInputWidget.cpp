@@ -101,7 +101,13 @@ QIcon chatToggleIcon(const QString &name, bool enabled)
     painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
     painter.fillRect(pixmap.rect(), enabled ? tokens.accent : tokens.textSecondary);
     painter.end();
-    return QIcon(pixmap);
+    QIcon icon(pixmap);
+    if (enabled) {
+        // 生成期间开关禁用，但仍须显示当前模式，避免 Qt 自动生成灰色图标。
+        icon.addPixmap(pixmap, QIcon::Disabled, QIcon::On);
+        icon.addPixmap(pixmap, QIcon::Disabled, QIcon::Off);
+    }
+    return icon;
 }
 
 } // namespace
