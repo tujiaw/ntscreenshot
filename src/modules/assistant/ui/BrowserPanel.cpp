@@ -165,7 +165,43 @@ const char script[] = R"JS(
  const args = %2;
 %1
  let state = globalThis.__ntBrowserState;
- const label = e => (e.getAttribute('aria-label') || (e.labels && Array.from(e.labels).map(l=>l.innerText).join(' ')) || e.innerText || e.placeholder || e.name || '').trim();
+ const label = e => (e.getAttribute('aria-label') || (e.labels && Array.from(e.labels).map(l=>l.innerText).join(' ')) || e.innerText || e.placeholder || e.name || e.title || '').trim();
+ const normalize = value => String(value || '').toLowerCase().replace(/\s+/g,' ').trim();
+ const interactiveSelector = 'a[href],button,input,textarea,select,[role=button],[role=link],[role=checkbox],[role=tab],[contenteditable=true]';
+ const interactiveElements = () => {
+   const result = [], seen = new Set();
+   const visit = rootNode => {
+     if (!rootNode || !rootNode.querySelectorAll) return;
+     rootNode.querySelectorAll(interactiveSelector).forEach(e => {
+       if (!seen.has(e)) { seen.add(e); result.push(e); }
+     });
+     rootNode.querySelectorAll('*').forEach(e => {
+       if (e.shadowRoot) visit(e.shadowRoot);
+     });
+   };
+   visit(document);
+   return result;
+ };
+ const resolveTarget = target => {
+   const wanted = normalize(target);
+   if (!wanted) return {element:null,ambiguous:false};
+   const candidates = interactiveElements().filter(e => ntVisible(e) && !e.disabled && e.getAttribute('aria-disabled') !== 'true');
+   const score = e => {
+     const values = [e.getAttribute('aria-label'), e.id, e.name, e.placeholder, e.title,
+       e.getAttribute('data-testid'), e.innerText, e.value].map(normalize).filter(Boolean);
+     let best = 0;
+     values.forEach(value => {
+       if (value === wanted) best = Math.max(best, 100);
+       else if (value.startsWith(wanted)) best = Math.max(best, 70);
+       else if (value.includes(wanted)) best = Math.max(best, 45);
+     });
+     return best;
+   };
+   const ranked = candidates.map(element => ({element,score:score(element)})).filter(row => row.score > 0)
+     .sort((a,b) => b.score - a.score);
+   if (!ranked.length) return {element:null,ambiguous:false};
+   return {element:ranked[0].element,ambiguous:ranked.length > 1 && ranked[0].score === ranked[1].score};
+ };
  const fingerprint = e => JSON.stringify([e.tagName,e.type,e.id,e.name,e.getAttribute('href'),
    label(e),e.getAttribute('role'),e.getAttribute('aria-disabled'),e.readOnly,ntSensitive(e) ? null : e.value,e.getAttribute('onclick'),
    e.form && e.form.action,e.closest('article,li,tr,[role=row]')?.innerText,
@@ -213,7 +249,7 @@ const char script[] = R"JS(
      return c.text.slice(Math.max(0,match-240),match+query.length+600);
    }).join('\n');
    const content = text.slice(offset, offset + (mode === 'summary' ? 2500 : 6000));
-   const candidates = Array.from(root.querySelectorAll('a[href],button,input,textarea,select,[role=button]'))
+   const candidates = interactiveElements()
      .filter(e=>ntVisible(e) && (mode === 'full' || (mode === 'focused' ? label(e).toLowerCase().includes(query) : inViewport(e))));
    const elementOffset = Number.isInteger(args.elementOffset) && args.elementOffset >= 0 && !error ? args.elementOffset : 0;
    const elements = candidates.slice(elementOffset,elementOffset+30);
@@ -251,14 +287,21 @@ const char script[] = R"JS(
    globalThis.__ntBrowserState = state;
    return JSON.stringify(result);
  };
+ if (args.action === 'wait_for') {
+   const match = resolveTarget(args.target || args.query || '');
+   return JSON.stringify({waitFor:true,found:!!match.element,ambiguous:match.ambiguous,target:String(args.target || args.query || '')});
+ }
  if (['click','fill','select'].includes(args.action)) {
-   if (!state || !state.usable || args.snapshot !== state.id || state.url !== location.href)
+   const semantic = String(args.target || '').trim();
+   if (!semantic && (!state || !state.usable || args.snapshot !== state.id || state.url !== location.href))
      return snapshot('元素快照已失效，已附最新快照；请使用新编号决定下一步','stale_snapshot');
-   const e = state.elements[args.element - 1];
-   if (!Number.isInteger(args.element) || !e || !e.isConnected || !ntVisible(e) || e.disabled || e.closest('[inert]') || e.getAttribute('aria-disabled') === 'true')
+   const resolved = semantic ? resolveTarget(semantic) : {element:state.elements[args.element - 1],ambiguous:false};
+   const e = resolved.element;
+   if (resolved.ambiguous) return JSON.stringify({error:'目标匹配到多个元素，请提供更具体的 target 或使用 element 编号',code:'target_ambiguous'});
+   if ((!semantic && !Number.isInteger(args.element)) || !e || !e.isConnected || !ntVisible(e) || e.disabled || e.closest('[inert]') || e.getAttribute('aria-disabled') === 'true')
      return snapshot('目标元素已不可操作，已附最新快照','target_unavailable');
    if (ntSensitive(e) || e.matches('input[type=file]')) return JSON.stringify({needsUser:true});
-   if (fingerprint(e) !== state.fingerprints[args.element - 1])
+   if (!semantic && fingerprint(e) !== state.fingerprints[args.element - 1])
      return snapshot('目标元素含义已变化，已附最新快照；尚未执行操作','target_changed');
    if (args.action === 'click') { e.click(); }
    else if (args.action === 'select') {
@@ -462,6 +505,7 @@ BrowserPanel::~BrowserPanel()
         QMutexLocker lock(&queuedRequestsMutex_);
         for (const auto &request : std::as_const(queuedRequests_)) {
             if (!request) continue;
+            request->cancelled = true;
             QMutexLocker requestLock(&request->mutex);
             request->result = QStringLiteral("浏览器已关闭");
             request->done = true;
@@ -482,15 +526,24 @@ QString BrowserPanel::execute(const QJsonObject &args, LlmTools::ToolAbort *abor
         queuedRequests_.append(request);
     }
     QMetaObject::invokeMethod(this,[this,args,request]{
-        {
-            QMutexLocker lock(&queuedRequestsMutex_);
-            queuedRequests_.removeOne(request);
-        }
         if (!request->cancelled) start(args,request);
+        // Keep the request queued until start() has installed request_. This
+        // closes the destruction race between dequeue and start.
+        QMutexLocker lock(&queuedRequestsMutex_);
+        queuedRequests_.removeOne(request);
     },Qt::QueuedConnection);
     QMutexLocker lock(&request->mutex);
     while (!request->done) {
-        if (abort && abort->isAborted()) { request->cancelled = true; return QStringLiteral("浏览器操作已取消"); }
+        if (abort && abort->isAborted()) {
+            request->cancelled = true;
+            // Wake the GUI-side state machine as well. Returning directly from
+            // the worker must not leave manual/authentication state attached
+            // to the next browser request.
+            QMetaObject::invokeMethod(this, [this, request] {
+                if (request_ == request) cancel();
+            }, Qt::QueuedConnection);
+            return QStringLiteral("浏览器操作已取消");
+        }
         request->ready.wait(&request->mutex,50);
     }
     return request->result;
@@ -504,7 +557,7 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
     request_->elapsed.start();
     emit activityRequested();
     const QString action = args.value("action").toString();
-    if (!QStringList{"open","read","click","fill","select","scroll","back","wait_user"}.contains(action)) {
+    if (!QStringList{"open","read","click","fill","select","scroll","back","wait_for","wait_user"}.contains(action)) {
         finish(QStringLiteral("不支持的浏览器操作")); return;
     }
     if (manual_) return;
@@ -591,6 +644,7 @@ void BrowserPanel::observe()
         if (generation != generation_) { request_->args = QJsonObject{{"action","read"}}; return; }
         const QString result = value.toString();
         auto object = QJsonDocument::fromJson(result.toUtf8()).object();
+        if (object.isEmpty()) qWarning() << "BrowserPanel: empty browser script result for action" << request->args.value("action").toString() << result;
         if (object.value("needsUser").toBool()) {
             if (authenticationWaitSkipped_) {
                 request_->authenticationStatus = QStringLiteral("skipped");
@@ -599,6 +653,23 @@ void BrowserPanel::observe()
                 settleMs_ = 0;
             } else {
                 takeOver(QStringLiteral("当前操作涉及认证或需要本人填写的字段，请在右侧处理。"));
+            }
+        } else if (object.value("waitFor").toBool()) {
+            const int timeoutMs = qBound(250, request_->args.value("timeoutMs").toInt(10000), 30000);
+            if (object.value("found").toBool()) {
+                request_->args = QJsonObject{{"action", "read"}, {"mode", "summary"}};
+                settled_.start();
+                settleMs_ = 0;
+            } else if (request->elapsed.elapsed() >= timeoutMs) {
+                finish(QString::fromUtf8(QJsonDocument(QJsonObject{
+                    {QStringLiteral("error"), QStringLiteral("等待目标超时")},
+                    {QStringLiteral("code"), QStringLiteral("wait_timeout")},
+                    {QStringLiteral("target"), object.value("target")}
+                }).toJson(QJsonDocument::Compact)));
+            } else {
+                // 保持同一个 wait_for 请求，定时器会在短间隔后重新检查 DOM。
+                settled_.start();
+                settleMs_ = 250;
             }
         } else if (object.value("acted").toBool()) {
             request_->args = QJsonObject{{"action","read"},{"since",request_->args.value("snapshot")}};

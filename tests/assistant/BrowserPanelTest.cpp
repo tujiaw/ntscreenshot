@@ -64,7 +64,10 @@ int main(int argc, char **argv)
         LlmTools::ToolAbort abort;
         QString output;
         QEventLoop loop;
-        auto *worker = QThread::create([&]{ output = panel->execute(args,&abort); });
+        // Capture the panel instance, not the mutable outer pointer: the close
+        // contract deliberately sets panel=nullptr while this worker is waiting.
+        BrowserPanel *targetPanel = panel;
+        auto *worker = QThread::create([targetPanel, &output, &args, &abort]{ output = targetPanel->execute(args,&abort); });
         QObject::connect(worker,&QThread::finished,&loop,&QEventLoop::quit);
         if (cancel) QTimer::singleShot(350,&loop,[&]{abort.abort();});
         worker->start(); loop.exec(); worker->wait(); delete worker;
@@ -74,6 +77,12 @@ int main(int argc, char **argv)
     auto snapshot = read({{"action","open"},{"url",base}});
     check(snapshot.value("content").toString().contains("DYNAMIC_READY"),QString::fromUtf8(QJsonDocument(snapshot).toJson()));
     check(snapshot.value("elements").toArray().size() == 4,"elements extracted");
+    snapshot = read({{"action","wait_for"},{"target","Apply"},{"timeoutMs",2000}});
+    check(snapshot.contains("snapshot") && snapshot.value("content").toString().contains("DYNAMIC_READY"),"semantic wait_for did not return a snapshot");
+    snapshot = read({{"action","fill"},{"target","Name"},{"text","Ada"}});
+    snapshot = read({{"action","click"},{"target","Apply"}});
+    check(snapshot.value("content").toString().contains("Hello Ada"),"semantic target fill/click did not update page");
+    snapshot = read({{"action","open"},{"url",base}});
     snapshot = read({{"action","fill"},{"snapshot",snapshot.value("snapshot")},{"element",1},{"text","Ada"}});
     const QString oldSnapshot = snapshot.value("snapshot").toString();
     snapshot = read({{"action","click"},{"snapshot",oldSnapshot},{"element",2}});
@@ -184,7 +193,8 @@ int main(int argc, char **argv)
     if (app.arguments().contains("--capture")) panel->grab().save("browser-panel.png");
     // Destruction wakes a waiting worker and destroys page before profile.
     QTimer::singleShot(350,&app,[&]{ delete panel; panel = nullptr; });
-    check(run({{"action","wait_user"},{"reason","Close test"}}).contains(QStringLiteral("关闭")),"close did not wake waiting worker");
+    const QString closeResult = run({{"action","wait_user"},{"reason","Close test"}});
+    check(closeResult.contains(QStringLiteral("关闭")), QStringLiteral("close did not wake waiting worker: %1").arg(closeResult));
     panel = new BrowserPanel;
     check(run({{"action","open"},{"url",base+"/account"}}).contains("NO_SESSION"),"cookies leaked into another conversation");
     delete panel;
