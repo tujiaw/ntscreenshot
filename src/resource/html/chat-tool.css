@@ -174,8 +174,12 @@
 .chat-tool-card-full-result {
   display: inline-block;
   margin: 6px 10px 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--link);
-  cursor: help;
+  cursor: pointer;
+  font: inherit;
 }
 
 .chat-tool-card-full-result:focus-visible {
@@ -183,27 +187,25 @@
   outline-offset: 2px;
 }
 
-.chat-tool-result-tooltip {
-  position: fixed;
-  z-index: 1000;
-  width: min(560px, calc(100vw - 16px));
+.chat-tool-card-full-result-panel {
+  margin: 0;
   max-height: min(60vh, 460px);
   overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--code-bg);
-  color: var(--text);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--line);
+  font: inherit;
   font-size: 11px;
   line-height: 1.5;
-}
-
-.chat-tool-result-tooltip pre {
-  margin: 0;
-  font: inherit;
   white-space: pre-wrap;
   word-break: break-word;
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat-tool-card-full-result-panel {
+    background: rgba(0, 0, 0, 0.2);
+  }
 }
 
 .chat-tool-card-divider {

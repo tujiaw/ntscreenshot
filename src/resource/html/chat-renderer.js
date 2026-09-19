@@ -621,42 +621,8 @@
   const TOOL_SUMMARY_LINE_MAX = 96;
   const toolResultCache = new Map();
   let nextToolResultId = 0;
-  let toolResultTooltip = null;
-
-  function hideToolResultTooltip() {
-    if (toolResultTooltip) {
-      toolResultTooltip.remove();
-      toolResultTooltip = null;
-    }
-  }
-
-  function showToolResultTooltip(trigger, id) {
-    const result = toolResultCache.get(id);
-    if (result === undefined) {
-      return;
-    }
-    hideToolResultTooltip();
-    const tip = document.createElement('div');
-    tip.className = 'chat-tool-result-tooltip';
-    tip.setAttribute('role', 'tooltip');
-    const content = document.createElement('pre');
-    content.textContent = result;
-    tip.appendChild(content);
-    tip.addEventListener('mouseleave', function (e) {
-      if (e.relatedTarget !== trigger) hideToolResultTooltip();
-    });
-    document.body.appendChild(tip);
-    toolResultTooltip = tip;
-    const rect = trigger.getBoundingClientRect();
-    tip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - tip.offsetWidth - 8)) + 'px';
-    const below = window.innerHeight - rect.bottom;
-    tip.style.top = (below >= Math.min(tip.offsetHeight, 160)
-      ? Math.min(rect.bottom, window.innerHeight - tip.offsetHeight - 8)
-      : Math.max(8, rect.top - tip.offsetHeight)) + 'px';
-  }
 
   function clearToolResultCache() {
-    hideToolResultTooltip();
     toolResultCache.clear();
     nextToolResultId = 0;
   }
@@ -857,21 +823,26 @@
 
       const resultId = String(++nextToolResultId);
       toolResultCache.set(resultId, resultRaw);
-      const detail = document.createElement('span');
+      const detail = document.createElement('button');
+      detail.type = 'button';
       detail.className = 'chat-tool-card-full-result';
-      detail.textContent = '详细结果 · 悬停查看全文';
-      detail.setAttribute('tabindex', '0');
-      detail.addEventListener('mouseenter', function () {
-        showToolResultTooltip(detail, resultId);
+      detail.textContent = '查看全文';
+      detail.setAttribute('aria-expanded', 'false');
+
+      const fullResult = document.createElement('pre');
+      fullResult.className = 'chat-tool-card-full-result-panel';
+      fullResult.hidden = true;
+      fullResult.textContent = toolResultCache.get(resultId) || '';
+
+      detail.addEventListener('click', function (e) {
+        e.preventDefault();
+        const open = !fullResult.hidden;
+        fullResult.hidden = open;
+        detail.setAttribute('aria-expanded', open ? 'false' : 'true');
+        detail.textContent = open ? '查看全文' : '收起全文';
       });
-      detail.addEventListener('focus', function () {
-        showToolResultTooltip(detail, resultId);
-      });
-      detail.addEventListener('mouseleave', function (e) {
-        if (e.relatedTarget !== toolResultTooltip && !detail.matches(':focus')) hideToolResultTooltip();
-      });
-      detail.addEventListener('blur', hideToolResultTooltip);
       details.appendChild(detail);
+      details.appendChild(fullResult);
 
       scrollPageToBottom();
     }
