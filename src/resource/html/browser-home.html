@@ -1,330 +1,168 @@
 <!DOCTYPE html>
-<!--
-  下面的 data-nt-theme="light" 只是默认值，运行时由 BrowserPanel::installHomeThemeScript()
-  注入的脚本按当前应用主题改写成 dark / light。
-  WebEngine 的 prefers-color-scheme 跟的是系统设置而不是应用主题，两者经常不一致，
-  所以这里不用媒体查询，直接由应用把主题写进文档，避免深色应用里闪出一张白页。
-  这段脚本必须在 DocumentReady 注入：文档创建时 <html> 尚未解析出来，那时设的属性会被丢掉。
--->
+<!-- 主题由 BrowserPanel::installHomeThemeScript() 在运行时同步。 -->
 <html lang="zh-CN" data-nt-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>浏览器操作</title>
+  <title>浏览器主页</title>
   <style>
     :root,
     html[data-nt-theme="light"] {
       color-scheme: light;
       --canvas: #ffffff;
       --surface: #f7f8fa;
-      --surface-raised: #ffffff;
-      --border: rgba(15, 23, 42, 0.10);
-      --border-strong: rgba(15, 23, 42, 0.16);
+      --border: rgba(15, 23, 42, 0.14);
+      --border-focus: #3b82f6;
       --text: #111827;
       --text-secondary: #6b7280;
-      --accent: #3b82f6;
-      --accent-subtle: rgba(59, 130, 246, 0.10);
-      --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-subtle: rgba(37, 99, 235, 0.10);
+      --focus-ring: rgba(37, 99, 235, 0.18);
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
     }
 
     html[data-nt-theme="dark"] {
       color-scheme: dark;
       --canvas: #0f1115;
       --surface: #161a20;
-      --surface-raised: #1c2128;
-      --border: rgba(255, 255, 255, 0.09);
-      --border-strong: rgba(255, 255, 255, 0.16);
+      --border: rgba(255, 255, 255, 0.14);
+      --border-focus: #6ea0f8;
       --text: #e6edf3;
       --text-secondary: #8b949e;
       --accent: #5b94f8;
+      --accent-hover: #78a8fb;
       --accent-subtle: rgba(91, 148, 248, 0.14);
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
+      --focus-ring: rgba(91, 148, 248, 0.22);
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.30);
     }
 
     * { box-sizing: border-box; }
 
     body {
+      min-height: 100vh;
       margin: 0;
-      padding: 40px 24px 56px;
+      display: grid;
+      place-items: center;
+      padding: 32px 24px;
       background: var(--canvas);
       color: var(--text);
       font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
-      font-size: 14px;
-      line-height: 1.7;
       -webkit-font-smoothing: antialiased;
     }
 
-    .page {
-      max-width: 720px;
-      margin: 0 auto;
-    }
-
-    /* === 头部 === */
-    header {
+    main {
+      width: min(100%, 620px);
+      margin-top: -8vh;
       text-align: center;
-      margin-bottom: 36px;
     }
 
-    .globe {
-      width: 56px;
-      height: 56px;
-      margin: 0 auto 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 16px;
+    .mark {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
       background: var(--accent-subtle);
       color: var(--accent);
     }
 
-    .globe svg { width: 32px; height: 32px; }
+    .mark svg { width: 26px; height: 26px; }
 
     h1 {
-      margin: 0 0 10px;
+      margin: 0;
       font-size: 24px;
-      font-weight: 600;
+      line-height: 1.35;
+      font-weight: 650;
       letter-spacing: 0.2px;
     }
 
-    .lede {
-      margin: 0 auto;
-      max-width: 520px;
+    .hint {
+      margin: 8px 0 24px;
       color: var(--text-secondary);
       font-size: 14px;
+      line-height: 1.6;
     }
 
-    /* === 通用小节 === */
-    section { margin-top: 32px; }
-
-    h2 {
-      margin: 0 0 14px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--text-secondary);
-    }
-
-    /* === 能力卡片 === */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 12px;
-    }
-
-    .card {
-      padding: 16px;
+    form {
+      display: flex;
+      gap: 8px;
+      padding: 6px;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface-raised);
+      border-radius: 14px;
+      background: var(--surface);
       box-shadow: var(--shadow);
+      transition: border-color 150ms ease, box-shadow 150ms ease;
     }
 
-    .card code {
-      display: inline-block;
-      margin-bottom: 6px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      background: var(--accent-subtle);
-      color: var(--accent);
-      font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
-      font-size: 12px;
+    form:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 4px var(--focus-ring), var(--shadow);
+    }
+
+    input {
+      min-width: 0;
+      flex: 1;
+      height: 42px;
+      padding: 0 12px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 16px;
+    }
+
+    input::placeholder { color: var(--text-secondary); opacity: 1; }
+
+    button {
+      height: 42px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #ffffff;
+      font: inherit;
+      font-size: 14px;
       font-weight: 600;
+      cursor: pointer;
     }
 
-    .card p {
-      margin: 0;
+    button:hover { background: var(--accent-hover); }
+    button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+    .privacy {
+      margin: 16px 0 0;
       color: var(--text-secondary);
       font-size: 13px;
       line-height: 1.6;
     }
 
-    /* === 步骤 === */
-    ol.steps {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      counter-reset: step;
-    }
-
-    ol.steps li {
-      position: relative;
-      padding-left: 36px;
-      margin-bottom: 14px;
-      counter-increment: step;
-    }
-
-    ol.steps li:last-child { margin-bottom: 0; }
-
-    ol.steps li::before {
-      content: counter(step);
-      position: absolute;
-      left: 0;
-      top: 1px;
-      width: 22px;
-      height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #ffffff;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    ol.steps strong {
-      display: block;
-      font-weight: 600;
-    }
-
-    ol.steps span {
-      color: var(--text-secondary);
-      font-size: 13px;
-    }
-
-    /* === 示例提示词 === */
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .chip {
-      padding: 7px 14px;
-      border: 1px solid var(--border-strong);
-      border-radius: 999px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 13px;
-    }
-
-    /* === 提示条 === */
-    .note {
-      margin-top: 10px;
-      padding: 16px 18px;
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 10px;
-      background: var(--surface);
-    }
-
-    .note p {
-      margin: 0 0 10px;
-      color: var(--text-secondary);
-      font-size: 13px;
-    }
-
-    .note p:last-child { margin-bottom: 0; }
-
-    .note strong { color: var(--text); font-weight: 600; }
-
-    footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 12px;
-    }
-
-    @media (max-width: 420px) {
-      body { padding: 28px 16px 40px; }
-      h1 { font-size: 20px; }
-      .grid { grid-template-columns: 1fr; }
+    @media (max-width: 460px) {
+      body { padding: 24px 16px; }
+      main { margin-top: -4vh; }
+      form { gap: 6px; }
+      button { padding: 0 15px; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <header>
-      <div class="globe" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <ellipse cx="12" cy="12" rx="4" ry="9" />
-          <path d="M3 12h18" />
-          <path d="M4.6 7.2h14.8" />
-          <path d="M4.6 16.8h14.8" />
-        </svg>
-      </div>
-      <h1>浏览器操作</h1>
-      <p class="lede">
-        AI 可以直接操作这块浏览器面板，帮你搜索、打开网页、读取内容。
-        需要登录或验证码时它会自动把控制权交给你，处理完再接着做。
-      </p>
-    </header>
-
-    <section>
-      <h2>它能做什么</h2>
-      <div class="grid">
-        <div class="card">
-          <code>open</code>
-          <p>打开指定网址，或从搜索引擎开始找。</p>
-        </div>
-        <div class="card">
-          <code>read</code>
-          <p>读取当前页面正文，并给可点、可填的元素编号。</p>
-        </div>
-        <div class="card">
-          <code>click</code>
-          <p>点击按钮、链接、菜单项，按编号定位。</p>
-        </div>
-        <div class="card">
-          <code>fill</code>
-          <p>填写搜索框、表单等普通输入框。</p>
-        </div>
-        <div class="card">
-          <code>select</code>
-          <p>选择下拉框选项。</p>
-        </div>
-        <div class="card">
-          <code>scroll</code>
-          <p>上下翻页，把没显示出来的内容读进来。</p>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <h2>怎么用</h2>
-      <ol class="steps">
-        <li>
-          <strong>打开浏览器模式</strong>
-          <span>点输入框左下角的浏览器图标，它会亮起来。联网和浏览器是两个模式，同一时间只能开一个。</span>
-        </li>
-        <li>
-          <strong>直接说需求</strong>
-          <span>比如「帮我查一下明天北京的天气」「去某网站找一下这个型号的价格」。AI 会自己决定打开哪个页面、点哪里、读什么。</span>
-        </li>
-        <li>
-          <strong>需要时接手</strong>
-          <span>只有任务确实需要认证时才请你接手，并显示 60 秒倒计时。网页操作会重新计时；完成后可点「已完成，继续」，也可「跳过登录」。无操作到期后 AI 会尝试未登录方式继续。</span>
-        </li>
-      </ol>
-    </section>
-
-    <section>
-      <h2>可以这样问</h2>
-      <div class="chips">
-        <span class="chip">帮我搜一下 Qt6 官方文档里 QWebEngineView 的用法</span>
-        <span class="chip">去 GitHub 看看这个项目最新的 issue</span>
-        <span class="chip">查一下明天上海的天气</span>
-        <span class="chip">把这个网页的正文读出来总结成三点</span>
-      </div>
-    </section>
-
-    <section>
-      <h2>几点说明</h2>
-      <div class="note">
-        <p><strong>登录状态只在当前对话里保留。</strong>关闭对话后清除，不会带到下一个对话。</p>
-        <p><strong>你手动操作不会打断 AI。</strong>你可以直接点页面、在地址栏输网址；AI 发现页面变了会重新读一遍再继续。</p>
-        <p><strong>它不会输入你的账号密码。</strong>需要凭据的环节一定交给你本人，也不建议把密码贴进对话里。</p>
-        <p><strong>高风险操作会先问你。</strong>下单、转账、删数据、对外发送这类不可逆动作，它动手前会先确认。</p>
-        <p><strong>网页内容当作不可信数据。</strong>页面里写的「指令」不会被当作你的要求执行。</p>
-      </div>
-    </section>
-
-    <footer>在地址栏输入网址，或直接告诉 AI 你想做什么。</footer>
-  </div>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="m16 16 4 4" />
+      </svg>
+    </div>
+    <h1>浏览网页</h1>
+    <p class="hint">搜索网页，或在对话中告诉 AI 你想找什么。</p>
+    <form action="https://www.bing.com/search" method="get" role="search">
+      <input name="q" type="search" aria-label="搜索网页" placeholder="输入搜索关键词" autocomplete="off" autofocus />
+      <button type="submit">搜索</button>
+    </form>
+    <p class="privacy">需要登录或验证码时，AI 会请你接手。</p>
+  </main>
 </body>
 </html>

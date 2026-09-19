@@ -41,7 +41,7 @@ private:
     void checkAutoResume();
     void finish(const QString &result, bool notifyUser = false);
     void navigate(const QString &url);
-    // 回到起始页（介绍 browser use 的静态页面）。
+    // 回到内置搜索起始页。
     void loadHome();
     // 把当前主题注入起始页：WebEngine 的 prefers-color-scheme 跟系统，不跟应用主题。
     void installHomeThemeScript();

@@ -85,6 +85,8 @@ public:
     void setChatPaneWidth(int width);
     int chatBrowserPaneWidth() const;
     void setChatBrowserPaneWidth(int width);
+    int chatToolCallLimit() const;
+    void setChatToolCallLimit(int limit);
 
     void setLocalSearchGlobalKey(const QString& key);
     QString localSearchGlobalKey() const;

@@ -693,7 +693,7 @@ void ChatWidget::initializeChatUi()
     connect(inputWidget_, &ChatInputWidget::sigStopRequested, browserPanel_, &BrowserPanel::cancel);
     refreshToolRegistry();
     agent_->setMaxIterations(10);
-    agent_->setMaxToolCalls(16);
+    agent_->setMaxToolCalls(settings_ ? settings_->chatToolCallLimit() : 10);
 
     connect(agent_, &Agent::AgentRunner::sigStreamStarted, this, &ChatWidget::onChatStreamStarted);
     connect(agent_, &Agent::AgentRunner::sigStreamDelta, this, &ChatWidget::onChatStreamDelta);
@@ -964,6 +964,8 @@ void ChatWidget::dispatchMessage(const QString &text, const QList<QPixmap> &imag
     if (browserPanel_) browserPanel_->resetAuthenticationWait();
     latestAssistantUsage_.clear();
     refreshToolRegistry();
+    // 设置窗口可能在对话窗口存活期间修改此值；每次请求开始时读取即可立即生效。
+    agent_->setMaxToolCalls(settings_ ? settings_->chatToolCallLimit() : 10);
     if (!images.isEmpty()) {
         appendChatMessage(kRoleUser, text, &images);
         agent_->runWithImages(text, images);

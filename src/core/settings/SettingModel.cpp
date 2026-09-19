@@ -23,6 +23,7 @@ static const QString KEY_CHAT           = "CHAT_GLOBAL_KEY";
 static const QString KEY_CHAT_USE_BROWSER = "CHAT/USE_BROWSER";
 static const QString KEY_CHAT_PANE_WIDTH  = "CHAT/PANE_WIDTH";
 static const QString KEY_CHAT_BROWSER_WIDTH = "CHAT/BROWSER_WIDTH";
+static const QString KEY_CHAT_TOOL_CALL_LIMIT = "CHAT/TOOL_CALL_LIMIT";
 static const QString KEY_LOCAL_SEARCH   = "LOCAL_SEARCH/GLOBAL_KEY";
 static const QString KEY_LOCAL_SEARCH_DEFAULT_VERSION = "LOCAL_SEARCH/HOTKEY_DEFAULT_VERSION";
 static const QString KEY_LOCAL_SEARCH_ROOTS = "LOCAL_SEARCH/ROOTS";
@@ -81,6 +82,7 @@ static const QString KEY_LLM_IMAGE_TOKEN_SAVING = "LLM/IMAGE_TOKEN_SAVING";
 
 static const double DEFAULT_LLM_TEMPERATURE = 0.7;
 static const QSize  DEFAULT_NOTIFY_SIZE(420, 300);
+static constexpr int DEFAULT_CHAT_TOOL_CALL_LIMIT = 10;
 static constexpr int LOCAL_SEARCH_HOTKEY_DEFAULT_VERSION = 2;
 static constexpr int LOCAL_SEARCH_ROOTS_DEFAULT_VERSION = 1;
 static constexpr int LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION = 2;
@@ -172,6 +174,7 @@ void SettingModel::revertDefault()
     setThemeMode(AppTheme::Dark);
     setNotificationWindowSize(DEFAULT_NOTIFY_SIZE);
     setTrayNotificationPosition(TrayNotificationPosition::BottomRight);
+    setChatToolCallLimit(DEFAULT_CHAT_TOOL_CALL_LIMIT);
 
     LlmProviderConfig defaultProvider;
     defaultProvider.name        = QStringLiteral("Default");
@@ -314,6 +317,19 @@ int SettingModel::chatBrowserPaneWidth() const
 void SettingModel::setChatBrowserPaneWidth(int width)
 {
     if (width > 0) settings_.setValue(KEY_CHAT_BROWSER_WIDTH, width);
+}
+
+int SettingModel::chatToolCallLimit() const
+{
+    return qBound(1,
+                  settings_.value(KEY_CHAT_TOOL_CALL_LIMIT,
+                                  DEFAULT_CHAT_TOOL_CALL_LIMIT).toInt(),
+                  100);
+}
+
+void SettingModel::setChatToolCallLimit(int limit)
+{
+    settings_.setValue(KEY_CHAT_TOOL_CALL_LIMIT, qBound(1, limit, 100));
 }
 
 void SettingModel::setLocalSearchGlobalKey(const QString& key)

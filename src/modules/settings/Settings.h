@@ -75,6 +75,7 @@ private:
     WindowManager* windowManager_ = nullptr;
     class QComboBox*   cbTheme_;
     class QComboBox*   cbLlmProviders_;
+    class QSpinBox*    sbChatToolCallLimit_ = nullptr;
     class QLineEdit*   leLlmProviderName_;
     class QCheckBox*   cbTextSelectionEnabled_;
     class QCheckBox*   cbImageTokenSaving_;

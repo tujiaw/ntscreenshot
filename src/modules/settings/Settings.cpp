@@ -185,6 +185,11 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     connect(ui.sbNotifyWidth, QOverload<int>::of(&QSpinBox::valueChanged), this, &Settings::onChatWindowSettingChanged);
     connect(ui.sbNotifyHeight, QOverload<int>::of(&QSpinBox::valueChanged), this, &Settings::onChatWindowSettingChanged);
     connect(ui.cbNotifyPosition, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Settings::onChatWindowSettingChanged);
+    connect(sbChatToolCallLimit_, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int limit) {
+        windowManager_->setting()->setChatToolCallLimit(limit);
+        emit windowManager_->sigSettingChanged();
+        showStatusTip(QStringLiteral("工具调用次数上限已更新"));
+    });
     connect(ui.kseScreenshot, &QKeySequenceEdit::editingFinished, this, &Settings::updateScreenshotGlobalKey);
     connect(ui.ksePin, &QKeySequenceEdit::editingFinished, this, &Settings::updatePinKey);
     connect(ui.kseChat, &QKeySequenceEdit::editingFinished, this, &Settings::updateChatKey);
@@ -461,6 +466,10 @@ void Settings::readData()
         ui.sbNotifyWidth->setValue(notifySize.width());
         ui.sbNotifyHeight->setValue(notifySize.height());
         ui.cbNotifyPosition->setCurrentIndex(static_cast<int>(setting->trayNotificationPosition()));
+    }
+    if (sbChatToolCallLimit_) {
+        const QSignalBlocker blocker(sbChatToolCallLimit_);
+        sbChatToolCallLimit_->setValue(setting->chatToolCallLimit());
     }
     if (cbImageTokenSaving_) {
         const QSignalBlocker imageTokenSavingBlocker(cbImageTokenSaving_);
@@ -1208,6 +1217,13 @@ void Settings::initLlmTab()
     ui.cbNotifyPosition->addItems({QStringLiteral("左上"), QStringLiteral("右上"),
                                    QStringLiteral("左下"), QStringLiteral("右下")});
     notificationForm->addRow(QStringLiteral("展示位置："), ui.cbNotifyPosition);
+    sbChatToolCallLimit_ = new QSpinBox(notificationPage);
+    sbChatToolCallLimit_->setRange(1, 100);
+    sbChatToolCallLimit_->setValue(10);
+    sbChatToolCallLimit_->setSuffix(QStringLiteral(" 次"));
+    sbChatToolCallLimit_->setToolTip(
+        QStringLiteral("单次对话请求允许执行的工具调用总数；达到上限后，AI 将基于已有上下文直接作答。"));
+    notificationForm->addRow(QStringLiteral("工具调用次数上限："), sbChatToolCallLimit_);
     notificationPageLayout->addLayout(notificationForm);
     notificationPageLayout->addStretch();
     qInfo() << "Settings::initLlmTab: notification page built";

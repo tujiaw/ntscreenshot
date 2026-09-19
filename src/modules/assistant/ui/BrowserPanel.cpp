@@ -32,6 +32,8 @@
 #include <QWaitCondition>
 #include <QJsonDocument>
 #include <QElapsedTimer>
+#include <QRegularExpression>
+#include <QUrlQuery>
 #include <atomic>
 #include <utility>
 
@@ -370,7 +372,7 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     auto *reload = navButton(QStringLiteral("refresh.png"), QStringLiteral("刷新页面"));
     auto *home = navButton(QStringLiteral("home.png"), QStringLiteral("回到主页"));
     address_ = new QLineEdit(this);
-    address_->setPlaceholderText(QStringLiteral("输入网址"));
+    address_->setPlaceholderText(QStringLiteral("搜索或输入网址"));
     address_->setFixedHeight(kAddressHeightPx);
     // 全局 QLineEdit 样式带 4px 上下内边距 + 1px 边框，配上 28px 的固定高度会把
     // 文字裁掉一半；这里收紧内边距，让 32px 里的可用高度足够放下 14px 的字。
@@ -410,7 +412,7 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     view_->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, false);
     installHomeThemeScript();
     layout->addWidget(view_, 1);
-    loadHome();  // 起始页 = 功能说明，Home 按钮也回到这里
+    loadHome();  // Home 按钮始终回到内置搜索起始页
     // 认证等待支持手动继续、跳过及无操作倒计时；停止仍由输入框统一触发。
     // 用户自己点这些按钮属于正常浏览，不打断 AI。
     connect(address_,&QLineEdit::returnPressed,this,[this]{ navigate(address_->text()); });
@@ -589,7 +591,23 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
 
 void BrowserPanel::navigate(const QString &text)
 {
-    const auto url = QUrl::fromUserInput(text);
+    const QString input = text.trimmed();
+    if (input.isEmpty()) return;
+
+    // 明显的网址沿用浏览器补全；其余内容作为搜索词，避免把“Qt 文档”之类的
+    // 输入误判成本地域名。显式协议始终按网址处理，随后仍由安全检查兜底。
+    const bool looksLikeUrl = input.contains(QStringLiteral("://"))
+        || (!input.contains(QRegularExpression(QStringLiteral("\\s")))
+            && (input.contains(QLatin1Char('.')) || input.startsWith(QStringLiteral("localhost"))));
+    QUrl url;
+    if (looksLikeUrl) {
+        url = QUrl::fromUserInput(input);
+    } else {
+        url = QUrl(QStringLiteral("https://www.bing.com/search"));
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("q"), input);
+        url.setQuery(query);
+    }
     if ((url.scheme() == "http" || url.scheme() == "https") && url.userInfo().isEmpty()) view_->load(url);
 }
 

@@ -87,7 +87,7 @@ private:
     QThread *workerThread_ = nullptr;
     QObject *workerContext_ = nullptr;
     int maxIterations_ = 10;
-    int maxToolCalls_ = 16;
+    int maxToolCalls_ = 10;
     int currentIteration_ = 0;
     int toolCallsUsed_ = 0;
     bool running_ = false;

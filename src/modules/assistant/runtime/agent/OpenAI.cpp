@@ -42,6 +42,7 @@ const char* KEY_TYPE = "type";
 const char* KEY_DELTA = "delta";
 const char* KEY_STREAM = "stream";
 const char* KEY_TOOLS = "tools";
+const char* KEY_TOOL_CHOICE = "tool_choice";
 const char* KEY_TOOL_CALLS = "tool_calls";
 const char* KEY_TOOL_CALL_ID = "tool_call_id";
 const char* KEY_FUNCTION = "function";
@@ -388,6 +389,23 @@ QString extractAssistantDeltaText(const QByteArray &chunkData, QString *errorOut
     return extractAssistantTextFromMessageObject(deltaObject);
 }
 
+QString removeLeakedToolMarkup(QString text)
+{
+    // 某些兼容网关会把内部工具 DSL 错放进 content。最终整理阶段绝不能执行或
+    // 展示这种文本；允许标签名两侧出现空白，以覆盖 Markdown 转义后的变体。
+    static const QRegularExpression callsBlock(
+        QStringLiteral(R"(<\s*calls\b[\s\S]*?<\s*/\s*calls\s*>)"),
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression invokeBlock(
+        QStringLiteral(R"(<\s*invoke\b[\s\S]*?<\s*/\s*invoke\s*>)"),
+        QRegularExpression::CaseInsensitiveOption);
+    text.remove(callsBlock);
+    text.remove(invokeBlock);
+    text.remove(QRegularExpression(QStringLiteral("<[^>]*DSML[^>]*>"),
+                                   QRegularExpression::CaseInsensitiveOption));
+    return text.trimmed();
+}
+
 QString extractTokenUsageLog(const QByteArray& responseData)
 {
     QJsonParseError parseError{};
@@ -587,8 +605,9 @@ void OpenAIChat::postConversation()
     if (finalAnswerMode_) {
         systemContent += QStringLiteral(
             "\n\n# 结果整理模式\n"
-            "工具调用阶段已经结束。请只根据当前对话中已经获得的网页内容、工具结果和用户上下文回答。"
+            "工具调用阶段已经结束，你现在没有任何可调用工具。立即根据当前对话中已经获得的网页内容、工具结果和用户上下文给出面向用户的最终答案。"
             "不要提及工具预算、调用次数、迭代上限或内部限制，也不要声称已经完成未实际完成的操作。"
+            "不得继续尝试调用工具，不得输出 tool_calls、<calls>、<invoke>、<parameter> 或任何工具协议标记。"
             "如果证据不足，直接说明已确认的内容、缺少的部分，并给出下一步建议。\n");
     }
     if (!summaryText_.isEmpty()) {
@@ -614,13 +633,17 @@ void OpenAIChat::postConversation()
     jsonBody[KEY_MODEL]       = provider.model;
     jsonBody[KEY_MESSAGES]    = messages;
     jsonBody[KEY_TEMPERATURE] = provider.temperature;
-    jsonBody[KEY_STREAM]      = streamingEnabled_;
-    if (streamingEnabled_) {
+    const bool streamThisRequest = streamingEnabled_ && !finalAnswerMode_;
+    jsonBody[KEY_STREAM]      = streamThisRequest;
+    if (streamThisRequest) {
         QJsonObject streamOptions;
         streamOptions.insert(QStringLiteral("include_usage"), true);
         jsonBody[KEY_STREAM_OPTIONS] = streamOptions;
     }
-    if (!toolDefinitions_.isEmpty()) {
+    if (finalAnswerMode_) {
+        // 即使兼容网关保留了服务端工具上下文，也明确禁止本次生成选择工具。
+        jsonBody[KEY_TOOL_CHOICE] = QStringLiteral("none");
+    } else if (!toolDefinitions_.isEmpty()) {
         jsonBody[KEY_TOOLS] = toolDefinitions_;
     }
 
@@ -635,7 +658,7 @@ void OpenAIChat::postConversation()
     resetActiveReplyState();
     activeReply_ = manager_->post(request, requestData);
     activeReplyTimeoutTimer_->start(kChatRequestTimeoutMs);
-    if (streamingEnabled_) {
+    if (streamThisRequest) {
         streamIdleTimer_->start(kStreamIdleTimeoutMs);
     }
     connect(activeReply_, &QNetworkReply::readyRead, this, &OpenAIChat::handleReplyReadyRead);
@@ -718,7 +741,7 @@ void OpenAIChat::handleReplyReadyRead()
 
     replyBuffer_.append(chunk);
     activeReplyTimeoutTimer_->start(kChatRequestTimeoutMs);
-    if (streamingEnabled_) {
+    if (streamingEnabled_ && !finalAnswerMode_) {
         streamIdleTimer_->start(kStreamIdleTimeoutMs);
     }
 
@@ -939,6 +962,18 @@ void OpenAIChat::handleNonStreamingReply(const QByteArray &responseData)
     }
 
     const QJsonArray toolCalls = messageObject.value(KEY_TOOL_CALLS).toArray();
+    if (finalAnswerMode_) {
+        if (!toolCalls.isEmpty()) {
+            qWarning() << "LLM Protocol Warning: ignored tool_calls returned during final-answer mode";
+        }
+        QString text = removeLeakedToolMarkup(extractAssistantTextFromMessageObject(messageObject));
+        if (text.isEmpty()) {
+            text = QStringLiteral("当前操作已结束。现有结果不足以确认目标是否完成，请根据已获得的信息继续处理或重新发起任务。");
+        }
+        finalizeSuccessfulReply(text, extractReasoningContentFromMessageObject(messageObject));
+        emit sigResponse(text);
+        return;
+    }
     if (!toolCalls.isEmpty()) {
         const QString textContent = extractAssistantTextFromMessageObject(messageObject);
         qDebug() << "LLM Response Result: non-streaming tool calls,"

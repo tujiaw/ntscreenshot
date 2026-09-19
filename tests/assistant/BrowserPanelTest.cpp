@@ -11,8 +11,10 @@
 #include <QThread>
 #include <QTimer>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QKeyEvent>
+#include <QUrlQuery>
 #include <iostream>
 
 static void check(bool value, const QString &message)
@@ -60,6 +62,22 @@ int main(int argc, char **argv)
     auto *panel = new BrowserPanel(nullptr, 8000);
     panel->resize(850,600);
     panel->show();
+    auto *view = panel->findChild<QWebEngineView *>();
+    auto *address = panel->findChild<QLineEdit *>();
+    check(view != nullptr,"visible web view missing");
+    check(address && address->placeholderText() == QStringLiteral("搜索或输入网址"),"address bar is not search-enabled");
+    QEventLoop searchLoop;
+    const auto searchConnection = QObject::connect(view,&QWebEngineView::urlChanged,&searchLoop,[&](const QUrl &url){
+        if (url.host() == QStringLiteral("www.bing.com")) searchLoop.quit();
+    });
+    address->setText(QStringLiteral("Qt WebEngine 文档"));
+    QMetaObject::invokeMethod(address,"returnPressed");
+    QTimer::singleShot(5000,&searchLoop,&QEventLoop::quit);
+    searchLoop.exec();
+    QObject::disconnect(searchConnection);
+    check(view->url().host() == QStringLiteral("www.bing.com")
+        && QUrlQuery(view->url()).queryItemValue(QStringLiteral("q")) == QStringLiteral("Qt WebEngine 文档"),
+        "address bar search did not build the expected query URL");
     auto run = [&](const QJsonObject &args, bool cancel = false) {
         LlmTools::ToolAbort abort;
         QString output;
@@ -91,8 +109,6 @@ int main(int argc, char **argv)
     check(snapshot.contains("error") && snapshot.contains("snapshot") && !snapshot.value("actionExecuted").toBool(),"stale snapshot must include recovery snapshot without acting");
     snapshot = read({{"action","select"},{"snapshot",snapshot.value("snapshot")},{"element",3},{"text","b"}});
     check(snapshot.contains("snapshot"),"select failed");
-    auto *view = panel->findChild<QWebEngineView *>();
-    check(view != nullptr,"visible web view missing");
     bool selected = false;
     QEventLoop selectedLoop;
     view->page()->runJavaScript("document.querySelector('select').value",[&](const QVariant &v){ selected = v.toString() == "b"; selectedLoop.quit(); });
