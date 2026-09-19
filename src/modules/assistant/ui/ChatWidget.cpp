@@ -978,6 +978,7 @@ void ChatWidget::enqueueOrSend(const QString &text, const QList<QPixmap> &images
 
 void ChatWidget::dispatchMessage(const QString &text, const QList<QPixmap> &images)
 {
+    if (browserPanel_) browserPanel_->resetAuthenticationWait();
     latestAssistantUsage_.clear();
     refreshToolRegistry();
     if (!images.isEmpty()) {
@@ -1135,6 +1136,7 @@ void ChatWidget::onRetryRequested()
     if (chatRequestPending_ || !agent_) {
         return;
     }
+    if (browserPanel_) browserPanel_->resetAuthenticationWait();
 
     for (int i = messages_.size() - 1; i >= 0; --i) {
         const QString role = messages_.at(i).toMap().value(QStringLiteral("role")).toString();

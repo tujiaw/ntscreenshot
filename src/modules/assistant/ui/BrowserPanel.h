@@ -3,30 +3,37 @@
 #include <QJsonObject>
 #include <QElapsedTimer>
 #include <memory>
+#include <QMutex>
+#include <QList>
 
 class QWebEngineView;
 class QWebEngineProfile;
 class QLineEdit;
 class QPushButton;
 class QTimer;
+class QLabel;
 namespace LlmTools { class ToolAbort; }
 
 // One off-the-record session per conversation. All WebEngine access stays on the GUI thread.
 class BrowserPanel final : public QWidget {
     Q_OBJECT
 public:
-    explicit BrowserPanel(QWidget *parent = nullptr);
+    explicit BrowserPanel(QWidget *parent = nullptr, int authenticationWaitMs = 60000);
     ~BrowserPanel() override;
     QString execute(const QJsonObject &args, LlmTools::ToolAbort *abort);
     void cancel();
     void clearSnapshotCache();
     void takeOver(const QString &reason);
     void resume();
+    void resetAuthenticationWait();
 signals:
     void attentionRequired(const QString &reason);
     void activityRequested();
     void collapseRequested();
 private:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void continueWithoutLogin();
+    void updateAuthenticationCountdown();
     struct Request;
     void start(const QJsonObject &args, const std::shared_ptr<Request> &request);
     void observe();
@@ -42,13 +49,19 @@ private:
     QWebEngineProfile *profile_;
     QLineEdit *address_;
     QTimer *timer_;
+    QWidget *authenticationBar_ = nullptr;
+    QLabel *authenticationCountdown_ = nullptr;
+    int authenticationWaitMs_;
+    bool authenticationWaitSkipped_ = false;
     std::shared_ptr<Request> request_;
+    QMutex queuedRequestsMutex_;
+    QList<std::shared_ptr<Request>> queuedRequests_;
     bool manual_ = false;
     bool loading_ = false;
     bool evaluating_ = false;
     quint64 generation_ = 0;
     QElapsedTimer settled_;
     int settleMs_ = 0;
-    // 本次交出控制权的时间；超过 kManualWaitTimeoutMs 仍未恢复则放弃等待。
+    // 用户在网页操作后重置；无操作到期则继续未登录任务。
     QElapsedTimer manualWait_;
 };

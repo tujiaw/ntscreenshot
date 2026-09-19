@@ -18,6 +18,8 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLineEdit>
+#include <QLabel>
+#include <QEvent>
 #include <QIcon>
 #include <QImage>
 #include <QPainter>
@@ -31,6 +33,7 @@
 #include <QJsonDocument>
 #include <QElapsedTimer>
 #include <atomic>
+#include <utility>
 
 namespace {
 QString permissionLabel(QWebEnginePermission::PermissionType type)
@@ -120,7 +123,6 @@ QUrl browserHomeUrl()
 }
 
 // 交给用户后若一直没完成认证，避免 Agent 工作线程无限期阻塞。
-constexpr qint64 kManualWaitTimeoutMs = 5 * 60 * 1000;
 // 交出控制权后的最短等待时间：用户动手需要时间，不能刚交出去就抢回来。
 constexpr qint64 kManualMinWaitMs = 5000;
 
@@ -134,11 +136,11 @@ protected:
     }
 };
 
-// 认证页特征检测：密码框、验证码、扫码登录、人机验证等需要用户介入的信号。
-// 自动接管恢复与主脚本共用同一份判断，避免两处条件漂移。
+// 认证组件只用于快照提示和等待后的恢复判断，不因组件存在自动暂停普通浏览。
 const char authDetection[] = R"JS(
  const ntVisible = e => !!(e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
- const ntSensitive = e => e.matches('input[type=password],input[autocomplete=one-time-code]') ||
+ const ntSensitive = e => e.matches('input[type=password],input[autocomplete=one-time-code],input[autocomplete=username]') ||
+   (e.matches('input') && (/^(username|login|account)$/i.test(e.name || e.id) || !!e.form?.querySelector('input[type=password]'))) ||
    /password|passwd|otp|verification|验证码|校验码|动态码/i.test([e.name,e.id,e.autocomplete,e.placeholder,e.getAttribute('aria-label')].join(' '));
  const ntNeedsUser = () => {
    const inputs = Array.from(document.querySelectorAll('input')).filter(ntVisible);
@@ -157,17 +159,15 @@ const char authProbe[] = R"JS(
 )JS";
 
 // The isolated world owns element references; websites cannot forge tool handles.
-// Check authentication before returning text or executing any DOM operation.
+// Credential values are excluded from snapshots; only sensitive target actions require handoff.
 const char script[] = R"JS(
 (() => {
  const args = %2;
 %1
- if (ntNeedsUser())
-   return JSON.stringify({needsUser:true});
  let state = globalThis.__ntBrowserState;
  const label = e => (e.getAttribute('aria-label') || (e.labels && Array.from(e.labels).map(l=>l.innerText).join(' ')) || e.innerText || e.placeholder || e.name || '').trim();
  const fingerprint = e => JSON.stringify([e.tagName,e.type,e.id,e.name,e.getAttribute('href'),
-   label(e),e.getAttribute('role'),e.getAttribute('aria-disabled'),e.readOnly,e.value,e.getAttribute('onclick'),
+   label(e),e.getAttribute('role'),e.getAttribute('aria-disabled'),e.readOnly,ntSensitive(e) ? null : e.value,e.getAttribute('onclick'),
    e.form && e.form.action,e.closest('article,li,tr,[role=row]')?.innerText,
    e instanceof HTMLSelectElement ? Array.from(e.options).map(o=>[o.value,o.text,o.disabled]) : null]);
  const inViewport = e => {
@@ -219,10 +219,10 @@ const char script[] = R"JS(
    const elements = candidates.slice(elementOffset,elementOffset+30);
    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
    const result = {snapshot:id,url:location.href.slice(0,2048),urlTruncated:location.href.length>2048,title:document.title.slice(0,200),mode,content,
-     contentLength:text.length,sourceTruncated:cache.truncated,
+     contentLength:text.length,sourceTruncated:cache.truncated,authenticationUiPresent:ntNeedsUser(),
      nextOffset:offset + content.length < text.length ? offset + content.length : null,
      elements:elements.map((e,i)=>({element:i+1,tag:e.tagName.toLowerCase(),type:e.type || '',
-       label:label(e).slice(0,100),disabled:!!(e.disabled || e.getAttribute('aria-disabled') === 'true'),
+       label:label(e).slice(0,100),requiresUser:ntSensitive(e),disabled:!!(e.disabled || e.getAttribute('aria-disabled') === 'true'),
        options:e instanceof HTMLSelectElement ? Array.from(e.options).slice(0,40).map(o=>({text:o.text.slice(0,60),value:o.value})) : undefined}))};
    if (error) { result.error=error; result.code=code; result.actionExecuted=false; }
    for (const row of result.elements) {
@@ -295,9 +295,11 @@ struct BrowserPanel::Request {
     bool done = false;
     std::atomic_bool cancelled{false};
     QElapsedTimer elapsed;
+    QString authenticationStatus;
 };
 
-BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
+BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
+    : QWidget(parent), authenticationWaitMs_(qMax(1000, authenticationWaitMs))
 {
     setMinimumWidth(320);
     // 除 header 外整个区域都留给网页：不留外边距，也不放状态栏。
@@ -340,7 +342,25 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
     bar->addWidget(external);
     connect(collapse, &QPushButton::clicked, this, &BrowserPanel::collapseRequested);
     layout->addWidget(header);
+    authenticationBar_ = new QWidget(this);
+    auto *authenticationLayout = new QHBoxLayout(authenticationBar_);
+    authenticationLayout->setContentsMargins(8, 4, 8, 4);
+    authenticationCountdown_ = new QLabel(authenticationBar_);
+    authenticationCountdown_->setObjectName(QStringLiteral("browserAuthenticationCountdown"));
+    authenticationCountdown_->setTextFormat(Qt::PlainText);
+    authenticationCountdown_->setWordWrap(true);
+    authenticationLayout->addWidget(authenticationCountdown_, 1);
+    auto *continueButton = new QPushButton(QStringLiteral("已完成，继续"), authenticationBar_);
+    auto *skipButton = new QPushButton(QStringLiteral("跳过登录"), authenticationBar_);
+    skipButton->setObjectName(QStringLiteral("browserSkipAuthentication"));
+    authenticationLayout->addWidget(continueButton);
+    authenticationLayout->addWidget(skipButton);
+    connect(continueButton, &QPushButton::clicked, this, &BrowserPanel::resume);
+    connect(skipButton, &QPushButton::clicked, this, &BrowserPanel::continueWithoutLogin);
+    layout->addWidget(authenticationBar_);
+    authenticationBar_->hide();
     view_ = new QWebEngineView(this);
+    qApp->installEventFilter(this);
     profile_ = new QWebEngineProfile(this);
     view_->setPage(new BrowserPage(profile_, view_));
     view_->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, false);
@@ -348,8 +368,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
     installHomeThemeScript();
     layout->addWidget(view_, 1);
     loadHome();  // 起始页 = 功能说明，Home 按钮也回到这里
-    // 没有“接管 / 已完成，继续 / 停止操作”按钮：只有遇到认证才自动交给用户，
-    // 页面离开认证环节后自动继续；停止由对话输入框的中断按钮统一触发。
+    // 认证等待支持手动继续、跳过及无操作倒计时；停止仍由输入框统一触发。
     // 用户自己点这些按钮属于正常浏览，不打断 AI。
     connect(address_,&QLineEdit::returnPressed,this,[this]{ navigate(address_->text()); });
     connect(back,&QPushButton::clicked,this,[this]{ view_->back(); });
@@ -378,6 +397,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
         if (url.scheme() == "http" || url.scheme() == "https") view_->load(url);
     });
     connect(view_->page(),&QWebEnginePage::authenticationRequired,this,[this](const QUrl &, QAuthenticator *auth){
+        if (authenticationWaitSkipped_) return;
         takeOver(QStringLiteral("网站需要 HTTP 身份认证，请输入账号和密码。"));
         bool ok = false;
         const QString user = QInputDialog::getText(this,QStringLiteral("网站认证"),QStringLiteral("账号"),QLineEdit::Normal,{},&ok);
@@ -386,6 +406,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
         if (ok) { auth->setUser(user); auth->setPassword(password); }
     });
     connect(view_->page(),&QWebEnginePage::permissionRequested,this,[this](QWebEnginePermission permission){
+        if (authenticationWaitSkipped_) { permission.deny(); return; }
         takeOver(QStringLiteral("网站请求设备权限，请确认后继续。"));
         const auto answer = QMessageBox::question(this,QStringLiteral("网站权限"),
             QStringLiteral("允许 %1 使用%2？").arg(permission.origin().toDisplayString(),permissionLabel(permission.permissionType())),
@@ -393,6 +414,7 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
         if (answer == QMessageBox::Yes) permission.grant(); else permission.deny();
     });
     connect(view_->page(),&QWebEnginePage::webAuthUxRequested,this,[this](QWebEngineWebAuthUxRequest *request){
+        if (authenticationWaitSkipped_) { request->cancel(); return; }
         takeOver(QStringLiteral("网站需要安全密钥或通行密钥认证，请完成认证后继续。"));
         QPointer<QWebEngineWebAuthUxRequest> guard(request);
         const auto handle = [this,guard]{
@@ -417,13 +439,14 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
     timer_ = new QTimer(this);
     timer_->setInterval(200);
     connect(timer_,&QTimer::timeout,this,[this]{
-        if (!request_) return;
-        if (request_->cancelled) { finish(QStringLiteral("浏览器操作已取消")); view_->stop(); return; }
+        if (request_ && request_->cancelled) { cancel(); return; }
         if (manual_) {
-            request_->elapsed.restart();  // 等待用户期间不计入 30 秒步骤超时
+            if (request_) request_->elapsed.restart();
+            updateAuthenticationCountdown();
             checkAutoResume();
             return;
         }
+        if (!request_) return;
         if (request_->elapsed.elapsed() > 30000) { finish(QStringLiteral("浏览器操作超时，可点击刷新重试。"),true); view_->stop(); return; }
         if (!loading_ && !evaluating_ && (!settled_.isValid() || settled_.elapsed() >= settleMs_)) observe();
     });
@@ -432,8 +455,20 @@ BrowserPanel::BrowserPanel(QWidget *parent) : QWidget(parent)
 
 BrowserPanel::~BrowserPanel()
 {
+    qApp->removeEventFilter(this);
     ++generation_;
     finish(QStringLiteral("浏览器已关闭"));
+    {
+        QMutexLocker lock(&queuedRequestsMutex_);
+        for (const auto &request : std::as_const(queuedRequests_)) {
+            if (!request) continue;
+            QMutexLocker requestLock(&request->mutex);
+            request->result = QStringLiteral("浏览器已关闭");
+            request->done = true;
+            request->ready.wakeAll();
+        }
+        queuedRequests_.clear();
+    }
     delete view_; // page must die before its profile
     delete profile_;
 }
@@ -442,7 +477,17 @@ QString BrowserPanel::execute(const QJsonObject &args, LlmTools::ToolAbort *abor
 {
     if (QThread::currentThread() == thread()) return QStringLiteral("浏览工具须由 Agent 工作线程调用");
     auto request = std::make_shared<Request>();
-    QMetaObject::invokeMethod(this,[this,args,request]{ if (!request->cancelled) start(args,request); },Qt::QueuedConnection);
+    {
+        QMutexLocker lock(&queuedRequestsMutex_);
+        queuedRequests_.append(request);
+    }
+    QMetaObject::invokeMethod(this,[this,args,request]{
+        {
+            QMutexLocker lock(&queuedRequestsMutex_);
+            queuedRequests_.removeOne(request);
+        }
+        if (!request->cancelled) start(args,request);
+    },Qt::QueuedConnection);
     QMutexLocker lock(&request->mutex);
     while (!request->done) {
         if (abort && abort->isAborted()) { request->cancelled = true; return QStringLiteral("浏览器操作已取消"); }
@@ -462,8 +507,17 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
     if (!QStringList{"open","read","click","fill","select","scroll","back","wait_user"}.contains(action)) {
         finish(QStringLiteral("不支持的浏览器操作")); return;
     }
-    if (manual_ || action == "wait_user") {
-        takeOver(QStringLiteral("请在右侧完成登录或验证码，完成后 AI 会自动继续。")); return;
+    if (manual_) return;
+    if (action == "wait_user") {
+        if (authenticationWaitSkipped_) {
+            request_->authenticationStatus = QStringLiteral("skipped");
+            request_->args = QJsonObject{{"action","read"}};
+        } else {
+            const QString reason = args.value("reason").toString().trimmed();
+            if (reason.isEmpty()) { finish(QStringLiteral("wait_user 需要 reason：请说明任务为何必须登录；仅出现登录组件不构成理由。")); return; }
+            takeOver(reason.left(500));
+        }
+        return;
     }
     if (action == "open") {
         const QUrl url(args.value("url").toString());
@@ -534,42 +588,91 @@ void BrowserPanel::observe()
         if (request_ != request || manual_ || request->cancelled) return;
         if (generation != generation_) { request_->args = QJsonObject{{"action","read"}}; return; }
         const QString result = value.toString();
-        const auto object = QJsonDocument::fromJson(result.toUtf8()).object();
+        auto object = QJsonDocument::fromJson(result.toUtf8()).object();
         if (object.value("needsUser").toBool()) {
-            takeOver(QStringLiteral("检测到密码、验证码或认证页面，请你在右侧完成；完成后 AI 会自动继续。"));
+            if (authenticationWaitSkipped_) {
+                request_->authenticationStatus = QStringLiteral("skipped");
+                request_->args = QJsonObject{{"action","read"}};
+            } else {
+                takeOver(QStringLiteral("当前操作涉及认证或需要本人填写的字段，请在右侧处理。"));
+            }
         } else if (object.value("acted").toBool()) {
             request_->args = QJsonObject{{"action","read"},{"since",request_->args.value("snapshot")}};
             settled_.start(); settleMs_ = 350;
         } else if (!object.isEmpty()) {
-            finish(result);
+            if (!request->authenticationStatus.isEmpty()) {
+                object.insert(QStringLiteral("authenticationStatus"), request->authenticationStatus);
+                object.insert(QStringLiteral("guidance"), request->authenticationStatus == QStringLiteral("resumed")
+                    ? QStringLiteral("认证等待已结束，请核对当前页面并继续任务，不假设登录成功，也不要因残留登录组件再次暂停。")
+                    : QStringLiteral("请根据当前页面继续任务，不假设登录成功。本轮不再请求等待登录；优先公开页面、访客入口或其他公开来源，不绕过访问控制。若确实必须登录，说明已完成部分、受限原因及用户可执行的建议。"));
+            }
+            finish(QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact)));
         }
     });
 }
 
 void BrowserPanel::takeOver(const QString &reason)
 {
+    if (authenticationWaitSkipped_) return;
     const bool notify = !manual_;
     if (!manual_) manualWait_.start();
     manual_ = true;
+    authenticationBar_->show();
+    updateAuthenticationCountdown();
     ++generation_;
-    if (notify) emit attentionRequired(reason);
+    if (notify) emit attentionRequired(reason + QStringLiteral(" 无操作 %1 秒后将尝试未登录方式继续，也可点击“跳过登录”。").arg(authenticationWaitMs_ / 1000));
 }
 
 void BrowserPanel::resume()
 {
     manual_ = false;
+    authenticationBar_->hide();
     ++generation_;
-    if (request_) { request_->args = QJsonObject{{"action","read"}}; request_->elapsed.restart(); }
+    if (request_) { request_->args = QJsonObject{{"action","read"}}; request_->elapsed.restart(); request_->authenticationStatus = QStringLiteral("resumed"); }
+}
+
+void BrowserPanel::continueWithoutLogin()
+{
+    const bool timedOut = manualWait_.isValid() && manualWait_.elapsed() >= authenticationWaitMs_;
+    resume();
+    authenticationWaitSkipped_ = true;
+    if (request_) request_->authenticationStatus = timedOut ? QStringLiteral("timed_out") : QStringLiteral("skipped");
+    for (auto *dialog : findChildren<QInputDialog *>()) dialog->reject();
+    for (auto *dialog : findChildren<QMessageBox *>()) dialog->reject();
+}
+
+void BrowserPanel::resetAuthenticationWait()
+{
+    authenticationWaitSkipped_ = false;
+}
+
+void BrowserPanel::updateAuthenticationCountdown()
+{
+    const qint64 remaining = qMax<qint64>(0, authenticationWaitMs_ - manualWait_.elapsed());
+    authenticationCountdown_->setText(QStringLiteral("等待你完成认证：%1 秒后尝试未登录方式继续。网页操作会重新计时。").arg((remaining + 999) / 1000));
+}
+
+bool BrowserPanel::eventFilter(QObject *watched, QEvent *event)
+{
+    auto *widget = qobject_cast<QWidget *>(watched);
+    if (manual_ && widget && isAncestorOf(widget) &&
+        (event->type() == QEvent::KeyPress || event->type() == QEvent::MouseButtonPress ||
+         event->type() == QEvent::Wheel || event->type() == QEvent::TouchBegin)) {
+        manualWait_.restart();
+        updateAuthenticationCountdown();
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 // 页面离开认证环节后自动把控制权交还 AI，无需任何按钮。
 void BrowserPanel::checkAutoResume()
 {
-    if (!manual_ || !request_ || evaluating_ || loading_) return;
-    if (manualWait_.isValid() && manualWait_.elapsed() > kManualWaitTimeoutMs) {
-        finish(QStringLiteral("等待用户完成认证超时，请重试或稍后再让我操作。"),true);
+    if (!manual_) return;
+    if (manualWait_.isValid() && manualWait_.elapsed() >= authenticationWaitMs_) {
+        continueWithoutLogin();
         return;
     }
+    if (!request_ || evaluating_ || loading_) return;
     // 刚交出控制权时先让用户动手，别立刻抢回来。
     if (!manualWait_.isValid() || manualWait_.elapsed() < kManualMinWaitMs) return;
     if (settled_.isValid() && settled_.elapsed() < settleMs_) return;
@@ -594,10 +697,12 @@ void BrowserPanel::cancel()
     view_->stop();
     // 取消后不再挂起，否则用户的下一条指令会被卡在“等待接管”上。
     manual_ = false;
+    authenticationBar_->hide();
 }
 
 void BrowserPanel::clearSnapshotCache()
 {
+    resetAuthenticationWait();
     view_->page()->runJavaScript(QStringLiteral(
         "if(globalThis.__ntBrowserTextCache) globalThis.__ntBrowserTextCache.observer.disconnect();"
         "delete globalThis.__ntBrowserTextCache; delete globalThis.__ntBrowserState;"),

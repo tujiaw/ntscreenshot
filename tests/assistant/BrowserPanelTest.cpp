@@ -10,6 +10,9 @@
 #include <QJsonArray>
 #include <QThread>
 #include <QTimer>
+#include <QLabel>
+#include <QPushButton>
+#include <QKeyEvent>
 #include <iostream>
 
 static void check(bool value, const QString &message)
@@ -36,6 +39,8 @@ int main(int argc, char **argv)
                     body = "<html><body>LOGIN_SECRET<input type=password value=NEVER_EXPOSE><button onclick=\"document.cookie='session=ok; path=/';location.href='/account'\">Sign in</button></body></html>";
                 else if (request.contains("GET /account "))
                     body = request.contains("session=ok") ? "<html><body>ACCOUNT_READY<a href='/'>Home</a></body></html>" : "<html><body>NO_SESSION</body></html>";
+                else if (request.contains("GET /optional "))
+                    body = "<html><body><h1>PUBLIC_ARTICLE</h1><form><input name=username value=PRIVATE_USER><input type=password value=NEVER_EXPOSE></form><button onclick=\"document.getElementById('result').innerText='PUBLIC_DONE'\">Public action</button><p id=result>Ready</p></body></html>";
                 else if (request.contains("GET /long ")) {
                     body = "<html><body><p id=long>" + QByteArray(14000,'x') + "</p><p>NEEDLE_TARGET</p>";
                     for (int i=0;i<45;++i) body += "<button>Item " + QByteArray::number(i) + "</button>";
@@ -52,7 +57,7 @@ int main(int argc, char **argv)
         }
     });
     const QString base = QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort());
-    auto *panel = new BrowserPanel;
+    auto *panel = new BrowserPanel(nullptr, 8000);
     panel->resize(850,600);
     panel->show();
     auto run = [&](const QJsonObject &args, bool cancel = false) {
@@ -121,28 +126,65 @@ int main(int argc, char **argv)
     snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",1}});
     check(snapshot.value("code") == "stale_snapshot" && snapshot.contains("snapshot"),"clearing conversation did not invalidate browser cache");
 
-    // 认证页应自动暂停并把控制权交给用户，用户完成登录后无需任何按钮，AI 自动继续。
+    // Optional login components must not block public content or ordinary actions.
     int attention = 0;
+    auto counter = QObject::connect(panel,&BrowserPanel::attentionRequired,panel,[&](const QString &){ ++attention; });
+    snapshot = read({{"action","open"},{"url",base+"/optional"}});
+    check(attention == 0 && snapshot.value("authenticationUiPresent").toBool() && snapshot.value("content").toString().contains("PUBLIC_ARTICLE"),"optional login blocked public reading");
+    const QString optionalResult = QString::fromUtf8(QJsonDocument(snapshot).toJson());
+    check(!optionalResult.contains("PRIVATE_USER") && !optionalResult.contains("NEVER_EXPOSE"),"credential values leaked in snapshot");
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",3}});
+    check(attention == 0 && snapshot.value("content").toString().contains("PUBLIC_DONE"),"optional login blocked public action");
+    QObject::disconnect(counter);
+
+    // Only an explicit task-related handoff pauses; completing login resumes automatically.
+    snapshot = read({{"action","open"},{"url",base+"/login"}});
     const auto connection = QObject::connect(panel,&BrowserPanel::attentionRequired,panel,[&](const QString &){
         ++attention;
+        auto *countdown = panel->findChild<QLabel *>(QStringLiteral("browserAuthenticationCountdown"));
+        check(countdown && countdown->isVisible() && !countdown->text().isEmpty(),"authentication countdown not shown");
         // Simulate the human completing authentication in exactly the same visible page.
         QTimer::singleShot(250,panel,[&]{ view->page()->runJavaScript("document.querySelector('button').click()"); });
     });
-    const QString loggedIn = run({{"action","open"},{"url",base+"/login"}});
+    const QString loggedIn = run({{"action","wait_user"},{"reason","The requested account page requires authentication"}});
     check(attention == 1,"login did not pause for user");
     check(loggedIn.contains("ACCOUNT_READY") && !loggedIn.contains("LOGIN_SECRET") && !loggedIn.contains("NEVER_EXPOSE"),"login handoff did not preserve session or leaked authentication page");
     QObject::disconnect(connection);
     check(run({{"action","open"},{"url",base+"/account"}}).contains("ACCOUNT_READY"),"cookies not retained across calls");
+    panel->resetAuthenticationWait();
+    snapshot = read({{"action","open"},{"url",base+"/optional"}});
+    counter = QObject::connect(panel,&BrowserPanel::attentionRequired,panel,[&](const QString &){ ++attention; });
+    QElapsedTimer waitTime;
+    waitTime.start();
+    QTimer::singleShot(1000,panel,[&]{
+        QKeyEvent activity(QEvent::KeyPress,Qt::Key_Shift,Qt::ShiftModifier);
+        QApplication::sendEvent(view,&activity);
+    });
+    snapshot = read({{"action","wait_user"},{"reason","Test an authentication-gated task"}});
+    check(snapshot.value("authenticationStatus") == "timed_out" && snapshot.contains("snapshot") && waitTime.elapsed() >= 8800,"idle timeout did not reset on user activity or return current page to AI");
+    const int afterTimeout = attention;
+    snapshot = read({{"action","wait_user"},{"reason","Repeated authentication request"}});
+    check(attention == afterTimeout && snapshot.value("authenticationStatus") == "skipped","timeout caused repeated authentication prompts");
+    snapshot = read({{"action","click"},{"snapshot",snapshot.value("snapshot")},{"element",3}});
+    check(snapshot.value("content").toString().contains("PUBLIC_DONE"),"cannot continue public task after timeout");
+    panel->resetAuthenticationWait();
+    const auto skipConnection = QObject::connect(panel,&BrowserPanel::attentionRequired,panel,[&](const QString &){
+        QTimer::singleShot(100,panel,[&]{ panel->findChild<QPushButton *>(QStringLiteral("browserSkipAuthentication"))->click(); });
+    });
+    snapshot = read({{"action","fill"},{"snapshot",snapshot.value("snapshot")},{"element",2},{"text","DO_NOT_WRITE"}});
+    check(snapshot.value("authenticationStatus") == "skipped","sensitive field did not hand off or skip failed");
+    QObject::disconnect(skipConnection);
+    QObject::disconnect(counter);
     check(run({{"action","open"},{"url","file:///C:/Windows/win.ini"}}).contains("HTTP/HTTPS"),"unsafe URL accepted");
-    check(run({{"action","wait_user"}},true).contains(QStringLiteral("取消")),"cancel while waiting failed");
-    panel->resume();
+    panel->resetAuthenticationWait();
+    check(run({{"action","wait_user"},{"reason","Cancellation test"}},true).contains(QStringLiteral("取消")),"cancel while waiting failed");
     check(run({{"action","open"},{"url",base+"/hang"}},true).contains(QStringLiteral("取消")),"cancel navigation failed");
     snapshot = read({{"action","open"},{"url",base}});
     check(snapshot.contains("snapshot"),"cannot recover after cancellation");
     if (app.arguments().contains("--capture")) panel->grab().save("browser-panel.png");
     // Destruction wakes a waiting worker and destroys page before profile.
     QTimer::singleShot(350,&app,[&]{ delete panel; panel = nullptr; });
-    check(run({{"action","wait_user"}}).contains(QStringLiteral("关闭")),"close did not wake waiting worker");
+    check(run({{"action","wait_user"},{"reason","Close test"}}).contains(QStringLiteral("关闭")),"close did not wake waiting worker");
     panel = new BrowserPanel;
     check(run({{"action","open"},{"url",base+"/account"}}).contains("NO_SESSION"),"cookies leaked into another conversation");
     delete panel;
