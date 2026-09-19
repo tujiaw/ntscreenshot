@@ -702,6 +702,7 @@ void ChatWidget::initializeChatUi()
     connect(inputWidget_, &ChatInputWidget::sigStopRequested, browserPanel_, &BrowserPanel::cancel);
     refreshToolRegistry();
     agent_->setMaxIterations(10);
+    agent_->setMaxToolCalls(16);
 
     connect(agent_, &Agent::AgentRunner::sigStreamStarted, this, &ChatWidget::onChatStreamStarted);
     connect(agent_, &Agent::AgentRunner::sigStreamDelta, this, &ChatWidget::onChatStreamDelta);

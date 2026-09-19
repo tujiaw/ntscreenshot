@@ -19,6 +19,7 @@
 #include <QSslConfiguration>
 #include <QTimer>
 #include <QStringList>
+#include <QRegularExpression>
 #include "shared/ui/TipsWidget.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/network/HttpRequest.h"
@@ -481,6 +482,7 @@ void OpenAIChat::resetConversation()
     droppedQueue_.clear();
     summaryPending_ = false;
     summaryBuffer_.clear();
+    finalAnswerMode_ = false;
     if (summaryReply_) {
         summaryReply_->disconnect(this);
         summaryReply_->abort();
@@ -581,6 +583,13 @@ void OpenAIChat::postConversation()
             "\n\n# 可用工具\n"
             "\n"
             "当前未启用联网，你无法调用任何工具。请基于已有知识直接回答；对不确定或时效性强的信息，明确说明无法联网核实。\n");
+    }
+    if (finalAnswerMode_) {
+        systemContent += QStringLiteral(
+            "\n\n# 结果整理模式\n"
+            "工具调用阶段已经结束。请只根据当前对话中已经获得的网页内容、工具结果和用户上下文回答。"
+            "不要提及工具预算、调用次数、迭代上限或内部限制，也不要声称已经完成未实际完成的操作。"
+            "如果证据不足，直接说明已确认的内容、缺少的部分，并给出下一步建议。\n");
     }
     if (!summaryText_.isEmpty()) {
         systemContent += QStringLiteral(
@@ -760,8 +769,14 @@ void OpenAIChat::handleReplyReadyRead()
                 emit sigStreamStarted();
             }
 
-            streamingText_ += deltaText;
-            emit sigStreamDelta(deltaText);
+            // Some OpenAI-compatible gateways leak their internal DSML tool syntax
+            // as assistant text. Never expose that protocol markup in the chat UI.
+            if (deltaText.contains(QStringLiteral("DSML"), Qt::CaseInsensitive)) {
+                qWarning() << "LLM Protocol Warning: suppressed raw tool-call markup from assistant text";
+            } else {
+                streamingText_ += deltaText;
+                emit sigStreamDelta(deltaText);
+            }
         }
 
         // Accumulate streaming tool_call deltas
@@ -933,7 +948,13 @@ void OpenAIChat::handleNonStreamingReply(const QByteArray &responseData)
         emit sigToolCallsReceived(toolCalls, textContent,
                                   extractReasoningContentFromMessageObject(messageObject));
     } else {
-        const QString text = extractAssistantTextFromMessageObject(messageObject);
+        QString text = extractAssistantTextFromMessageObject(messageObject);
+        if (text.contains(QStringLiteral("DSML"), Qt::CaseInsensitive)) {
+            qWarning() << "LLM Protocol Warning: response contained raw tool-call markup; removing it";
+            text.replace(QRegularExpression(QStringLiteral("<[^>]*DSML[^>]*>"),
+                                             QRegularExpression::CaseInsensitiveOption), QString());
+            text = text.trimmed();
+        }
         if (!text.isEmpty()) {
             qDebug() << "LLM Response Result: non-streaming text only,"
                      << "chars =" << text.size()
@@ -948,6 +969,11 @@ void OpenAIChat::handleNonStreamingReply(const QByteArray &responseData)
             emit sigError(QStringLiteral("响应 content 为空"));
         }
     }
+}
+
+void OpenAIChat::setFinalAnswerMode(bool enabled)
+{
+    finalAnswerMode_ = enabled;
 }
 
 void OpenAIChat::resetActiveReplyState()

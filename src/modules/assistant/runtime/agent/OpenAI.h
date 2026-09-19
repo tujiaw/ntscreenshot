@@ -27,6 +27,7 @@ public:
     // --- 对话控制 ---
     void setStreamingEnabled(bool enabled);
     void setToolDefinitions(const QJsonArray &definitions);
+    void setFinalAnswerMode(bool enabled);
     void appendConversationMessage(const QJsonObject &message);
     void restoreSession(const QJsonArray &messages, const QString &summaryText);
     void postConversationAsync();
@@ -97,6 +98,7 @@ private:
     // 可选配置
     bool streamingEnabled_ = false;
     QJsonArray toolDefinitions_;
+    bool finalAnswerMode_ = false;
     Agent::ToolCallAccumulator streamToolCallAccumulator_;
 
     // Rate limit retry

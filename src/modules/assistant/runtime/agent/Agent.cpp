@@ -145,6 +145,12 @@ void AgentRunner::setMaxIterations(int max)
     qDebug() << "[Agent] Max iterations set to:" << maxIterations_;
 }
 
+void AgentRunner::setMaxToolCalls(int max)
+{
+    maxToolCalls_ = qMax(1, max);
+    qDebug() << "[Agent] Max browser/tool calls set to:" << maxToolCalls_;
+}
+
 void AgentRunner::setupChat()
 {
     if (chat_) {
@@ -232,6 +238,7 @@ void AgentRunner::run(const QString &userMessage)
     running_ = true;
     stopped_ = false;
     currentIteration_ = 0;
+    toolCallsUsed_ = 0;
     emit sigStateChanged(true);
 
     qDebug() << "[Agent] >>> Agent started (text), max iterations:" << maxIterations_;
@@ -249,6 +256,7 @@ void AgentRunner::runWithImages(const QString &text, const QList<QPixmap> &image
     running_ = true;
     stopped_ = false;
     currentIteration_ = 0;
+    toolCallsUsed_ = 0;
     emit sigStateChanged(true);
 
     qDebug() << "[Agent] >>> Agent started (images:" << images.size()
@@ -263,6 +271,7 @@ void AgentRunner::retryLastResponse()
     running_ = true;
     stopped_ = false;
     currentIteration_ = 0;
+    toolCallsUsed_ = 0;
     emit sigStateChanged(true);
 
     qDebug() << "[Agent] >>> Agent retry requested, max iterations:" << maxIterations_;
@@ -356,6 +365,7 @@ void AgentRunner::restoreSession(const QJsonArray &messages, const QString &summ
 void AgentRunner::doRun(const QString &userMessage)
 {
     qDebug() << "[Agent] Worker: doRun";
+    chat_->setFinalAnswerMode(false);
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -365,6 +375,7 @@ void AgentRunner::doRun(const QString &userMessage)
 void AgentRunner::doRunWithImages(const QString &text, const QList<QPixmap> &images)
 {
     qDebug() << "[Agent] Worker: doRunWithImages — images:" << images.size();
+    chat_->setFinalAnswerMode(false);
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -374,6 +385,7 @@ void AgentRunner::doRunWithImages(const QString &text, const QList<QPixmap> &ima
 void AgentRunner::doRetry()
 {
     qDebug() << "[Agent] Worker: doRetry — resending last conversation";
+    chat_->setFinalAnswerMode(false);
     currentIteration_ = 1;
     phase_.store(Phase::WaitingLlm);
     emit sigIterationChanged(currentIteration_, maxIterations_);
@@ -397,11 +409,32 @@ void AgentRunner::handleWorkerToolCalls(const QJsonArray &toolCalls, const QStri
 void AgentRunner::beginToolBatch(const QList<ToolCall> &calls)
 {
     phase_.store(Phase::ExecutingTools);
-    pendingCalls_ = calls;
+    const int remaining = qMax(0, maxToolCalls_ - toolCallsUsed_);
+    pendingCalls_ = calls.mid(0, remaining);
     pendingCallIndex_ = 0;
 
+    if (pendingCalls_.size() < calls.size()) {
+        qWarning() << "[Agent] Tool budget reached; preserving conversation for final synthesis"
+                   << "used=" << toolCallsUsed_ << "limit=" << maxToolCalls_;
+    }
+
+    // Keep the conversation protocol valid when the incoming batch is larger
+    // than the remaining budget. Omitted calls must not appear as unfulfilled
+    // tool_calls in the assistant message.
+    if (pendingCalls_.isEmpty()) {
+        if (!pendingTextContent_.isEmpty()) {
+            QJsonObject assistantMsg;
+            assistantMsg[KEY_ROLE] = QStringLiteral("assistant");
+            assistantMsg[KEY_CONTENT] = pendingTextContent_;
+            chat_->appendConversationMessage(assistantMsg);
+            syncSessionCache();
+        }
+        afterAllTools();
+        return;
+    }
+
     QJsonArray toolCallsJson;
-    for (const ToolCall &call : calls) {
+    for (const ToolCall &call : pendingCalls_) {
         QJsonObject funcObj;
         funcObj[KEY_NAME] = call.name;
         funcObj[KEY_ARGUMENTS] = call.arguments;
@@ -465,6 +498,7 @@ void AgentRunner::executeCurrentTool()
     }
 
     const ToolCall call = pendingCalls_.at(pendingCallIndex_);
+    ++toolCallsUsed_;
     QString result;
     QString fullResult;
     if (!registry_ || !registry_->hasTool(call.name)) {
@@ -498,7 +532,7 @@ void AgentRunner::afterAllTools()
         return;
     }
 
-    if (currentIteration_ >= maxIterations_) {
+    if (currentIteration_ >= maxIterations_ || toolCallsUsed_ >= maxToolCalls_) {
         qDebug() << "[Agent] Max iterations reached after tool processing — final answer without tools";
         runFinalAnswerWithoutTools();
         return;
@@ -522,6 +556,7 @@ void AgentRunner::runFinalAnswerWithoutTools()
     }
 
     chat_->setToolDefinitions(QJsonArray());
+    chat_->setFinalAnswerMode(true);
     phase_.store(Phase::WaitingLlm);
     qDebug() << "[Agent] Final answer without tools — posting once, no tool definitions";
     chat_->postConversationAsync();

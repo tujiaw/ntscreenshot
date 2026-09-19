@@ -512,6 +512,8 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
         if (authenticationWaitSkipped_) {
             request_->authenticationStatus = QStringLiteral("skipped");
             request_->args = QJsonObject{{"action","read"}};
+            settled_.start();
+            settleMs_ = 0;
         } else {
             const QString reason = args.value("reason").toString().trimmed();
             if (reason.isEmpty()) { finish(QStringLiteral("wait_user 需要 reason：请说明任务为何必须登录；仅出现登录组件不构成理由。")); return; }
@@ -593,6 +595,8 @@ void BrowserPanel::observe()
             if (authenticationWaitSkipped_) {
                 request_->authenticationStatus = QStringLiteral("skipped");
                 request_->args = QJsonObject{{"action","read"}};
+                settled_.start();
+                settleMs_ = 0;
             } else {
                 takeOver(QStringLiteral("当前操作涉及认证或需要本人填写的字段，请在右侧处理。"));
             }
@@ -697,6 +701,7 @@ void BrowserPanel::cancel()
     view_->stop();
     // 取消后不再挂起，否则用户的下一条指令会被卡在“等待接管”上。
     manual_ = false;
+    authenticationWaitSkipped_ = false;
     authenticationBar_->hide();
 }
 
