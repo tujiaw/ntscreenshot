@@ -117,7 +117,6 @@ private:
     bool restoringLayout_ = false;
     QPushButton *closeBtn_;
     QPushButton *pinBtn_;
-    QPushButton *clearBtn_;
     QPushButton *maxBtn_ = nullptr;
     bool pinned_;
     Agent::AgentRunner *agent_;

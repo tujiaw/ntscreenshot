@@ -179,7 +179,6 @@ ChatWidget::ChatWidget(
     , inputWidget_(nullptr)
     , pinBtn_(nullptr)
     , closeBtn_(nullptr)
-    , clearBtn_(nullptr)
     , agent_(nullptr)
     , toolRegistry_(nullptr)
     , webBridge_(nullptr)
@@ -234,14 +233,6 @@ ChatWidget::ChatWidget(
     pinBtn_->setToolTip(QStringLiteral("置顶"));
     connect(pinBtn_, &QPushButton::toggled, this, &ChatWidget::onPinToggled);
 
-    clearBtn_ = new QPushButton(titleBar_);
-    clearBtn_->setObjectName(QStringLiteral("chatClearButton"));
-    clearBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
-    clearBtn_->setIconSize(QSize(Util::scaleSize(18), Util::scaleSize(18)));
-    clearBtn_->setCursor(Qt::PointingHandCursor);
-    clearBtn_->setToolTip(QStringLiteral("清空历史"));
-    connect(clearBtn_, &QPushButton::clicked, this, &ChatWidget::onClearHistoryRequested);
-
     maxBtn_ = new QPushButton(titleBar_);
     maxBtn_->setObjectName(QStringLiteral("chatMaximizeButton"));
     maxBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
@@ -269,7 +260,6 @@ ChatWidget::ChatWidget(
     titleLayout->addWidget(titleLabel_, 0, Qt::AlignVCenter);
     titleLayout->addStretch();
     titleLayout->addWidget(pinBtn_, 0, Qt::AlignVCenter);
-    titleLayout->addWidget(clearBtn_, 0, Qt::AlignVCenter);
     titleLayout->addWidget(maxBtn_, 0, Qt::AlignVCenter);
     titleLayout->addWidget(closeBtn_, 0, Qt::AlignVCenter);
 
@@ -632,6 +622,7 @@ void ChatWidget::initializeChatUi()
     // inputWidget_->setPlaceholderText("问问AI");
     connect(inputWidget_, &ChatInputWidget::sigSendRequested, this, &ChatWidget::onSendRequested);
     connect(inputWidget_, &ChatInputWidget::sigStopRequested, this, &ChatWidget::onStopRequested);
+    connect(inputWidget_, &ChatInputWidget::sigClearRequested, this, &ChatWidget::onClearHistoryRequested);
     chatLayout->addWidget(inputWidget_);
 
     agent_ = new Agent::AgentRunner(settings_, this);
@@ -792,7 +783,7 @@ QString ChatWidget::pixmapToDataUrl(const QPixmap &image) const
 
 bool ChatWidget::isDraggableTitleArea(const QPoint &pos) const
 {
-    if (!closeBtn_ || !pinBtn_ || !clearBtn_ || !maxBtn_) {
+    if (!closeBtn_ || !pinBtn_ || !maxBtn_) {
         return false;
     }
 
@@ -803,7 +794,6 @@ bool ChatWidget::isDraggableTitleArea(const QPoint &pos) const
 
     if (closeBtn_->geometry().contains(pos) ||
         pinBtn_->geometry().contains(pos) ||
-        clearBtn_->geometry().contains(pos) ||
         maxBtn_->geometry().contains(pos)) {
         return false;
     }
@@ -847,7 +837,7 @@ void ChatWidget::applyPinnedState(bool pinned)
 
 void ChatWidget::refreshTitleBarButtons()
 {
-    if (!pinBtn_ || !clearBtn_ || !closeBtn_ || !maxBtn_) {
+    if (!pinBtn_ || !closeBtn_ || !maxBtn_) {
         return;
     }
 
@@ -868,14 +858,6 @@ void ChatWidget::refreshTitleBarButtons()
         hoverBg,
         dark ? "rgba(147,197,253,0.48)" : "rgba(37,99,235,0.24)",
         dark ? "rgba(59,130,246,0.18)" : "rgba(37,99,235,0.12)"));
-
-    clearBtn_->setIcon(colorizedIcon(QStringLiteral(":/images/clear.png"), iconColor));
-    clearBtn_->setStyleSheet(buildTitleButtonStyle(
-        QStringLiteral("chatClearButton"),
-        normalBorder,
-        normalBg,
-        dark ? "rgba(251,191,36,0.48)" : "rgba(217,119,6,0.20)",
-        dark ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.10)"));
 
     closeBtn_->setIcon(colorizedIcon(QStringLiteral(":/images/remove.png"), iconColor));
     closeBtn_->setStyleSheet(buildTitleButtonStyle(

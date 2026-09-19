@@ -238,6 +238,7 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
     , inputEdit_(nullptr)
     , addButton_(nullptr)
     , modelButton_(nullptr)
+    , clearButton_(nullptr)
     , sendButton_(nullptr)
     , pending_(false)
 {
@@ -314,6 +315,16 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
     sendButton_->setCursor(Qt::PointingHandCursor);
     connect(sendButton_, &QPushButton::clicked, this, &ChatInputWidget::onSendClicked);
 
+    clearButton_ = new QToolButton(surface);
+    // 与联网/浏览器开关保持一致：按钮本身不留额外 padding，图标铺满 18px 区域。
+    clearButton_->setObjectName(QStringLiteral("chatInputToggleButton"));
+    clearButton_->setFixedSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx));
+    clearButton_->setIconSize(QSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx)));
+    clearButton_->setIcon(ThemeIcon::icon(QStringLiteral("clear.png"), IconTone::Muted, 18));
+    clearButton_->setCursor(Qt::PointingHandCursor);
+    clearButton_->setToolTip(QStringLiteral("清空历史"));
+    connect(clearButton_, &QToolButton::clicked, this, &ChatInputWidget::sigClearRequested);
+
     toolbarLayout->addWidget(addButton_);
     toolbarLayout->addWidget(modelButton_);
     // 联网与浏览器操作互斥：两个图标按钮并排，开启一个会自动关闭另一个。
@@ -352,6 +363,8 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
     toolbarLayout->addSpacing(Util::scaleSize(kChatInputToggleGapPx));
     toolbarLayout->addWidget(browserButton_);
     toolbarLayout->addStretch();
+    toolbarLayout->addWidget(clearButton_);
+    toolbarLayout->addSpacing(Util::scaleSize(8));
     toolbarLayout->addWidget(sendButton_);
     surfaceLayout->addLayout(toolbarLayout);
 
@@ -649,6 +662,9 @@ void ChatInputWidget::refreshToggleButtons()
         browserButton_->setToolTip(enabled
             ? QStringLiteral("浏览器已开启：模型可操作右侧浏览器（点击关闭）")
             : QStringLiteral("浏览器已关闭：点击允许模型操作右侧浏览器（与联网二选一）"));
+    }
+    if (clearButton_) {
+        clearButton_->setIcon(ThemeIcon::icon(QStringLiteral("clear.png"), IconTone::Muted, 18));
     }
 }
 

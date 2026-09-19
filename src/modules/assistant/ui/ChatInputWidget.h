@@ -33,6 +33,7 @@ public:
 signals:
     void sigSendRequested(const QString &text, const QList<QPixmap> &images);
     void sigStopRequested();
+    void sigClearRequested();
     void sigWebEnabledChanged(bool enabled);
     void sigBrowserEnabledChanged(bool enabled);
 
@@ -79,6 +80,7 @@ private:
     QToolButton *modelButton_;
     QToolButton *webButton_ = nullptr;
     QToolButton *browserButton_ = nullptr;
+    QToolButton *clearButton_ = nullptr;
     QPushButton *sendButton_;
     QList<QuotedReferenceItem> quotedReferences_;
     bool pending_;
