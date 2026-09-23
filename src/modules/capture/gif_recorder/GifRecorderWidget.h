@@ -15,7 +15,8 @@ class GifRecorderWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit GifRecorderWidget(const QRect &captureRect, QWidget *parent = nullptr);
+    explicit GifRecorderWidget(const QRect &captureRect, const QString &outputDirectory,
+                               QWidget *parent = nullptr);
     ~GifRecorderWidget() override;
 
     void stopRecording();
@@ -34,6 +35,8 @@ protected:
 private slots:
     void onRecord();
     void onStop();
+    void onCopy();
+    void onOpen();
     void onCancel();
     void onEncoderReady(bool success, const QString &error);
     void onCaptureTimer();
@@ -42,6 +45,7 @@ private slots:
 
 private:
     enum class State { Preparing, Starting, Recording, Encoding, Closed };
+    enum class CompletionAction { None, Copy, Open };
 
     QRect contentRect() const;
     void positionControlPanel();
@@ -49,12 +53,15 @@ private:
     QString defaultOutputPath() const;
 
     QRect captureRect_;
+    QString outputDirectory_;
+    QString outputPath_;
     GifRecorderControlPanel *controlPanel_ = nullptr;
     QTimer *captureTimer_ = nullptr;
     QThread *encoderThread_ = nullptr;
     GifEncoderWorker *encoderWorker_ = nullptr;
     QElapsedTimer elapsed_;
     State state_ = State::Preparing;
+    CompletionAction completionAction_ = CompletionAction::None;
     int borderWidth_ = 3;
     int pendingFrames_ = 0;
     int capturedFrames_ = 0;

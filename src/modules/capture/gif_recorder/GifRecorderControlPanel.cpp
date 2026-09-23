@@ -39,14 +39,21 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     elapsedLabel_ = new QLabel(QStringLiteral("00:00 · 0"), this);
     elapsedLabel_->setObjectName(QStringLiteral("gifElapsedLabel"));
     recordButton_ = new QPushButton(QStringLiteral("录制"), this);
-    stopButton_ = new QPushButton(QStringLiteral("停止"), this);
+    copyButton_ = new QPushButton(QStringLiteral("完成/复制"), this);
+    openButton_ = new QPushButton(QStringLiteral("完成/打开"), this);
     cancelButton_ = new QToolButton(this);
 
     recordButton_->setObjectName(QStringLiteral("gifRecordButton"));
-    stopButton_->setObjectName(QStringLiteral("gifStopButton"));
+    copyButton_->setObjectName(QStringLiteral("gifCopyButton"));
+    copyButton_->setToolTip(QStringLiteral("复制 GIF 文件到剪贴板"));
+    openButton_->setObjectName(QStringLiteral("gifOpenButton"));
+    openButton_->setToolTip(QStringLiteral("打开已保存的 GIF 文件"));
     cancelButton_->setObjectName(QStringLiteral("gifCloseButton"));
     recordButton_->setFixedSize(56, 24);
-    stopButton_->setFixedSize(56, 24);
+    copyButton_->setMinimumWidth(copyButton_->fontMetrics().horizontalAdvance(copyButton_->text()) + 28);
+    openButton_->setMinimumWidth(openButton_->fontMetrics().horizontalAdvance(openButton_->text()) + 28);
+    copyButton_->setFixedHeight(24);
+    openButton_->setFixedHeight(24);
     cancelButton_->setFixedSize(22, 22);
     cancelButton_->setIconSize(QSize(12, 12));
     cancelButton_->setIcon(ThemeIcon::icon(QStringLiteral("icon_window_close.png")));
@@ -58,11 +65,13 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     layout->addWidget(elapsedLabel_);
     layout->addSpacing(8);
     layout->addWidget(recordButton_);
-    layout->addWidget(stopButton_);
+    layout->addWidget(copyButton_);
+    layout->addWidget(openButton_);
     layout->addWidget(cancelButton_);
 
     connect(recordButton_, &QPushButton::clicked, this, &GifRecorderControlPanel::sigRecordClicked);
-    connect(stopButton_, &QPushButton::clicked, this, &GifRecorderControlPanel::sigStopClicked);
+    connect(copyButton_, &QPushButton::clicked, this, &GifRecorderControlPanel::sigCopyClicked);
+    connect(openButton_, &QPushButton::clicked, this, &GifRecorderControlPanel::sigOpenClicked);
     connect(cancelButton_, &QToolButton::clicked, this, &GifRecorderControlPanel::sigCancelClicked);
     setPreparing();
 }
@@ -108,30 +117,37 @@ void GifRecorderControlPanel::setElapsedMilliseconds(qint64 milliseconds, int fr
 void GifRecorderControlPanel::setPreparing()
 {
     fpsEdit_->setEnabled(true);
+    fpsEdit_->show();
     recordButton_->setEnabled(true);
+    recordButton_->show();
     recordButton_->setText(QStringLiteral("录制"));
-    stopButton_->setEnabled(false);
-    stopButton_->setText(QStringLiteral("停止"));
+    copyButton_->hide();
+    openButton_->hide();
     cancelButton_->setEnabled(true);
+    cancelButton_->setToolTip(QStringLiteral("取消录制 (Esc)"));
     setElapsedMilliseconds(0, 0);
+    adjustSize();
 }
 
 void GifRecorderControlPanel::setRecording()
 {
     fpsEdit_->setEnabled(false);
-    recordButton_->setEnabled(false);
-    stopButton_->setEnabled(true);
-    stopButton_->setText(QStringLiteral("停止"));
+    recordButton_->hide();
+    copyButton_->show();
+    copyButton_->setEnabled(true);
+    openButton_->show();
+    openButton_->setEnabled(true);
     cancelButton_->setEnabled(true);
     setElapsedMilliseconds(0, 0);
+    adjustSize();
 }
 
 void GifRecorderControlPanel::setStarting()
 {
     fpsEdit_->setEnabled(false);
     recordButton_->setEnabled(false);
-    stopButton_->setEnabled(false);
-    stopButton_->setText(QStringLiteral("停止"));
+    copyButton_->setEnabled(false);
+    openButton_->setEnabled(false);
     cancelButton_->setEnabled(true);
     elapsedLabel_->setText(QStringLiteral("准备中…"));
 }
@@ -140,8 +156,8 @@ void GifRecorderControlPanel::setEncoding()
 {
     fpsEdit_->setEnabled(false);
     recordButton_->setEnabled(false);
-    stopButton_->setEnabled(false);
-    stopButton_->setText(QStringLiteral("停止"));
+    copyButton_->setEnabled(false);
+    openButton_->setEnabled(false);
     cancelButton_->setEnabled(false);
     elapsedLabel_->setText(QStringLiteral("保存中…"));
 }

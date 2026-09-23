@@ -24,7 +24,8 @@ public:
 
 signals:
     void sigRecordClicked();
-    void sigStopClicked();
+    void sigCopyClicked();
+    void sigOpenClicked();
     void sigCancelClicked();
 
 protected:
@@ -35,6 +36,7 @@ protected:
     QLabel *elapsedLabel_ = nullptr;
     QLineEdit *fpsEdit_ = nullptr;
     QPushButton *recordButton_ = nullptr;
-    QPushButton *stopButton_ = nullptr;
+    QPushButton *copyButton_ = nullptr;
+    QPushButton *openButton_ = nullptr;
     QToolButton *cancelButton_ = nullptr;
 };

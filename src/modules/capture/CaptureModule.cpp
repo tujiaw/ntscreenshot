@@ -92,7 +92,12 @@ void CaptureModule::openGifRecorder(const QRect& captureRect)
         previous->deleteLater();
     }
 
-    gifRecorder_ = std::make_unique<GifRecorderWidget>(captureRect, nullptr);
+    QString outputDirectory;
+    if (settings_) {
+        bool autoSave = false;
+        settings_->getAutoSaveImage(autoSave, outputDirectory);
+    }
+    gifRecorder_ = std::make_unique<GifRecorderWidget>(captureRect, outputDirectory, nullptr);
     connect(gifRecorder_.get(), &GifRecorderWidget::sigWindowClosed, this, [this]() {
         if (gifRecorder_) {
             gifRecorder_.release()->deleteLater();

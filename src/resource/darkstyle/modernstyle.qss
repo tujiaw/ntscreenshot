@@ -517,13 +517,13 @@ QWidget#GifRecorderControlPanel QPushButton:disabled {
     border-color: @BORDER@;
 }
 QWidget#GifRecorderControlPanel QPushButton#gifRecordButton:enabled,
-QWidget#GifRecorderControlPanel QPushButton#gifStopButton:enabled {
+QWidget#GifRecorderControlPanel QPushButton#gifCopyButton:enabled {
     color: #FFFFFF;
     background: @ACCENT@;
     border-color: @ACCENT@;
 }
 QWidget#GifRecorderControlPanel QPushButton#gifRecordButton:enabled:hover,
-QWidget#GifRecorderControlPanel QPushButton#gifStopButton:enabled:hover {
+QWidget#GifRecorderControlPanel QPushButton#gifCopyButton:enabled:hover {
     background: @ACCENT_HOVER@;
     border-color: @ACCENT_HOVER@;
 }

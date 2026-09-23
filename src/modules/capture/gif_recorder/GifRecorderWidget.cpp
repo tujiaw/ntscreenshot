@@ -5,16 +5,21 @@
 #include "core/platform/Util.h"
 #include "core/theme/ThemeManager.h"
 #include "shared/ui/TipsWidget.h"
-#include "modules/capture/pin/PinWidget.h"
 
+#include <QApplication>
+#include <QClipboard>
 #include <QDateTime>
-#include <QFileDialog>
+#include <QDir>
+#include <QFileInfo>
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QPainter>
 #include <QRegion>
 #include <QShortcut>
+#include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
+#include <QUrl>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -23,9 +28,11 @@
 #endif
 #endif
 
-GifRecorderWidget::GifRecorderWidget(const QRect &captureRect, QWidget *parent)
+GifRecorderWidget::GifRecorderWidget(const QRect &captureRect, const QString &outputDirectory,
+                                     QWidget *parent)
     : QWidget(parent)
     , captureRect_(Util::clampToDesktopLocal(captureRect))
+    , outputDirectory_(outputDirectory)
     , controlPanel_(new GifRecorderControlPanel())
     , captureTimer_(new QTimer(this))
     , encoderThread_(new QThread(this))
@@ -42,7 +49,8 @@ GifRecorderWidget::GifRecorderWidget(const QRect &captureRect, QWidget *parent)
 
     controlPanel_->setCaptureSize(contentRect().size());
     connect(controlPanel_, &GifRecorderControlPanel::sigRecordClicked, this, &GifRecorderWidget::onRecord);
-    connect(controlPanel_, &GifRecorderControlPanel::sigStopClicked, this, &GifRecorderWidget::onStop);
+    connect(controlPanel_, &GifRecorderControlPanel::sigCopyClicked, this, &GifRecorderWidget::onCopy);
+    connect(controlPanel_, &GifRecorderControlPanel::sigOpenClicked, this, &GifRecorderWidget::onOpen);
     connect(controlPanel_, &GifRecorderControlPanel::sigCancelClicked, this, &GifRecorderWidget::onCancel);
     auto *escapeShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), controlPanel_);
     escapeShortcut->setContext(Qt::ApplicationShortcut);
@@ -100,9 +108,15 @@ QRect GifRecorderWidget::contentRect() const
 
 QString GifRecorderWidget::defaultOutputPath() const
 {
-    const QString name = QStringLiteral("recording_%1.gif")
-                             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss")));
-    return PinWidget::saveDir().absoluteFilePath(name);
+    QString directory = outputDirectory_.trimmed();
+    if (directory.isEmpty()) {
+        directory = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    }
+    QDir dir(directory);
+    dir.mkpath(QStringLiteral("."));
+
+    const QString timestamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz"));
+    return dir.absoluteFilePath(QStringLiteral("recording_%1.gif").arg(timestamp));
 }
 
 void GifRecorderWidget::positionControlPanel()
@@ -169,18 +183,11 @@ void GifRecorderWidget::onRecord()
         return;
     }
 
-    QString path = QFileDialog::getSaveFileName(controlPanel_, QStringLiteral("保存 GIF 录制"),
-                                                defaultOutputPath(), QStringLiteral("GIF 动图 (*.gif)"));
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!path.endsWith(QStringLiteral(".gif"), Qt::CaseInsensitive)) {
-        path += QStringLiteral(".gif");
-    }
+    outputPath_ = defaultOutputPath();
 
     state_ = State::Starting;
     controlPanel_->setStarting();
-    emit sigBeginEncoding(path, contentRect().size());
+    emit sigBeginEncoding(outputPath_, contentRect().size());
 }
 
 void GifRecorderWidget::onEncoderReady(bool success, const QString &error)
@@ -201,6 +208,7 @@ void GifRecorderWidget::onEncoderReady(bool success, const QString &error)
     elapsed_.restart();
     state_ = State::Recording;
     controlPanel_->setRecording();
+    positionControlPanel();
     update();
     captureTimer_->start(qMax(1, 1000 / controlPanel_->framesPerSecond()));
     onCaptureTimer();
@@ -267,17 +275,44 @@ void GifRecorderWidget::onCancel()
     closeRecorder();
 }
 
+void GifRecorderWidget::onCopy()
+{
+    if (state_ != State::Recording) {
+        return;
+    }
+    completionAction_ = CompletionAction::Copy;
+    onStop();
+}
+
+void GifRecorderWidget::onOpen()
+{
+    if (state_ != State::Recording) {
+        return;
+    }
+    completionAction_ = CompletionAction::Open;
+    onStop();
+}
+
 void GifRecorderWidget::onEncodingFinished(bool success, const QString &path, const QString &error)
 {
     if (state_ == State::Closed) {
         return;
     }
     if (success) {
-        TipsWidget::popup(nullptr, QStringLiteral("GIF 录制已保存\n%1").arg(path), 4, 0, true);
+        outputPath_ = path;
+        if (completionAction_ == CompletionAction::Copy && QFileInfo::exists(outputPath_)) {
+            auto *mimeData = new QMimeData();
+            mimeData->setUrls({QUrl::fromLocalFile(outputPath_)});
+            mimeData->setText(QDir::toNativeSeparators(outputPath_));
+            QApplication::clipboard()->setMimeData(mimeData);
+        } else if (completionAction_ == CompletionAction::Open && QFileInfo::exists(outputPath_)) {
+            Util::shellExecute(outputPath_);
+        }
+        closeRecorder();
     } else {
         TipsWidget::popup(nullptr, QStringLiteral("GIF 保存失败\n%1").arg(error), 4, 0, true);
+        closeRecorder();
     }
-    closeRecorder();
 }
 
 void GifRecorderWidget::closeRecorder()
