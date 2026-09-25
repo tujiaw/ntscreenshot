@@ -10,6 +10,23 @@ function(nt_add_qt_test test_name target_name)
     endif()
 endfunction()
 
+add_executable(image_matcher_tests
+    capture/ImageMatcherTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/ImageMatcher.cpp)
+target_include_directories(image_matcher_tests PRIVATE ${NT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(image_matcher_tests PRIVATE Qt6::Core Qt6::Gui ${OpenCV_LIBS})
+if(MSVC)
+    target_compile_options(image_matcher_tests PRIVATE /utf-8)
+endif()
+if(WIN32)
+    add_test(NAME long_screenshot_matcher
+        COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/x64/vc16/bin;$ENV{PATH}"
+            $<TARGET_FILE:image_matcher_tests>)
+else()
+    add_test(NAME long_screenshot_matcher COMMAND image_matcher_tests)
+endif()
+
 add_executable(background_browser_tests
     assistant/BackgroundBrowserTest.cpp
     ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/BackgroundBrowser.cpp

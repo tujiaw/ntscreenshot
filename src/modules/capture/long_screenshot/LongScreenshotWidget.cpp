@@ -7,6 +7,8 @@
 #include <QApplication>
 #include <QScreen>
 #include <cmath>
+#include <algorithm>
+#include <cstring>
 #include <limits>
 #include "core/platform/Util.h"
 #include "core/theme/ThemeManager.h"
@@ -73,12 +75,13 @@ void LongScreenshotWidget::updateInfoLabel()
     if (!controlPanel_) {
         return;
     }
+    // Keep the panel's content width stable while capturing. Appending and
+    // removing a warning here changes its size/position and makes the hint
+    // visibly jump between frames.
     QString text = QString(QStringLiteral("已截取: %1 帧")).arg(capturedFrames_.size());
     controlPanel_->setInfoText(text);
 
-    positionControlPanel();
-
-    if (!controlPanel_->isVisible()) {
+    if (!finishRequested_ && !controlPanel_->isVisible()) {
         controlPanel_->show();
         controlPanel_->raise();
     }
@@ -93,25 +96,36 @@ void LongScreenshotWidget::positionControlPanel()
     const QRect screenRect = Util::desktopRect();
     const QRect globalCaptureRect(captureRect_.topLeft() + screenRect.topLeft(), captureRect_.size());
 
-    // 默认悬浮在截图区域右上角外侧
-    int x = globalCaptureRect.right() - controlPanel_->width();
-    int y = globalCaptureRect.top() - controlPanel_->height() - 6;
-    // 截图区域贴近屏幕顶部时，面板改到区域内侧，避免跑出屏幕
-    if (y < screenRect.top()) {
-        y = globalCaptureRect.top() + 6;
+    const QSize size = controlPanel_->size();
+    const QRect candidates[] = {
+        QRect(QPoint(globalCaptureRect.right() - size.width() + 1,
+                     globalCaptureRect.top() - size.height() - 6), size),
+        QRect(QPoint(globalCaptureRect.right() - size.width() + 1,
+                     globalCaptureRect.bottom() + 7), size),
+        QRect(QPoint(globalCaptureRect.right() + 7, globalCaptureRect.top()), size),
+        QRect(QPoint(globalCaptureRect.left() - size.width() - 6, globalCaptureRect.top()), size)
+    };
+    for (const QRect& candidate : candidates) {
+        if (screenRect.contains(candidate) && !candidate.intersects(globalCaptureRect)) {
+            panelIntersectsCapture_ = false;
+            controlPanel_->move(candidate.topLeft());
+            panelPositioned_ = true;
+            return;
+        }
     }
-    if (x + controlPanel_->width() > screenRect.right()) {
-        x = screenRect.right() - controlPanel_->width();
-    }
-    if (x < screenRect.left()) {
-        x = screenRect.left();
-    }
+    // No outside position fits. Keep controls usable but hide them for every grab.
+    panelIntersectsCapture_ = true;
+    const int x = qBound(screenRect.left(), globalCaptureRect.left() + 6,
+                         screenRect.right() - size.width() + 1);
+    const int y = qBound(screenRect.top(), globalCaptureRect.top() + 6,
+                         screenRect.bottom() - size.height() + 1);
     controlPanel_->move(x, y);
+    panelPositioned_ = true;
 }
 
 void LongScreenshotWidget::startCapture()
 {
-    if (completionRequested_) {
+    if (completionRequested_ || finishRequested_) {
         return;
     }
 
@@ -121,7 +135,11 @@ void LongScreenshotWidget::startCapture()
 
     // 初始化并显示控制面板信息
     if (controlPanel_) {
-        controlPanel_->setInfoText(QStringLiteral("截长图"));
+        // Use the final text shape before positioning, then freeze the
+        // top-level panel size. Resizing a floating native window while the
+        // frame count changes can make Windows re-center it visually.
+        controlPanel_->setInfoText(QStringLiteral("已截取: 0 帧"));
+        controlPanel_->setFixedSize(controlPanel_->size());
         positionControlPanel();
         controlPanel_->show();
         controlPanel_->raise();
@@ -133,7 +151,7 @@ void LongScreenshotWidget::startCapture()
 
 void LongScreenshotWidget::captureCurrentFrame()
 {
-    if (completionRequested_) {
+    if (completionRequested_ || finishRequested_) {
         return;
     }
 
@@ -142,15 +160,15 @@ void LongScreenshotWidget::captureCurrentFrame()
         return;
     }
 
-    // 上一帧的 ORB/相位相关分析还未完成时，跳过本帧。
-    // 避免在主线程积压耗时 250ms 的分析任务。
-    if (analysisInProgress_) {
-        return;
-    }
-
     // 截图必须在主线程执行
     QRect innerRect = captureRect_.adjusted(borderWidth_, borderWidth_, -borderWidth_, -borderWidth_);
+    const bool restorePanel = panelIntersectsCapture_ && controlPanel_ && controlPanel_->isVisible();
+    if (restorePanel) controlPanel_->hide();
     QImage currentImage = Util::grabDesktopImage(innerRect);
+    if (restorePanel) {
+        controlPanel_->show();
+        controlPanel_->raise();
+    }
     if (currentImage.isNull()) {
         return;
     }
@@ -159,15 +177,33 @@ void LongScreenshotWidget::captureCurrentFrame()
         currentImage = currentImage.convertToFormat(QImage::Format_RGB32);
     }
 
-    if (capturedFrames_.isEmpty()) {
+    if (capturedFrames_.isEmpty() && !analysisInProgress_ && pendingFrames_.isEmpty()) {
         capturedFrames_.push_back({currentImage, 0, 0.0});
         lastCapturedImage_ = currentImage;
         return;
     }
 
-    // ORB + 相位相关耗时 200~300ms，放到全局线程池避免阻塞主线程。
-    // QThreadPool 属于 Qt Core，无需额外模块。
+    if (pendingFrames_.size() >= MAX_PENDING_FRAMES) {
+        captureOverloaded_ = true;
+        captureTimer_->stop();
+        updateInfoLabel();
+        return;
+    }
+    pendingFrames_.enqueue(currentImage);
+    processNextFrame();
+}
+
+void LongScreenshotWidget::processNextFrame()
+{
+    if (completionRequested_ || analysisInProgress_) return;
+    if (pendingFrames_.isEmpty()) {
+        if (finishRequested_) finishCapture();
+        return;
+    }
+
+    // Process captured frames in order, retaining the overlap between each pair.
     analysisInProgress_ = true;
+    QImage currentImage = pendingFrames_.dequeue();
     QImage prevImage = lastCapturedImage_;
     LongScreenshotWidget* self = this;
     auto lifetimeToken = lifetimeToken_;
@@ -175,13 +211,14 @@ void LongScreenshotWidget::captureCurrentFrame()
     QThreadPool::globalInstance()->start([currentImage, prevImage, self, lifetimeToken]() {
         int shift = 0;
         double score = 0.0;
-        bool accepted = LongScreenshotWidget::shouldAppendFrame(currentImage, prevImage, &shift, &score);
+        bool motion = LongScreenshotWidget::hasGlobalMotion(currentImage, prevImage);
+        bool accepted = motion && LongScreenshotWidget::shouldAppendFrame(currentImage, prevImage, &shift, &score);
 
         if (!lifetimeToken->load() || !qApp) {
             return;
         }
 
-        QMetaObject::invokeMethod(qApp, [currentImage, shift, score, accepted, self, lifetimeToken]() {
+        QMetaObject::invokeMethod(qApp, [currentImage, shift, score, accepted, motion, self, lifetimeToken]() {
             if (!lifetimeToken->load()) {
                 return;
             }
@@ -191,13 +228,26 @@ void LongScreenshotWidget::captureCurrentFrame()
                 return;
             }
             if (!accepted) {
+                if (motion) ++self->unmatchedMotionCount_;
                 qDebug() << "[LongScr] frame rejected, frames so far:" << self->capturedFrames_.size();
-                return;
+            } else {
+                self->unmatchedMotionCount_ = 0;
+                self->capturedFrames_.push_back({currentImage, shift, score});
+                self->lastCapturedImage_ = currentImage;
+                qDebug() << "frame count:" << self->capturedFrames_.size();
             }
-            self->capturedFrames_.push_back({currentImage, shift, score});
-            self->lastCapturedImage_ = currentImage;
             self->updateInfoLabel();
-            qDebug() << "frame count:" << self->capturedFrames_.size();
+            if (self->captureOverloaded_ && !self->finishRequested_
+                && self->pendingFrames_.size() <= MAX_PENDING_FRAMES / 3) {
+                self->captureOverloaded_ = false;
+                self->captureTimer_->start(CAPTURE_INTERVAL_MS);
+            }
+            if (self->capturedFrames_.size() >= MAX_CAPTURED_FRAMES) {
+                self->pendingFrames_.clear();
+                self->finishRequested_ = true;
+                self->captureTimer_->stop();
+            }
+            self->processNextFrame();
         }, Qt::QueuedConnection);
     });
 }
@@ -309,17 +359,14 @@ QPixmap LongScreenshotWidget::stitchImages()
         totalHeight = MAX_STITCH_HEIGHT; // 限制最大高度
     }
 
-    QImage result(width, totalHeight, QImage::Format_ARGB32);
+    QImage result(width, totalHeight, QImage::Format_RGB32);
     result.fill(Qt::white);
-
-    QPainter painter(&result);
-    // 使用直接覆盖模式(Source)，接缝处的羽化由我们手动处理
-    painter.setCompositionMode(QPainter::CompositionMode_Source);
-
-    // 绘制第一帧作为基底
+    const QImage first = capturedFrames_.first().image.convertToFormat(QImage::Format_RGB32);
     int currentY = 0;
-    painter.drawImage(0, 0, capturedFrames_.first().image);
-    currentY += capturedFrames_.first().image.height();
+    for (int row = 0; row < first.height() && row < totalHeight; ++row) {
+        std::memcpy(result.scanLine(row), first.constScanLine(row), width * sizeof(QRgb));
+    }
+    currentY += first.height();
 
     for (int i = 1; i < capturedFrames_.size(); ++i) {
         const auto& frame = capturedFrames_[i];
@@ -328,28 +375,24 @@ QPixmap LongScreenshotWidget::stitchImages()
         if (shift <= 0) continue;
         if (currentY + shift > totalHeight) break;
 
-        const QImage& img = frame.image;
+        const QImage img = frame.image.convertToFormat(QImage::Format_RGB32);
+        if (img.width() != width || shift >= img.height()) continue;
 
         // 计算当前帧新增内容的来源位置
         // shift 表示当前帧底部“新增”了多少个像素的高度
         int sourceY = img.height() - shift;
 
-        // 接缝羽化：限制在 4px 以内。
-        // 过大的羽化区域（旧值 24px）会跨越表格行边界，导致相邻行内容混叠出现"双影"。
-        int blendHeight = qBound(0, shift / 8, 4);
-
-        if (blendHeight > 0) {
-            blendSeamRows(result, img, currentY - blendHeight, sourceY - blendHeight, blendHeight);
+        // Move the cut to the best-matching row in the overlap, avoiding text
+        // baselines. Copy pixels rather than alpha-blending two text renders.
+        const int seamRows = chooseSeamRows(result, img, currentY, sourceY);
+        for (int row = -seamRows; row < shift; ++row) {
+            std::memcpy(result.scanLine(currentY + row),
+                        img.constScanLine(sourceY + row), width * sizeof(QRgb));
         }
-
-        QRect srcRect(0, sourceY, img.width(), shift);
-        QRect dstRect(0, currentY, img.width(), shift);
-        painter.drawImage(dstRect, img, srcRect);
 
         currentY += shift;
     }
 
-    painter.end();
     return QPixmap::fromImage(result);
 }
 
@@ -358,37 +401,29 @@ std::pair<int, double> LongScreenshotWidget::estimateScrollShift(const QImage& p
     return ImageMatcher::estimateScrollShift(previous, current, minShift, maxShift);
 }
 
-void LongScreenshotWidget::blendSeamRows(QImage& result, const QImage& source, int targetY, int sourceY, int rowCount) const
+int LongScreenshotWidget::chooseSeamRows(const QImage& result, const QImage& source, int targetY, int sourceY)
 {
-    // 安全检查，防止越界
-    if (rowCount <= 0 || targetY < 0 || sourceY < 0) return;
-    int width = qMin(result.width(), source.width());
-    int maxRows = qMin(rowCount, qMin(result.height() - targetY, source.height() - sourceY));
-
-    if (maxRows <= 0) return;
-
-    for (int row = 0; row < maxRows; ++row) {
-        // 透明度 Alpha 从 0.0 (保留原有图像) 渐变到 1.0 (使用新图像内容)
-        // 使得接缝处过渡更加平滑
-        float alpha = (float)(row + 1) / (float)(maxRows + 1);
-
-        int dstY = targetY + row;
-        int srcY = sourceY + row;
-
-        QRgb* dstLine = reinterpret_cast<QRgb*>(result.scanLine(dstY));
-        const QRgb* srcLine = reinterpret_cast<const QRgb*>(source.constScanLine(srcY));
-
-        for (int x = 0; x < width; ++x) {
-            QRgb up = dstLine[x];
-            QRgb down = srcLine[x];
-
-            int r = (int)(qRed(up) * (1.0f - alpha) + qRed(down) * alpha);
-            int g = (int)(qGreen(up) * (1.0f - alpha) + qGreen(down) * alpha);
-            int b = (int)(qBlue(up) * (1.0f - alpha) + qBlue(down) * alpha);
-
-            dstLine[x] = qRgb(r, g, b);
+    const int limit = std::min({24, sourceY, targetY});
+    int bestRows = 0;
+    double bestCost = std::numeric_limits<double>::max();
+    const int x0 = result.width() / 10;
+    const int x1 = result.width() * 9 / 10;
+    for (int rows = 1; rows <= limit; ++rows) {
+        const QRgb* oldLine = reinterpret_cast<const QRgb*>(result.constScanLine(targetY - rows));
+        const QRgb* newLine = reinterpret_cast<const QRgb*>(source.constScanLine(sourceY - rows));
+        double difference = 0;
+        int samples = 0;
+        for (int x = x0; x < x1; x += 3) {
+            difference += std::abs(qGray(oldLine[x]) - qGray(newLine[x]));
+            ++samples;
+        }
+        const double cost = samples ? difference / samples : 255.0;
+        if (cost < bestCost) {
+            bestCost = cost;
+            bestRows = rows;
         }
     }
+    return bestCost <= 12.0 ? bestRows : 0;
 }
 
 bool LongScreenshotWidget::isReliableShift(int shift, double score, int imageHeight)
@@ -420,17 +455,27 @@ void LongScreenshotWidget::stopCapture()
 
 void LongScreenshotWidget::onFinish()
 {
-    if (completionRequested_) {
+    if (completionRequested_ || finishRequested_) {
         return;
     }
-    completionRequested_ = true;
-
+    finishRequested_ = true;
     captureTimer_->stop();
-
-    // 隐藏控制面板
     if (controlPanel_) {
         controlPanel_->hide();
     }
+    // The final screen state must be queued behind in-flight analysis.
+    QRect innerRect = captureRect_.adjusted(borderWidth_, borderWidth_, -borderWidth_, -borderWidth_);
+    QImage finalFrame = Util::grabDesktopImage(innerRect);
+    if (!finalFrame.isNull() && !capturedFrames_.isEmpty()) {
+        pendingFrames_.enqueue(finalFrame.convertToFormat(QImage::Format_RGB32));
+    }
+    processNextFrame();
+}
+
+void LongScreenshotWidget::finishCapture()
+{
+    if (completionRequested_) return;
+    completionRequested_ = true;
 
     if (capturedFrames_.isEmpty()) {
         TipsWidget::popup(this, QStringLiteral("未截取到图像"), 2, 0, true);
@@ -470,6 +515,7 @@ void LongScreenshotWidget::onCancel()
         return;
     }
     completionRequested_ = true;
+    pendingFrames_.clear();
 
     captureTimer_->stop();
 
@@ -494,21 +540,4 @@ void LongScreenshotWidget::paintEvent(QPaintEvent*)
     painter.setPen(pen);
     painter.drawRect(rect());
 
-    painter.setPen(Qt::white);
-    painter.setRenderHint(QPainter::TextAntialiasing);
-
-    // 绘制半透明背景，确保信息文字清晰可读
-    QString infoText = QString(QStringLiteral("已截取: %1 帧 | 停止滚动以完成")).arg(capturedFrames_.size());
-    QFont font = painter.font();
-    font.setPixelSize(14);
-    font.setBold(true);
-    painter.setFont(font);
-
-    QFontMetrics fm(font);
-    int textWidth = fm.horizontalAdvance(infoText) + 20;
-    int textHeight = fm.height() + 10;
-
-    QRect textBgRect(rect().right() - textWidth - 10, rect().bottom() - textHeight - 10, textWidth, textHeight);
-    painter.fillRect(textBgRect, QColor(0, 0, 0, 160));
-    painter.drawText(textBgRect, Qt::AlignCenter, infoText);
 }

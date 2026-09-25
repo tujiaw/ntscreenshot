@@ -32,6 +32,9 @@ void LongScreenshotControlPanel::setupUI()
     infoLabel_ = new QLabel(this);
     infoLabel_->setObjectName(QStringLiteral("longScreenshotInfoLabel"));
     infoLabel_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    // The capture hint is intentionally omitted. A changing label resizes the
+    // native floating panel and makes it jump while frames are captured.
+    infoLabel_->setVisible(false);
 
     finishButton_ = new QPushButton(
         ThemeIcon::icon(QStringLiteral("ok.png"), IconTone::OnAccent, iconSize), QString(), this);
@@ -54,8 +57,6 @@ void LongScreenshotControlPanel::setupUI()
     QHBoxLayout* hLayout = new QHBoxLayout(this);
     Util::scaleLayoutMargins(hLayout, 10, 6, 6, 6);
     hLayout->setSpacing(Util::scaleSize(4));
-    hLayout->addWidget(infoLabel_);
-    hLayout->addSpacing(Util::scaleSize(8));
     hLayout->addWidget(finishButton_);
     hLayout->addWidget(cancelButton_);
 

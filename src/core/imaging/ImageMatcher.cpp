@@ -4,6 +4,47 @@
 #include <limits>
 #include <QDebug>
 
+// Validate a candidate against the actual overlapping pixels. Feature votes and
+// correlation peaks alone are ambiguous on repeated rows and fixed page chrome.
+static double overlapError(const cv::Mat& previous, const cv::Mat& current, int shift)
+{
+    if (shift < 0 || shift >= previous.rows || previous.size() != current.size()) {
+        return 1.0;
+    }
+    const int x0 = previous.cols * 15 / 100;
+    const int x1 = previous.cols * 85 / 100;
+    const int y0 = qMax(0, previous.rows * 10 / 100);
+    const int y1 = qMin(previous.rows - shift, previous.rows * 90 / 100);
+    if (x1 <= x0 || y1 - y0 < 20) {
+        return 1.0;
+    }
+
+    double difference = 0.0;
+    int samples = 0;
+    for (int y = y0; y < y1; y += 3) {
+        const uchar* oldLine = previous.ptr<uchar>(y + shift);
+        const uchar* newLine = current.ptr<uchar>(y);
+        for (int x = x0; x < x1; x += 3) {
+            // Blank background should not dilute a mismatch between text rows.
+            if (oldLine[x] >= 245 && newLine[x] >= 245) continue;
+            difference += std::abs(int(oldLine[x]) - int(newLine[x]));
+            ++samples;
+        }
+    }
+    return samples ? difference / (samples * 255.0) : 1.0;
+}
+
+static std::pair<int, double> validatedShift(
+    const cv::Mat& previous, const cv::Mat& current, int shift)
+{
+    const double error = overlapError(previous, current, shift);
+    const double stationaryError = overlapError(previous, current, 0);
+    if (error >= 0.15 || (shift > 0 && error >= stationaryError * 0.9)) {
+        return {-1, std::numeric_limits<double>::max()};
+    }
+    return {shift, error};
+}
+
 // 相位相关法：在频域中计算两帧之间的全局位移。
 // 该方法对周期性重复内容（如表格行）天然免疫，因为它寻找的是整体图像中
 // 最主导的平移量，而非依赖局部块的空间唯一性。
@@ -35,11 +76,6 @@ static std::pair<int, double> tryPhaseCorrelation(
     // 相位相关返回 dy = -scroll_shift，取反得到正向滚动量
     int shift = -static_cast<int>(std::round(shiftPt.y));
 
-    // 若超出范围，尝试原始值（应对 FFT 绕回或符号约定差异）
-    if (shift < minShift || shift > maxShift) {
-        shift = -shift;
-    }
-
     qDebug() << "[ImageMatcher] Phase correlation raw: shift=" << shift << "response=" << response;
 
     // response 越高表示相关峰越明显。0.1 是宽松阈值，足以排除纯随机噪声；
@@ -48,8 +84,7 @@ static std::pair<int, double> tryPhaseCorrelation(
         return {-1, std::numeric_limits<double>::max()};
     }
 
-    // 返回伪 score=0.05，与 ORB 的伪分保持一致，可通过 isReliableShift 的 <0.15 检查
-    return {shift, 0.05};
+    return {shift, 0.0};
 }
 
 cv::Mat ImageMatcher::QImageToCvMat(const QImage &inImage, bool clone)
@@ -68,7 +103,7 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
     cv::Mat currMat = QImageToCvMat(current);
 
     // 检查图像是否转换成功或是否为空
-    if (prevMat.empty() || currMat.empty()) {
+    if (prevMat.empty() || currMat.empty() || prevMat.size() != currMat.size()) {
         qDebug() << "[ImageMatcher] Error: Empty Mat.";
         return {-1, std::numeric_limits<double>::max()};
     }
@@ -78,8 +113,8 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
 
     // 将彩色图像转换为灰度图像，大幅提升模板匹配的计算速度
     cv::Mat grayPrev, grayCurr;
-    cv::cvtColor(prevMat, grayPrev, cv::COLOR_BGRA2GRAY);
-    cv::cvtColor(currMat, grayCurr, cv::COLOR_BGRA2GRAY);
+    cv::cvtColor(prevMat, grayPrev, prevMat.channels() == 4 ? cv::COLOR_BGRA2GRAY : cv::COLOR_RGB2GRAY);
+    cv::cvtColor(currMat, grayCurr, currMat.channels() == 4 ? cv::COLOR_BGRA2GRAY : cv::COLOR_RGB2GRAY);
 
     // 确定模板区域 (ROI - Region of Interest)
     // 方案五混合方案：如果 ORB 特征点太少（可能是大片空白或纯色导致），自动降级为模板匹配
@@ -186,9 +221,12 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
                 qDebug() << "[ImageMatcher] ORB shift<=0 (maxCount:" << maxCount << "), may be table content trap, trying phase correlation.";
                 useTemplateFallback = true;
             } else {
-                double pseudoScore = 0.05 * (10.0 / std::max(10, maxCount)); 
-                qDebug() << "[ImageMatcher] ORB matched! bestShift:" << bestShift << "maxCount:" << maxCount << "pseudoScore:" << pseudoScore;
-                return {bestShift, pseudoScore};
+                auto validated = validatedShift(grayPrev, grayCurr, bestShift);
+                if (validated.first >= 0) {
+                    return validated;
+                }
+                qDebug() << "[ImageMatcher] ORB overlap validation failed:" << bestShift;
+                useTemplateFallback = true;
             }
         }
     }
@@ -203,7 +241,8 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
         auto [pcShift, pcScore] = tryPhaseCorrelation(grayPrev, grayCurr, minShift, maxShift);
         if (pcShift >= minShift && pcShift <= maxShift && pcScore < std::numeric_limits<double>::max()) {
             qDebug() << "[ImageMatcher] Phase correlation matched: shift=" << pcShift;
-            return {pcShift, pcScore};
+            auto validated = validatedShift(grayPrev, grayCurr, pcShift);
+            if (validated.first >= 0) return validated;
         }
         qDebug() << "[ImageMatcher] Phase correlation insufficient, falling back to template matching.";
     }
@@ -283,10 +322,12 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
             return {-1, std::numeric_limits<double>::max()};
         }
 
-        double score = (bestMaxVal >= 0.60) ? 0.08 : (1.0 - bestMaxVal);
+        auto validated = bestMaxVal >= 0.70
+            ? validatedShift(grayPrev, grayCurr, bestShift)
+            : std::pair<int, double>{-1, std::numeric_limits<double>::max()};
         qDebug() << "[ImageMatcher] Multi-template match done, shift:" << bestShift
-                 << "maxVal:" << bestMaxVal << "score:" << score;
-        return {bestShift, score};
+                 << "maxVal:" << bestMaxVal << "score:" << validated.second;
+        return validated;
     }
 
     qDebug() << "[ImageMatcher] Fallback failed.";
