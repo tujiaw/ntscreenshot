@@ -358,10 +358,6 @@ void Settings::applyModernLayout()
             legacyTabs->setCurrentWidget(llmHostPage);
             if (llmTabs) {
                 llmTabs->setCurrentIndex(0);
-                for (int index : {0, 2}) {
-                    subPages.append({llmTabs->tabText(index),
-                                     [=] { llmTabs->setCurrentIndex(index); }});
-                }
             }
             break;
         case 4:

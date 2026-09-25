@@ -73,6 +73,33 @@ QCursor createPolyLineCursor()
     painter.drawEllipse(Util::scaleSize(2), Util::scaleSize(2), size - 1, size - 1);
     return QCursor(pixmap, canvasSize / 2, canvasSize / 2);
 }
+
+class ImageToolsButton : public QPushButton
+{
+public:
+    explicit ImageToolsButton(const QIcon& icon, QWidget* parent)
+        : QPushButton(icon, QString(), parent) {}
+
+protected:
+    void paintEvent(QPaintEvent* event) override
+    {
+        QPushButton::paintEvent(event);
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(ThemeManager::tokens().textSecondary);
+        const qreal margin = Util::scaleSize(4);
+        const qreal arrowWidth = Util::scaleSize(6);
+        const qreal right = width() - margin;
+        const qreal bottom = height() - margin;
+        QPolygonF triangle;
+        triangle << QPointF(right - arrowWidth, bottom - arrowWidth / 2)
+                 << QPointF(right, bottom - arrowWidth / 2)
+                 << QPointF(right - arrowWidth / 2, bottom);
+        painter.drawPolygon(triangle);
+    }
+};
 }
 
 DrawPanel::DrawPanel(SettingModel* settings, QWidget *parent, QWidget *drawWidget)
@@ -168,13 +195,13 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     QPushButton* pbText = createShapeBtn("text.png", QStringLiteral("文本（Ctrl+Enter 完成，Esc 取消）"));
 
     QPushButton* pbMosaic = createShapeBtn("mosaic.png", QStringLiteral("马赛克"));
-    const int imageToolsIconSize = Util::scaleSize(24);
-    QPushButton* pbImageTools = new QPushButton(
-        ThemeIcon::icon("tools-solid.png", IconTone::Default, imageToolsIconSize), "", this);
+    const int imageToolsIconSize = Util::scaleSize(16);
+    QPushButton* pbImageTools = new ImageToolsButton(
+        ThemeIcon::icon("tools-solid.png", IconTone::Default, imageToolsIconSize), this);
     pbImageTools->setToolTip(QStringLiteral("更多图像工具"));
     pbImageTools->setFixedSize(btnSize, btnSize);
     pbImageTools->setIconSize(QSize(imageToolsIconSize, imageToolsIconSize));
-    pbImageTools->setProperty("iconBaseSize", 24);
+    pbImageTools->setProperty("iconBaseSize", 16);
     UiStyler::setRole(pbImageTools, UiRole::IconButton);
     QMenu* mosaicMenu = new QMenu(pbImageTools);
     mosaicMenu->addAction(QStringLiteral("识别二维码/条码"), this, &DrawPanel::sigScanCode);
