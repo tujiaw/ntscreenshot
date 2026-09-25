@@ -275,10 +275,11 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     hLayout->setSpacing(Util::scaleSize(2));
     hLayout->addWidget(pbFont_);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
-    for (int i = 0; i < 6; ++i) hLayout->addWidget(btns_.at(i).first);
+    // Keep every drawing tool together, including mosaic.
+    for (int i = 0; i < btns_.size(); ++i) hLayout->addWidget(btns_.at(i).first);
+    hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
-    hLayout->addWidget(pbMosaic);
     hLayout->addWidget(pbImageTools);
     hLayout->addWidget(pbAskAi);
     hLayout->addWidget(pbOcr);

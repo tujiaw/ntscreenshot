@@ -193,11 +193,6 @@ DrawSettings::DrawSettings(QWidget *parent)
         segLayout->addWidget(btn);
     }
 
-    // 竖线分隔
-    auto *divider = new QFrame(this);
-    divider->setObjectName(QStringLiteral("DrawSettingsDivider"));
-    divider->setFixedWidth(Util::scaleSize(1));
-
     // 颜色网格：2排 × 8列
     auto *colorGrid = new QWidget(this);
     auto *gridLayout = new QVBoxLayout(colorGrid);
@@ -216,18 +211,24 @@ DrawSettings::DrawSettings(QWidget *parent)
     gridLayout->addLayout(colorRow1);
     gridLayout->addLayout(colorRow2);
 
-    // 单行布局：线宽 | 分隔 | 颜色 | 字号 | 当前颜色
+    // Keep the original compact one-row panel. The controls are intentionally
+    // grouped with short labels and separators so the panel stays within the
+    // toolbar's 44px height.
+    auto *divider = new QFrame(this);
+    divider->setObjectName(QStringLiteral("DrawSettingsDivider"));
+    divider->setFixedWidth(Util::scaleSize(1));
+
     row1_ = new QHBoxLayout();
     row1_->addWidget(penWidthLabel_);
     row1_->addWidget(penWidthContainer);
-    row1_->addSpacing(Util::scaleSize(4));
+    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(divider, 0, Qt::AlignVCenter);
-    row1_->addSpacing(Util::scaleSize(4));
+    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(colorLabel_);
     row1_->addWidget(colorGrid);
-    row1_->addSpacing(Util::scaleSize(4));
+    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(sizeList_);
-    row1_->addSpacing(Util::scaleSize(4));
+    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(pbCurrentColor_);
     row1_->addStretch();
 
@@ -246,8 +247,8 @@ void DrawSettings::rescaleForDpi()
         btn->setFixedSize(penW, penH);
     }
 
-    // 圆形色块：紧凑尺寸，2排×8列
-    const int colorSize = Util::scaleSize(14);
+    // Slightly larger than the old dots, while still fitting two rows in 44px.
+    const int colorSize = Util::scaleSize(15);
     for (QPushButton *btn : colorBtns_) {
         btn->setFixedSize(colorSize, colorSize);
     }
@@ -261,7 +262,6 @@ void DrawSettings::rescaleForDpi()
 
     sizeList_->setFixedWidth(Util::scaleSize(56));
 
-    // 分隔线高度
     if (auto *divider = findChild<QFrame*>(QStringLiteral("DrawSettingsDivider"))) {
         divider->setFixedWidth(Util::scaleSize(1));
         divider->setFixedHeight(Util::scaleSize(18));
