@@ -441,8 +441,7 @@ void ScreenshotWidget::initDrawPanel(void)
                 drawPanel_->showToolMessage(QStringLiteral("图像增强失败"), true);
                 return;
             }
-            drawPanel_->drawer()->clearHistory();
-            drawPanel_->drawer()->pushBitmap(out, currentRect_);
+            drawPanel_->drawer()->replaceWithBitmap(out, currentRect_);
             drawPanel_->showToolMessage(QStringLiteral("已应用图像增强"), false);
         });
 
@@ -460,8 +459,7 @@ void ScreenshotWidget::initDrawPanel(void)
                 drawPanel_->showToolMessage(QStringLiteral("未检测到可打码区域"), true);
                 return;
             }
-            drawPanel_->drawer()->clearHistory();
-            drawPanel_->drawer()->pushBitmap(out, currentRect_);
+            drawPanel_->drawer()->replaceWithBitmap(out, currentRect_);
             drawPanel_->showToolMessage(QStringLiteral("已智能打码"), false);
         });
 
@@ -477,10 +475,15 @@ void ScreenshotWidget::initDrawPanel(void)
             }
             QImage cropped = src.copy(content);
             QRect newRect(currentRect_.topLeft() + content.topLeft(), cropped.size());
-            drawPanel_->drawer()->clearHistory();
-            drawPanel_->drawer()->pushBitmap(cropped, newRect);
+            const QRect previousRect = currentRect_;
+            drawPanel_->drawer()->replaceWithBitmap(cropped, newRect, [this, previousRect]() {
+                currentRect_ = previousRect;
+                onSelectedScreenSizeChanged(previousRect.width(), previousRect.height());
+                moveDrawPanel();
+                update();
+            });
             currentRect_ = newRect;
-            moveDrawPanel();
+            onSelectedScreenSizeChanged(newRect.width(), newRect.height());
             update();
             drawPanel_->showToolMessage(QStringLiteral("已自动裁边"), false);
         });

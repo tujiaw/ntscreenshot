@@ -9,11 +9,15 @@ class TextEdit : public QTextEdit
 public:
     TextEdit(QWidget *parent);
     QPoint startCursorPoint();
-    void setStyle(const QColor &color);
+    void setStyle(const QFont &font, const QColor &color);
+
+signals:
+    void commitRequested();
+    void cancelRequested();
 
 public slots:
     void onTextChanged();
 
 protected:
-    virtual void keyPressEvent(QKeyEvent *e);
+    void keyPressEvent(QKeyEvent *e) override;
 };

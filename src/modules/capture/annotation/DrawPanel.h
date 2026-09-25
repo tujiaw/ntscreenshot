@@ -6,6 +6,7 @@
 #include <QPen>
 #include <QBrush>
 #include <QImage>
+#include <functional>
 #include <memory>
 #include "DrawSettings.h"
 
@@ -98,12 +99,16 @@ public:
     bool isDraw() const;
     void undo();
     void pushBitmap(const QImage &image, const QRect &rect);
+    void replaceWithBitmap(const QImage &image, const QRect &rect,
+                           std::function<void()> onUndo = {});
+    void clearForTransformation(std::function<void()> onUndo);
     void clearHistory();
     
     void drawPixmap(QPixmap &pixmap, const QPoint &offset = QPoint(0, 0));
     void onPaint(QPainter &painter);
     void showTextEdit(const QPoint &pos);
     bool saveText();
+    void cancelText();
     void setDrawRect(const QRect &rect);
 
 protected:
@@ -125,6 +130,14 @@ private:
     DrawMode drawMode_;
     // 历史绘制模式缓存
     QList<DrawMode> drawModeCache_;
+    struct UndoState {
+        bool replacesModes = false;
+        QList<DrawMode> modes;
+        QRect drawRect;
+        std::function<void()> onUndo;
+    };
+    QList<UndoState> undoHistory_;
+    void rememberState(bool replacesModes = false, std::function<void()> onUndo = {});
     TextEdit *textEdit_;
     QImage bkImage_;
     QRect drawRect_;

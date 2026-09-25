@@ -369,10 +369,22 @@ void PinWidget::replacePixmap(const QPixmap& pixmap)
     if (pixmap.isNull()) {
         return;
     }
-    flush();
-    if (drawPanel_) {
-        drawPanel_->drawer()->clearHistory();
-    }
+    if (!drawPanel_) onDraw();
+    const QPixmap previousPixmap = pixmap_;
+    const QPixmap previousOriginal = originalPixmap_;
+    const double previousScale = currentScale_;
+    drawPanel_->drawer()->clearForTransformation(
+        [this, previousPixmap, previousOriginal, previousScale]() {
+            pixmap_ = previousPixmap;
+            originalPixmap_ = previousOriginal;
+            currentScale_ = previousScale;
+            if (QWidget* parent = parentWidget()) {
+                const int border = getBorderWidth();
+                parent->resize(pixmap_.size() + QSize(border * 2, border * 2));
+            }
+            drawPanel_->onReferRectChanged(QRect(mapToGlobal(QPoint(0, 0)), size()));
+            update();
+        });
     originalPixmap_ = pixmap;
     pixmap_ = pixmap;
     currentScale_ = 1.0;

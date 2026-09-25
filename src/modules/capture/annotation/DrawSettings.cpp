@@ -13,7 +13,7 @@
 #include "core/theme/ThemeManager.h"
 
 static int s_penWidth = 3;
-static int s_fontSize = 12;
+static int s_fontSize = 16;
 static QColor s_currentColor = QColor("#FF0000");
 
 namespace {

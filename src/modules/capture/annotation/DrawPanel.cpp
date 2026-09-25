@@ -5,6 +5,9 @@
 #include <QPoint>
 #include <QPolygon>
 #include <QStaticText>
+#include <QTextDocument>
+#include <QTextCursor>
+#include <QTextCharFormat>
 #include <QDebug>
 #include <QPushButton>
 #include <QButtonGroup>
@@ -162,21 +165,18 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     QPushButton* pbArrow = createShapeBtn("arrow.png", QStringLiteral("箭头"));
     QPushButton* pbRectangle = createShapeBtn("rectangle.png", QStringLiteral("矩形"));
     QPushButton* pbEllipse = createShapeBtn("ellipse.png", QStringLiteral("椭圆"));
-    QPushButton* pbText = createShapeBtn("text.png", QStringLiteral("文本"));
+    QPushButton* pbText = createShapeBtn("text.png", QStringLiteral("文本（Ctrl+Enter 完成，Esc 取消）"));
 
-    // Mosaic button hosts all image tools; click opens menu instead of toggling directly.
-    QPushButton* pbMosaic = new QPushButton(
-        ThemeIcon::icon("mosaic.png", IconTone::Default, iconSize), "", this);
-    pbMosaic->setToolTip(QStringLiteral("马赛克 / 图像工具"));
-    pbMosaic->setCheckable(true);
-    pbMosaic->setFixedSize(btnSize, btnSize);
-    pbMosaic->setIconSize(QSize(iconSize, iconSize));
-    UiStyler::setRole(pbMosaic, UiRole::IconButton);
-
-    QMenu* mosaicMenu = new QMenu(pbMosaic);
-    QAction* actMosaic = mosaicMenu->addAction(QStringLiteral("马赛克"));
-    actMosaic->setCheckable(true);
-    mosaicMenu->addSeparator();
+    QPushButton* pbMosaic = createShapeBtn("mosaic.png", QStringLiteral("马赛克"));
+    const int imageToolsIconSize = Util::scaleSize(24);
+    QPushButton* pbImageTools = new QPushButton(
+        ThemeIcon::icon("tools-solid.png", IconTone::Default, imageToolsIconSize), "", this);
+    pbImageTools->setToolTip(QStringLiteral("更多图像工具"));
+    pbImageTools->setFixedSize(btnSize, btnSize);
+    pbImageTools->setIconSize(QSize(imageToolsIconSize, imageToolsIconSize));
+    pbImageTools->setProperty("iconBaseSize", 24);
+    UiStyler::setRole(pbImageTools, UiRole::IconButton);
+    QMenu* mosaicMenu = new QMenu(pbImageTools);
     mosaicMenu->addAction(QStringLiteral("识别二维码/条码"), this, &DrawPanel::sigScanCode);
     QMenu* enhanceMenu = mosaicMenu->addMenu(QStringLiteral("图像增强"));
     enhanceMenu->addAction(QStringLiteral("自动增强"), this, [this]() { emit sigEnhance(0); });
@@ -188,22 +188,8 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     mosaicMenu->addAction(QStringLiteral("自动裁边"), this, &DrawPanel::sigAutoCrop);
     mosaicMenu->addAction(QStringLiteral("提取主色"), this, &DrawPanel::sigExtractColors);
 
-    connect(pbMosaic, &QPushButton::clicked, this, [pbMosaic, mosaicMenu, actMosaic]() {
-        // Undo the automatic checkable toggle; menu action controls mosaic mode.
-        pbMosaic->blockSignals(true);
-        pbMosaic->setChecked(!pbMosaic->isChecked());
-        pbMosaic->blockSignals(false);
-        actMosaic->setChecked(pbMosaic->isChecked());
-        mosaicMenu->exec(pbMosaic->mapToGlobal(QPoint(0, pbMosaic->height())));
-    });
-    connect(actMosaic, &QAction::triggered, this, [this, pbMosaic](bool checked) {
-        uncheckOtherButtons(pbMosaic);
-        pbMosaic->setChecked(checked);
-        if (checked) {
-            drawer_.setMode(getMode());
-        } else {
-            drawer_.setMode(DrawMode(DrawMode::None));
-        }
+    connect(pbImageTools, &QPushButton::clicked, this, [pbImageTools, mosaicMenu]() {
+        mosaicMenu->exec(pbImageTools->mapToGlobal(QPoint(0, pbImageTools->height())));
     });
 
     QPushButton* pbAskAi = createActionBtn("llm.png", QStringLiteral("问 AI"));
@@ -266,6 +252,7 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbMosaic);
+    hLayout->addWidget(pbImageTools);
     hLayout->addWidget(pbAskAi);
     hLayout->addWidget(pbOcr);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
@@ -393,7 +380,12 @@ void DrawPanel::adjustPos()
         for (QPushButton* btn : btns) {
             if (btn->parent() == this) {
                 btn->setFixedSize(btnSize, btnSize);
-                if (!btn->icon().isNull()) btn->setIconSize(QSize(iconSize, iconSize));
+                if (!btn->icon().isNull()) {
+                    const int baseIconSize = btn->property("iconBaseSize").toInt();
+                    const int adjustedIconSize = baseIconSize > 0
+                        ? Util::scaleSize(baseIconSize) : iconSize;
+                    btn->setIconSize(QSize(adjustedIconSize, adjustedIconSize));
+                }
             }
         }
         
@@ -430,13 +422,8 @@ void DrawPanel::cancelChecked()
         if (!buttonModePair.first->isChecked()) {
             continue;
         }
-        // Mosaic is not in shapeGroup_; clear it directly.
-        if (!shapeGroup_->buttons().contains(buttonModePair.first)) {
-            buttonModePair.first->setChecked(false);
-            drawer_.setMode(DrawMode(DrawMode::None));
-        } else {
-            emit shapeGroup_->buttonClicked(buttonModePair.first);
-        }
+        buttonModePair.first->setChecked(false);
+        drawer_.setMode(DrawMode(DrawMode::None));
         break;
     }
 }
@@ -804,7 +791,20 @@ void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter&
 
 void DrawMode::drawText(const QRectF &rectangle, const QString& text, QPainter& painter)
 {
-    painter.drawText(rectangle, Qt::AlignLeft, text);
+    QTextDocument document;
+    document.setDocumentMargin(0);
+    document.setDefaultFont(font_);
+    document.setPlainText(text);
+    document.setTextWidth(-1);
+    QTextCursor cursor(&document);
+    cursor.select(QTextCursor::Document);
+    QTextCharFormat format;
+    format.setForeground(pen_.color());
+    cursor.mergeCharFormat(format);
+    painter.save();
+    painter.translate(rectangle.topLeft());
+    document.drawContents(&painter);
+    painter.restore();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -860,12 +860,31 @@ bool Drawer::isDraw() const
 
 void Drawer::undo()
 {
+    if (textEdit_ && textEdit_->isVisible()) {
+        cancelText();
+        return;
+    }
     drawStartPos_ = QPoint(0, 0);
     drawEndPos_ = QPoint(0, 0);
-    if (!drawModeCache_.isEmpty()) {
-        drawModeCache_.pop_back();
+    if (!undoHistory_.isEmpty()) {
+        UndoState previous = undoHistory_.takeLast();
+        if (previous.replacesModes) {
+            drawModeCache_ = std::move(previous.modes);
+            drawRect_ = previous.drawRect;
+            if (previous.onUndo) previous.onUndo();
+        } else if (!drawModeCache_.isEmpty()) {
+            drawModeCache_.pop_back();
+        }
         parent_->update();
     }
+}
+
+void Drawer::rememberState(bool replacesModes, std::function<void()> onUndo)
+{
+    undoHistory_.push_back({replacesModes,
+                            replacesModes ? drawModeCache_ : QList<DrawMode>{},
+                            replacesModes ? drawRect_ : QRect{},
+                            std::move(onUndo)});
 }
 
 void Drawer::pushBitmap(const QImage &image, const QRect &rect)
@@ -875,13 +894,34 @@ void Drawer::pushBitmap(const QImage &image, const QRect &rect)
     }
     DrawMode mode(DrawMode::Bitmap);
     mode.setBitmap(image, rect);
+    rememberState();
     drawModeCache_.push_back(mode);
+    parent_->update();
+}
+
+void Drawer::replaceWithBitmap(const QImage &image, const QRect &rect,
+                               std::function<void()> onUndo)
+{
+    if (image.isNull() || !rect.isValid()) return;
+    rememberState(true, std::move(onUndo));
+    drawModeCache_.clear();
+    DrawMode mode(DrawMode::Bitmap);
+    mode.setBitmap(image, rect);
+    drawModeCache_.push_back(mode);
+    parent_->update();
+}
+
+void Drawer::clearForTransformation(std::function<void()> onUndo)
+{
+    rememberState(true, std::move(onUndo));
+    drawModeCache_.clear();
     parent_->update();
 }
 
 void Drawer::clearHistory()
 {
     drawModeCache_.clear();
+    undoHistory_.clear();
     drawMode_.clear();
     drawStartPos_ = QPoint(0, 0);
     drawEndPos_ = QPoint(0, 0);
@@ -906,30 +946,46 @@ void Drawer::showTextEdit(const QPoint &pos)
 {
     if (!textEdit_) {
         textEdit_ = new TextEdit(parent_);
+        connect(textEdit_, &TextEdit::commitRequested, this, &Drawer::saveText);
+        connect(textEdit_, &TextEdit::cancelRequested, this, &Drawer::cancelText);
     }
 
-    textEdit_->setFont(drawMode_.font());
-    textEdit_->setStyle(drawMode_.pen().color());
+    textEdit_->setStyle(drawMode_.font(), drawMode_.pen().color());
     textEdit_->move(pos - QPoint(2, 12));
-    textEdit_->setFocus();
     textEdit_->show();
+    textEdit_->setFocus();
 }
 
 bool Drawer::saveText()
 {
     if (textEdit_ && textEdit_->isVisible()) {
-        QString text = textEdit_->toPlainText().trimmed();
-        if (!text.isEmpty()) {
+        const bool hadFocus = QApplication::focusWidget() == textEdit_;
+        const QString text = textEdit_->toPlainText();
+        if (!text.trimmed().isEmpty()) {
             QPoint start = textEdit_->startCursorPoint();
             drawMode_.setText(QRectF(start.x(), start.y(), textEdit_->width(), textEdit_->height()), text);
+            rememberState();
             drawModeCache_.push_back(drawMode_);
         }
         drawMode_.clear();
         textEdit_->clear();
         textEdit_->setVisible(false);
+        if (hadFocus) parent_->setFocus();
+        parent_->update();
         return true;
     }
     return false;
+}
+
+void Drawer::cancelText()
+{
+    if (!textEdit_ || !textEdit_->isVisible()) return;
+    const bool hadFocus = QApplication::focusWidget() == textEdit_;
+    textEdit_->clear();
+    textEdit_->hide();
+    if (hadFocus) parent_->setFocus();
+    drawMode_.clear();
+    parent_->update();
 }
 
 void Drawer::setDrawRect(const QRect &rect)
@@ -1020,6 +1076,7 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
             }
 
             if (isEnabled_ && drawMode_.isValid()) {
+                rememberState();
                 drawModeCache_.push_back(drawMode_);
             }
             drawMode_.clear();
