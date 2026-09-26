@@ -23,6 +23,23 @@ endif()
 nt_add_qt_test(draw_settings_layout draw_settings_layout_tests)
 set_tests_properties(draw_settings_layout PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(image_util_auto_crop_tests
+    imaging/ImageUtilAutoCropTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/ImageUtil.cpp)
+target_include_directories(image_util_auto_crop_tests PRIVATE ${NT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(image_util_auto_crop_tests PRIVATE Qt6::Core Qt6::Gui ${OpenCV_LIBS})
+if(MSVC)
+    target_compile_options(image_util_auto_crop_tests PRIVATE /utf-8)
+endif()
+if(WIN32)
+    add_test(NAME image_util_auto_crop
+        COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/x64/vc16/bin;$ENV{PATH}"
+            $<TARGET_FILE:image_util_auto_crop_tests>)
+else()
+    add_test(NAME image_util_auto_crop COMMAND image_util_auto_crop_tests)
+endif()
+
 add_executable(image_matcher_tests
     capture/ImageMatcherTest.cpp
     ${NT_SOURCE_DIR}/core/imaging/ImageMatcher.cpp)

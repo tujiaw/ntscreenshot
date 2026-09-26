@@ -468,7 +468,7 @@ void ScreenshotWidget::initDrawPanel(void)
                 return;
             }
             QImage src = captureSelection().toImage();
-            const QRect content = ImageUtil::DetectContentRect(src);
+            const QRect content = ImageUtil::DetectContentRectAdaptive(src);
             if (!content.isValid() || content.size() == src.size()) {
                 drawPanel_->showToolMessage(QStringLiteral("无需裁边"), true);
                 return;

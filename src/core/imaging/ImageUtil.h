@@ -21,6 +21,11 @@ QRect DetectContentRect(const QImage& image, int whiteThreshold = 245);
 // Crop to content rect; returns original if detection fails.
 QImage AutoCrop(const QImage& image, int whiteThreshold = 245);
 
+// Conservatively detect transparent or nearly uniform opaque borders.
+// Returns the full image rectangle when the border/content is uncertain.
+QRect DetectContentRectAdaptive(const QImage& image);
+QImage AutoCropAdaptive(const QImage& image);
+
 // Extract dominant colors (up to maxColors), sorted by frequency.
 QVector<QColor> DominantColors(const QImage& image, int maxColors = 5);
 

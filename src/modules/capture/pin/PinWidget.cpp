@@ -482,7 +482,7 @@ void PinWidget::onSmartMask()
 void PinWidget::onAutoCrop()
 {
     QImage src = currentImage();
-    QImage cropped = ImageUtil::AutoCrop(src);
+    QImage cropped = ImageUtil::AutoCropAdaptive(src);
     if (cropped.isNull() || cropped.size() == src.size()) {
         notifyToolMessage(QStringLiteral("无需裁边"), true);
         return;

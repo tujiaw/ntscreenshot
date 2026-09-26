@@ -142,6 +142,111 @@ QImage AutoCrop(const QImage& image, int whiteThreshold)
     return image.copy(contentRect);
 }
 
+QRect DetectContentRectAdaptive(const QImage& image)
+{
+    if (image.isNull()) {
+        return {};
+    }
+
+    constexpr int colorTolerance = 12;
+    constexpr int transparentThreshold = 16;
+    constexpr int opaqueThreshold = 240;
+    constexpr int padding = 2;
+    const QImage argb = image.convertToFormat(QImage::Format_ARGB32);
+    const int width = argb.width();
+    const int height = argb.height();
+    const QRect fullRect = image.rect();
+    if (width < 2 || height < 2) {
+        return fullRect;
+    }
+
+    const QRgb corners[] = {
+        argb.pixel(0, 0), argb.pixel(width - 1, 0),
+        argb.pixel(0, height - 1), argb.pixel(width - 1, height - 1)
+    };
+    const bool transparent = std::all_of(std::begin(corners), std::end(corners),
+        [](QRgb pixel) { return qAlpha(pixel) <= transparentThreshold; });
+    const bool opaque = std::all_of(std::begin(corners), std::end(corners),
+        [](QRgb pixel) { return qAlpha(pixel) >= opaqueThreshold; });
+    if (!transparent && !opaque) {
+        return fullRect;
+    }
+
+    const int red = (qRed(corners[0]) + qRed(corners[1]) + qRed(corners[2]) + qRed(corners[3])) / 4;
+    const int green = (qGreen(corners[0]) + qGreen(corners[1]) + qGreen(corners[2]) + qGreen(corners[3])) / 4;
+    const int blue = (qBlue(corners[0]) + qBlue(corners[1]) + qBlue(corners[2]) + qBlue(corners[3])) / 4;
+    auto matchesBorder = [&](QRgb pixel) {
+        return transparent ? qAlpha(pixel) <= transparentThreshold
+                           : qAlpha(pixel) >= opaqueThreshold &&
+                                 std::abs(qRed(pixel) - red) <= colorTolerance &&
+                                 std::abs(qGreen(pixel) - green) <= colorTolerance &&
+                                 std::abs(qBlue(pixel) - blue) <= colorTolerance;
+    };
+    if (opaque && !std::all_of(std::begin(corners), std::end(corners), matchesBorder)) {
+        return fullRect;
+    }
+
+    // Check each outer edge independently before treating any inward line as border.
+    auto rowMatches = [&](int y, int left, int right) {
+        const QRgb* row = reinterpret_cast<const QRgb*>(argb.constScanLine(y));
+        int mismatches = 0;
+        const int count = right - left + 1;
+        for (int x = left; x <= right; ++x) {
+            if (!matchesBorder(row[x]) && ++mismatches * 100 > count) {
+                return false;
+            }
+        }
+        return true;
+    };
+    auto columnMatches = [&](int x, int top, int bottom) {
+        int mismatches = 0;
+        const int count = bottom - top + 1;
+        for (int y = top; y <= bottom; ++y) {
+            const QRgb* row = reinterpret_cast<const QRgb*>(argb.constScanLine(y));
+            if (!matchesBorder(row[x]) && ++mismatches * 100 > count) {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!rowMatches(0, 0, width - 1) || !rowMatches(height - 1, 0, width - 1) ||
+        !columnMatches(0, 0, height - 1) || !columnMatches(width - 1, 0, height - 1)) {
+        return fullRect;
+    }
+
+    int top = 0;
+    while (top < height && rowMatches(top, 0, width - 1)) {
+        ++top;
+    }
+    if (top == height) { // Uniform image: no reliable content boundary.
+        return fullRect;
+    }
+    int bottom = height - 1;
+    while (bottom > top && rowMatches(bottom, 0, width - 1)) {
+        --bottom;
+    }
+    int left = 0;
+    while (left < width && columnMatches(left, top, bottom)) {
+        ++left;
+    }
+    if (left == width) {
+        return fullRect;
+    }
+    int right = width - 1;
+    while (right > left && columnMatches(right, top, bottom)) {
+        --right;
+    }
+
+    return QRect(QPoint(qMax(0, left - padding), qMax(0, top - padding)),
+                 QPoint(qMin(width - 1, right + padding), qMin(height - 1, bottom + padding)));
+}
+
+QImage AutoCropAdaptive(const QImage& image)
+{
+    const QRect contentRect = DetectContentRectAdaptive(image);
+    return contentRect.isValid() && contentRect != image.rect() ? image.copy(contentRect) : image;
+}
+
 QVector<QColor> DominantColors(const QImage& image, int maxColors)
 {
     QVector<QColor> colors;
