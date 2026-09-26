@@ -284,10 +284,10 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     hLayout->addWidget(pbAskAi);
     hLayout->addWidget(pbOcr);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
-    hLayout->addWidget(pbSticker);
     hLayout->addWidget(pbLongScreenshot);
     hLayout->addWidget(pbGifRecording);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
+    hLayout->addWidget(pbSticker);
     hLayout->addWidget(pbSave);
     hLayout->addWidget(pbFinished);
 
