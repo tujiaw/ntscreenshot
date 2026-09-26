@@ -4,6 +4,8 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-26
+
 ### Added
 
 - A visible browser panel beside the AI conversation with an address bar, back / forward / reload / home controls, and a built-in start page that introduces browser use. It keeps one off-the-record login session per conversation and exposes structured browser-use actions, handing control to you automatically when a page asks for a password or verification code. Manual interaction pauses automation, and AI resumes on its own once the page leaves the challenge; stopping is handled by the chat input's stop button. The chat window remembers the last Web / browser choice and the pane widths. Browser contract tests cover DOM actions, authentication handoff, cookie isolation, cancellation, and closure.
@@ -15,6 +17,8 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Changed
 
+- Improved screenshot annotation controls, long-screenshot stitching, and conservative automatic border cropping.
+- Limited the CI build to Windows.
 - README now leads with download, features, and support instead of internal release-readiness notes.
 - README now includes a social preview and direct latest-release download links.
 - GitHub Releases now include bilingual download instructions and categorized change notes.
