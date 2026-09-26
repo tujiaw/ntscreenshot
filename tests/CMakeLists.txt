@@ -10,6 +10,19 @@ function(nt_add_qt_test test_name target_name)
     endif()
 endfunction()
 
+add_executable(draw_settings_layout_tests
+    capture/DrawSettingsLayoutTest.cpp
+    ${NT_SOURCE_DIR}/modules/capture/annotation/DrawSettings.cpp)
+target_include_directories(draw_settings_layout_tests PRIVATE ${NT_SOURCE_DIR})
+target_compile_definitions(draw_settings_layout_tests PRIVATE
+    DRAW_SETTINGS_QSS_PATH="${NT_SOURCE_DIR}/resource/darkstyle/modernstyle.qss")
+target_link_libraries(draw_settings_layout_tests PRIVATE Qt6::Widgets)
+if(MSVC)
+    target_compile_options(draw_settings_layout_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(draw_settings_layout draw_settings_layout_tests)
+set_tests_properties(draw_settings_layout PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(image_matcher_tests
     capture/ImageMatcherTest.cpp
     ${NT_SOURCE_DIR}/core/imaging/ImageMatcher.cpp)

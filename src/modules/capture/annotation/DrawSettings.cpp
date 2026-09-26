@@ -9,6 +9,8 @@
 #include <QEnterEvent>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QSizePolicy>
+#include <QShowEvent>
 #include "core/platform/Util.h"
 #include "core/theme/ThemeManager.h"
 
@@ -18,7 +20,7 @@ static QColor s_currentColor = QColor("#FF0000");
 
 namespace {
 
-// 线宽预览按钮：用水平线条展示真实的笔画粗细，选中态为白底+阴影
+// 三档线宽上下排列；每档仍用横向笔画展示粗细。
 class PenWidthButton : public QPushButton
 {
 public:
@@ -185,16 +187,18 @@ DrawSettings::DrawSettings(QWidget *parent)
     // 线宽分段控件背景容器
     auto *penWidthContainer = new QWidget(this);
     penWidthContainer->setObjectName(QStringLiteral("DrawSettingsSegment"));
-    auto *segLayout = new QHBoxLayout(penWidthContainer);
-    segLayout->setContentsMargins(Util::scaleSize(3), Util::scaleSize(3),
-                                  Util::scaleSize(3), Util::scaleSize(3));
-    segLayout->setSpacing(Util::scaleSize(2));
+    penWidthContainer->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    auto *segLayout = new QVBoxLayout(penWidthContainer);
+    segLayout->setContentsMargins(Util::scaleSize(3), 0,
+                                  Util::scaleSize(3), 0);
+    segLayout->setSpacing(Util::scaleSize(1));
     for (auto *btn : penWidthBtns_) {
         segLayout->addWidget(btn);
     }
 
     // 颜色网格：2排 × 8列
     auto *colorGrid = new QWidget(this);
+    colorGrid->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     auto *gridLayout = new QVBoxLayout(colorGrid);
     gridLayout->setContentsMargins(0, 0, 0, 0);
     gridLayout->setSpacing(Util::scaleSize(1));
@@ -221,14 +225,10 @@ DrawSettings::DrawSettings(QWidget *parent)
     row1_ = new QHBoxLayout();
     row1_->addWidget(penWidthLabel_);
     row1_->addWidget(penWidthContainer);
-    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(divider, 0, Qt::AlignVCenter);
-    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(colorLabel_);
     row1_->addWidget(colorGrid);
-    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(sizeList_);
-    row1_->addSpacing(Util::scaleSize(3));
     row1_->addWidget(pbCurrentColor_);
     row1_->addStretch();
 
@@ -241,26 +241,34 @@ DrawSettings::DrawSettings(QWidget *parent)
 
 void DrawSettings::rescaleForDpi()
 {
-    const int penW = Util::scaleSize(26);
-    const int penH = Util::scaleSize(20);
+    const int penW = Util::scaleSize(36);
+    const int penH = Util::scaleSize(11);
     for (QPushButton *btn : penWidthBtns_) {
         btn->setFixedSize(penW, penH);
+        btn->setStyleSheet(QStringLiteral("min-width:%1px;max-width:%1px;"
+                                           "min-height:%2px;max-height:%2px;"
+                                           "padding:0;border:none;background:transparent;")
+                               .arg(penW).arg(penH));
     }
 
-    // Slightly larger than the old dots, while still fitting two rows in 44px.
-    const int colorSize = Util::scaleSize(15);
+    // Keep two rows of clearly separated colors within the 44px panel.
+    const int colorSize = Util::scaleSize(14);
     for (QPushButton *btn : colorBtns_) {
         btn->setFixedSize(colorSize, colorSize);
+        btn->setStyleSheet(QStringLiteral("min-width:%1px;max-width:%1px;"
+                                           "min-height:%1px;max-height:%1px;"
+                                           "padding:0;border:none;background:transparent;")
+                               .arg(colorSize));
     }
 
     const int labelW = Util::scaleSize(28);
     if (penWidthLabel_) penWidthLabel_->setFixedWidth(labelW);
     if (colorLabel_) colorLabel_->setFixedWidth(labelW);
 
-    pbCurrentColor_->setFixedSize(Util::scaleSize(22), Util::scaleSize(22));
+    pbCurrentColor_->setFixedSize(Util::scaleSize(44), Util::scaleSize(24));
     refreshCurrentColorButton();
 
-    sizeList_->setFixedWidth(Util::scaleSize(56));
+    sizeList_->setFixedWidth(Util::scaleSize(54));
 
     if (auto *divider = findChild<QFrame*>(QStringLiteral("DrawSettingsDivider"))) {
         divider->setFixedWidth(Util::scaleSize(1));
@@ -268,7 +276,7 @@ void DrawSettings::rescaleForDpi()
     }
 
     if (row1_) {
-        row1_->setSpacing(Util::scaleSize(4));
+        row1_->setSpacing(Util::scaleSize(2));
     }
     if (QVBoxLayout *main = qobject_cast<QVBoxLayout*>(layout())) {
         Util::scaleLayoutMargins(main, 6, 3, 6, 3);
@@ -276,6 +284,15 @@ void DrawSettings::rescaleForDpi()
     }
 
     setFixedSize(Util::scaleSize(400), Util::scaleSize(44));
+    layout()->activate();
+}
+
+void DrawSettings::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    // A newly shown panel may have just been polished by the application
+    // stylesheet. Reapply the exact control sizes before its first layout.
+    rescaleForDpi();
 }
 
 void DrawSettings::refreshCurrentColorButton()
@@ -284,9 +301,13 @@ void DrawSettings::refreshCurrentColorButton()
         return;
     }
     const int radius = qMax(1, Util::scaleSize(6));
+    const int width = Util::scaleSize(44);
+    const int height = Util::scaleSize(24);
     pbCurrentColor_->setStyleSheet(QString(
-        "QPushButton{background-color:%1; border:1px solid rgba(128,128,128,120); border-radius:%2px;}")
-        .arg(s_currentColor.name()).arg(radius));
+        "QPushButton{background-color:%1; border:1px solid rgba(128,128,128,120); "
+        "border-radius:%2px; min-width:%3px; max-width:%3px; "
+        "min-height:%4px; max-height:%4px; padding:0px;}")
+        .arg(s_currentColor.name()).arg(radius).arg(width).arg(height));
 }
 
 void DrawSettings::syncPresetSelection()

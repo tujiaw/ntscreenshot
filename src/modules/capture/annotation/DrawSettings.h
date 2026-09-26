@@ -7,6 +7,7 @@ class QComboBox;
 class QHBoxLayout;
 class QLabel;
 class QPushButton;
+class QShowEvent;
 class DrawSettings : public QWidget
 {
     Q_OBJECT
@@ -27,6 +28,9 @@ public slots:
     void onCurrentColor();
     void onColor();
     void onPenWidthSelected();
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private:
     void refreshCurrentColorButton();

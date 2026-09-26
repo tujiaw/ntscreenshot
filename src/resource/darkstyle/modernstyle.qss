@@ -339,8 +339,6 @@ QWidget#DrawSettingsPanel {
     border-bottom-right-radius: 10px;
 }
 QWidget#DrawSettingsPanel QPushButton {
-    min-width: 0px; max-width: 64px;
-    min-height: 0px; max-height: 40px;
     padding: 0px;
 }
 QWidget#DrawSettingsPanel QWidget#DrawSettingsSegment {
