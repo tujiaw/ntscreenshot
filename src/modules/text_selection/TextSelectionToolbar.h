@@ -16,7 +16,7 @@ public:
     explicit TextSelectionToolbar(QWidget *parent = nullptr);
     void setActions(const QList<TextSelectionActionConfig> &actions);
     void showForSelection(const QRect &selectionRect, const QRect &boundsRect);
-    void showNearGlobalPoint(const QPoint &globalPoint);
+    void showNearGlobalPoint(const QPoint &globalPoint, const QRect &selectionRect = {});
     bool containsGlobalPoint(const QPoint &globalPoint) const;
 
 signals:
@@ -25,6 +25,7 @@ signals:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void rebuildActionButtons();

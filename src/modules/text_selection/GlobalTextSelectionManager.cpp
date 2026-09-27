@@ -3,13 +3,19 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCoreApplication>
-#include <QElapsedTimer>
-#include <QEventLoop>
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QMetaObject>
+#include <QPointer>
 #include <QThread>
 #include <QTimer>
+#include <QtConcurrent>
 #include <cstring>
+
+#ifdef Q_OS_WIN
+#include <UIAutomation.h>
+#include <ole2.h>
+#endif
 
 #include "core/settings/SettingModel.h"
 #include "modules/text_selection/TextSelectionToolbar.h"
@@ -18,13 +24,15 @@
 namespace {
 GlobalTextSelectionManager *g_textSelectionManager = nullptr;
 
-constexpr int kPassiveClipboardWaitMs = 80;
+constexpr int kMaxSelectedText = 5000;
 constexpr int kClipboardCopyWaitMs = 220;
-constexpr int kRetryPauseScheduleMs[] = {0, 40, 120};
 
-struct ClipboardTextSnapshot {
-    bool hasText = false;
-    QString text;
+template<typename T> struct ComHolder {
+    T *ptr = nullptr;
+    ~ComHolder() { if (ptr) ptr->Release(); }
+    T **put() { return &ptr; }
+    T *operator->() const { return ptr; }
+    explicit operator bool() const { return ptr != nullptr; }
 };
 
 QString windowClassName(HWND hwnd)
@@ -157,107 +165,71 @@ bool isTerminalLikeWindow(HWND hwnd)
         || isVsCodeLikeTerminalWindow(hwnd);
 }
 
-bool waitForClipboardSequenceChange(DWORD beforeSequence, int timeoutMs)
+bool sourceIsCurrent(HWND source)
 {
-    QElapsedTimer timer;
-    timer.start();
-    while (timer.elapsed() < timeoutMs) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-        if (::GetClipboardSequenceNumber() != beforeSequence) {
-            return true;
-        }
+    return source && ::IsWindow(source)
+        && ::GetAncestor(::GetForegroundWindow(), GA_ROOT) == ::GetAncestor(source, GA_ROOT);
+}
+
+TextSelectionResult readClipboardSelection(HWND source)
+{
+    TextSelectionResult result;
+    if (!sourceIsCurrent(source) || isTerminalLikeWindow(source)) return result;
+
+    // Keep the complete OLE data object, not just CF_UNICODETEXT. This preserves
+    // images, HTML, files and delayed-rendered clipboard formats while Ctrl+C runs.
+    const bool comInitialized = SUCCEEDED(::CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+    ComHolder<IDataObject> previousClipboard;
+    const bool hadPreviousClipboard = SUCCEEDED(::OleGetClipboard(previousClipboard.put()));
+
+    const DWORD before = ::GetClipboardSequenceNumber();
+    INPUT inputs[4] = {};
+    inputs[0].type = INPUT_KEYBOARD; inputs[0].ki.wVk = VK_CONTROL;
+    inputs[1].type = INPUT_KEYBOARD; inputs[1].ki.wVk = 'C';
+    inputs[2].type = INPUT_KEYBOARD; inputs[2].ki.wVk = 'C'; inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+    inputs[3].type = INPUT_KEYBOARD; inputs[3].ki.wVk = VK_CONTROL; inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+    if (::SendInput(4, inputs, sizeof(INPUT)) != 4) {
+        if (comInitialized) ::CoUninitialize();
+        return result;
+    }
+
+    for (int elapsed = 0; elapsed < kClipboardCopyWaitMs; elapsed += 10) {
+        if (::GetClipboardSequenceNumber() != before) break;
         QThread::msleep(10);
     }
-    return ::GetClipboardSequenceNumber() != beforeSequence;
-}
+    if (::GetClipboardSequenceNumber() == before) {
+        if (comInitialized) ::CoUninitialize();
+        return result;
+    }
 
-bool openClipboardWithRetry(HWND owner = nullptr, int attempts = 6, DWORD delayMs = 8)
-{
-    for (int i = 0; i < attempts; ++i) {
-        if (::OpenClipboard(owner) != FALSE) {
-            return true;
+    if (!::OpenClipboard(nullptr)) {
+        if (comInitialized) ::CoUninitialize();
+        return result;
+    }
+    const DWORD copiedSequence = ::GetClipboardSequenceNumber();
+    if (::IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+        if (HANDLE data = ::GetClipboardData(CF_UNICODETEXT)) {
+            if (const auto *chars = static_cast<const wchar_t*>(::GlobalLock(data))) {
+                result.text = QString::fromWCharArray(chars, kMaxSelectedText + 1);
+                ::GlobalUnlock(data);
+            }
         }
-        ::Sleep(delayMs);
     }
-    return false;
-}
-
-ClipboardTextSnapshot snapshotClipboardText()
-{
-    ClipboardTextSnapshot snapshot;
-    if (!openClipboardWithRetry()) {
-        return snapshot;
-    }
-
-    if (::IsClipboardFormatAvailable(CF_UNICODETEXT) == FALSE) {
-        ::CloseClipboard();
-        return snapshot;
-    }
-
-    HANDLE clipboardData = ::GetClipboardData(CF_UNICODETEXT);
-    if (!clipboardData) {
-        ::CloseClipboard();
-        return snapshot;
-    }
-
-    const auto *lockedText = static_cast<const wchar_t*>(::GlobalLock(clipboardData));
-    if (lockedText) {
-        snapshot.hasText = true;
-        snapshot.text = QString::fromWCharArray(lockedText).trimmed();
-        ::GlobalUnlock(clipboardData);
-    }
-
     ::CloseClipboard();
-    return snapshot;
-}
-
-bool setClipboardPlainText(const QString &text)
-{
-    if (!openClipboardWithRetry()) {
-        return false;
+    // Restore only if no other application changed the clipboard after our copy.
+    if (::GetClipboardSequenceNumber() == copiedSequence) {
+        if (hadPreviousClipboard) {
+            ::OleSetClipboard(previousClipboard.ptr);
+        } else if (::OpenClipboard(nullptr)) {
+            ::EmptyClipboard();
+            ::CloseClipboard();
+        }
     }
-
-    if (::EmptyClipboard() == FALSE) {
-        ::CloseClipboard();
-        return false;
-    }
-
-    const std::wstring wideText = text.toStdWString();
-    const size_t bytes = (wideText.size() + 1) * sizeof(wchar_t);
-    HGLOBAL memory = ::GlobalAlloc(GMEM_MOVEABLE, bytes);
-    if (!memory) {
-        ::CloseClipboard();
-        return false;
-    }
-
-    void *buffer = ::GlobalLock(memory);
-    if (!buffer) {
-        ::GlobalFree(memory);
-        ::CloseClipboard();
-        return false;
-    }
-
-    memcpy(buffer, wideText.c_str(), bytes);
-    ::GlobalUnlock(memory);
-
-    if (::SetClipboardData(CF_UNICODETEXT, memory) == nullptr) {
-        ::GlobalFree(memory);
-        ::CloseClipboard();
-        return false;
-    }
-
-    ::CloseClipboard();
-    return true;
-}
-
-QString clipboardTextOrEmpty()
-{
-    ClipboardTextSnapshot snapshot = snapshotClipboardText();
-    QString text = snapshot.text;
-    if (text.length() > 5000) {
-        text = text.left(5000);
-    }
-    return text;
+    if (comInitialized) ::CoUninitialize();
+    if (!sourceIsCurrent(source)) return {};
+    result.truncated = result.text.size() > kMaxSelectedText;
+    result.text = result.text.left(kMaxSelectedText);
+    return result;
 }
 
 bool isMeaningfulText(const QString &text)
@@ -284,18 +256,82 @@ QString normalizeSelectedText(QString text)
     return text.trimmed();
 }
 
-void waitBriefly(int delayMs)
+TextSelectionResult readUiAutomationSelection(const QPoint &point, bool &supported)
 {
-    if (delayMs <= 0) {
-        return;
+    TextSelectionResult result;
+    supported = false;
+    if (FAILED(::CoInitializeEx(nullptr, COINIT_MULTITHREADED))) return result;
+    {
+        ComHolder<IUIAutomation> automation;
+        if (SUCCEEDED(::CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
+                                         IID_IUIAutomation, reinterpret_cast<void**>(automation.put())))) {
+            ComHolder<IUIAutomation2> automation2;
+            if (SUCCEEDED(automation->QueryInterface(IID_IUIAutomation2,
+                                                      reinterpret_cast<void**>(automation2.put())))) {
+                automation2->put_ConnectionTimeout(250);
+                automation2->put_TransactionTimeout(250);
+            }
+            ComHolder<IUIAutomationElement> element;
+            POINT nativePoint{point.x(), point.y()};
+            if (SUCCEEDED(automation->ElementFromPoint(nativePoint, element.put())) && element) {
+                ComHolder<IUIAutomationTextPattern> pattern;
+                if (SUCCEEDED(element->GetCurrentPatternAs(UIA_TextPatternId, IID_IUIAutomationTextPattern,
+                              reinterpret_cast<void**>(pattern.put()))) && pattern) {
+                    supported = true;
+                    ComHolder<IUIAutomationTextRangeArray> ranges;
+                    if (SUCCEEDED(pattern->GetSelection(ranges.put())) && ranges) {
+                        int count = 0;
+                        ranges->get_Length(&count);
+                        if (count == 1) {
+                            ComHolder<IUIAutomationTextRange> range;
+                            if (SUCCEEDED(ranges->GetElement(0, range.put())) && range) {
+                                BSTR value = nullptr;
+                                if (SUCCEEDED(range->GetText(kMaxSelectedText + 1, &value)) && value) {
+                                    result.text = QString::fromWCharArray(value, ::SysStringLen(value));
+                                    ::SysFreeString(value);
+                                    result.truncated = result.text.size() > kMaxSelectedText;
+                                    result.text.truncate(kMaxSelectedText);
+                                }
+                                SAFEARRAY *rectangles = nullptr;
+                                if (SUCCEEDED(range->GetBoundingRectangles(&rectangles)) && rectangles) {
+                                    double *values = nullptr;
+                                    LONG lower = 0, upper = -1;
+                                    ::SafeArrayGetLBound(rectangles, 1, &lower);
+                                    ::SafeArrayGetUBound(rectangles, 1, &upper);
+                                    if (upper - lower + 1 >= 4 && SUCCEEDED(::SafeArrayAccessData(rectangles, reinterpret_cast<void**>(&values)))) {
+                                        for (LONG i = 0; i + 3 < upper - lower + 1; i += 4) {
+                                            const QRect part(static_cast<int>(values[i]), static_cast<int>(values[i + 1]),
+                                                             static_cast<int>(values[i + 2]), static_cast<int>(values[i + 3]));
+                                            result.bounds = result.bounds.isValid() ? result.bounds.united(part) : part;
+                                        }
+                                        ::SafeArrayUnaccessData(rectangles);
+                                    }
+                                    ::SafeArrayDestroy(rectangles);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
+    ::CoUninitialize();
+    return result;
+}
 
-    QElapsedTimer timer;
-    timer.start();
-    while (timer.elapsed() < delayMs) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-        QThread::msleep(5);
-    }
+TextSelectionResult readSelection(HWND source, const QPoint &point)
+{
+    if (!sourceIsCurrent(source)) return {};
+    bool supported = false;
+    TextSelectionResult result = readUiAutomationSelection(point, supported);
+    if (!sourceIsCurrent(source)) return {};
+    // Some providers advertise TextPattern but return an empty/degenerate
+    // selection at the release point. In that case use the clipboard-preserving
+    // fallback instead of silently dropping an otherwise valid selection.
+    if (!supported || result.text.trimmed().isEmpty()) result = readClipboardSelection(source);
+    result.text = normalizeSelectedText(result.text);
+    if (!isMeaningfulText(result.text)) return {};
+    return result;
 }
 }
 #endif
@@ -306,13 +342,6 @@ GlobalTextSelectionManager::GlobalTextSelectionManager(QObject *parent)
     , setting_(nullptr)
 {
     connect(popup_.get(), &TextSelectionToolbar::sigActionTriggered, this, [this](const QString &actionId, const QString &inputText) {
-        if (actionId == QStringLiteral("copy")) {
-            if (QClipboard *clipboard = QApplication::clipboard()) {
-                clipboard->setText(selectedText_, QClipboard::Clipboard);
-            }
-            hidePopup();
-            return;
-        }
         emit sigActionTriggered(actionId, selectedText_, inputText);
         hidePopup();
     });
@@ -340,7 +369,11 @@ LRESULT CALLBACK GlobalTextSelectionManager::mouseHookProc(int nCode, WPARAM wPa
 {
     if (nCode >= 0 && g_textSelectionManager) {
         const auto *info = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
-        if (info) {
+        if (info && (info->flags & LLMHF_INJECTED) == 0
+            && (wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP
+                || (wParam == WM_MOUSEMOVE && (::GetAsyncKeyState(VK_LBUTTON) & 0x8000))
+                || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN
+                || wParam == WM_MOUSEWHEEL || wParam == WM_MOUSEHWHEEL)) {
             const QPoint globalPos(info->pt.x, info->pt.y);
             QMetaObject::invokeMethod(
                 g_textSelectionManager,
@@ -380,14 +413,7 @@ void GlobalTextSelectionManager::handleGlobalMouseEvent(WPARAM wParam, const QPo
         }
 
         hidePopup();
-
-        const DWORD now = ::GetTickCount();
-        const QPoint delta = globalPos - lastClickPoint_;
-        doubleClickCandidate_ = (now - lastClickTime_ <= ::GetDoubleClickTime())
-            && (qAbs(delta.x()) <= ::GetSystemMetrics(SM_CXDOUBLECLK) / 2)
-            && (qAbs(delta.y()) <= ::GetSystemMetrics(SM_CYDOUBLECLK) / 2);
-        lastClickTime_ = now;
-        lastClickPoint_ = globalPos;
+        ++generation_;
         pressPoint_ = globalPos;
         dragging_ = false;
         dragSourceWindow_ = ::GetForegroundWindow();
@@ -404,37 +430,49 @@ void GlobalTextSelectionManager::handleGlobalMouseEvent(WPARAM wParam, const QPo
 
     if (wParam == WM_LBUTTONUP) {
         if (popupContainsGlobalPoint(globalPos)) {
-            doubleClickCandidate_ = false;
             dragging_ = false;
             return;
         }
 
-        doubleClickCandidate_ = false; // 强制关闭，双击鼠标不触发
-        const bool shouldTrigger = dragging_ || doubleClickCandidate_;
+        const bool shouldTrigger = dragging_;
         const HWND sourceWindow = dragSourceWindow_;
         dragging_ = false;
-        doubleClickCandidate_ = false;
         dragSourceWindow_ = nullptr;
 
         if (!shouldTrigger) {
             return;
         }
 
-        const int delayMs = 60;
-        QTimer::singleShot(delayMs, this, [this, globalPos, sourceWindow]() {
-            triggerForSelection(globalPos, sourceWindow);
+        const uint64_t generation = generation_;
+        QTimer::singleShot(60, this, [this, globalPos, sourceWindow, generation]() {
+            triggerForSelection(globalPos, sourceWindow, generation);
         });
     }
 }
 
-void GlobalTextSelectionManager::triggerForSelection(const QPoint &globalPos, HWND sourceWindow)
+void GlobalTextSelectionManager::triggerForSelection(const QPoint &globalPos, HWND sourceWindow, uint64_t generation)
 {
-    const QString text = captureSelectedTextWithRetry(sourceWindow ? sourceWindow : ::GetForegroundWindow());
-    if (!isMeaningfulText(text)) {
-        return;
-    }
-
-    showPopup(globalPos, text);
+    if (generation != generation_ || activeReads_ >= 2 || isOwnProcessWindow(sourceWindow)
+        || !sourceIsCurrent(sourceWindow)
+        || (setting_ && !setting_->textSelectionEnabled())) return;
+    ++activeReads_;
+    auto *watcher = new QFutureWatcher<TextSelectionResult>(this);
+    connect(watcher, &QFutureWatcher<TextSelectionResult>::finished, this,
+            [this, watcher, globalPos, sourceWindow, generation]() {
+        --activeReads_;
+        const TextSelectionResult result = watcher->result();
+        watcher->deleteLater();
+        if (generation == generation_ && sourceIsCurrent(sourceWindow)
+            && (!setting_ || setting_->textSelectionEnabled()) && !result.text.isEmpty()) {
+            showPopup(globalPos, result);
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([sourceWindow, globalPos]() {
+        return readSelection(sourceWindow, globalPos);
+    }));
+    QTimer::singleShot(700, watcher, [this, generation]() {
+        if (generation == generation_) ++generation_;
+    });
 }
 
 bool GlobalTextSelectionManager::installMouseHook()
@@ -481,77 +519,6 @@ bool GlobalTextSelectionManager::isOwnProcessWindow(HWND hwnd) const
     return processId == ::GetCurrentProcessId();
 }
 
-QString GlobalTextSelectionManager::captureSelectedText(HWND sourceWindow)
-{
-    if (!sourceWindow || !::IsWindow(sourceWindow) || isOwnProcessWindow(sourceWindow)) {
-        return QString();
-    }
-
-    const ClipboardTextSnapshot backup = snapshotClipboardText();
-    const DWORD beforeSequence = ::GetClipboardSequenceNumber();
-    const bool terminalLikeWindow = isTerminalLikeWindow(sourceWindow);
-    bool clipboardChanged = false;
-
-    if (waitForClipboardSequenceChange(beforeSequence, terminalLikeWindow ? 150 : kPassiveClipboardWaitMs)) {
-        clipboardChanged = true;
-        const QString result = normalizeSelectedText(clipboardTextOrEmpty());
-        if (backup.hasText && result != backup.text) {
-            setClipboardPlainText(backup.text);
-        }
-        return result;
-    }
-
-    if (terminalLikeWindow) {
-        return QString();
-    }
-
-    ::SetForegroundWindow(sourceWindow);
-    INPUT inputs[4];
-    ZeroMemory(inputs, sizeof(inputs));
-    inputs[0].type = INPUT_KEYBOARD; inputs[0].ki.wVk = VK_CONTROL;
-    inputs[1].type = INPUT_KEYBOARD; inputs[1].ki.wVk = 'C';
-    inputs[2].type = INPUT_KEYBOARD; inputs[2].ki.wVk = 'C'; inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
-    inputs[3].type = INPUT_KEYBOARD; inputs[3].ki.wVk = VK_CONTROL; inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
-    ::SendInput(4, inputs, sizeof(INPUT));
-
-    clipboardChanged = waitForClipboardSequenceChange(beforeSequence, kClipboardCopyWaitMs);
-
-    QString result;
-    if (clipboardChanged) {
-        result = normalizeSelectedText(clipboardTextOrEmpty());
-    }
-
-    if (clipboardChanged && backup.hasText && result != backup.text) {
-        setClipboardPlainText(backup.text);
-    }
-    return result;
-}
-
-QString GlobalTextSelectionManager::captureSelectedTextWithRetry(HWND sourceWindow)
-{
-    QString bestEffortText;
-
-    for (int delayMs : kRetryPauseScheduleMs) {
-        waitBriefly(delayMs);
-
-        HWND activeWindow = ::GetForegroundWindow();
-        if (activeWindow && ::IsWindow(activeWindow) && !isOwnProcessWindow(activeWindow)) {
-            sourceWindow = activeWindow;
-        }
-
-        const QString text = captureSelectedText(sourceWindow);
-        if (text.isEmpty()) {
-            continue;
-        }
-
-        bestEffortText = text;
-        if (isMeaningfulText(text)) {
-            return text;
-        }
-    }
-
-    return bestEffortText;
-}
 #endif
 
 void GlobalTextSelectionManager::hidePopup()
@@ -561,13 +528,13 @@ void GlobalTextSelectionManager::hidePopup()
     }
 }
 
-void GlobalTextSelectionManager::showPopup(const QPoint &globalPos, const QString &selectedText)
+void GlobalTextSelectionManager::showPopup(const QPoint &globalPos, const TextSelectionResult &result)
 {
-    selectedText_ = selectedText;
+    selectedText_ = result.text;
     if (popup_) {
         popup_->hide();
         popup_->setActions(setting_ ? setting_->textSelectionActions()
                                     : QList<TextSelectionActionConfig>());
-        popup_->showNearGlobalPoint(globalPos);
+        popup_->showNearGlobalPoint(globalPos, result.bounds);
     }
 }

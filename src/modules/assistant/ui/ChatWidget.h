@@ -19,6 +19,7 @@ class ChatWebBridge;
 class ChatInputWidget;
 class BrowserPanel;
 class QResizeEvent;
+class QCloseEvent;
 class QShowEvent;
 class QSplitter;
 class QVBoxLayout;
@@ -53,6 +54,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void closeAnimation();
@@ -133,6 +135,7 @@ private:
     bool dragging_;
     QPoint dragOffset_;
     bool chatRequestPending_;
+    bool closing_ = false;
     QList<MessageQueueItem> messageQueue_;
     QWidget *queuePanel_;
 };

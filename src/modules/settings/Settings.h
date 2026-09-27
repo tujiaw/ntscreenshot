@@ -57,6 +57,9 @@ private:
     void onTextSelectionActionFieldChanged();
     void onAddTextSelectionAction();
     void onDelTextSelectionAction();
+    void onSaveTextSelectionAction();
+    void onCancelTextSelectionAction();
+    void onResetTextSelectionActions();
 
 private:
     void initLlmTab();
@@ -84,6 +87,8 @@ private:
     class QLineEdit*   leTextSelectionActionLabel_;
     class QPlainTextEdit* teTextSelectionActionPrompt_;
     class QPushButton* btnDelTextSelectionAction_;
+    class QPushButton* btnSaveTextSelectionAction_ = nullptr;
+    class QPushButton* btnCancelTextSelectionAction_ = nullptr;
     class QListWidget* listLocalSearchRoots_ = nullptr;
     class QPlainTextEdit* teLocalSearchExcludes_ = nullptr;
     class QKeySequenceEdit* kseLocalSearch_ = nullptr;
@@ -113,5 +118,7 @@ private:
     bool httpPythonReady_ = false;
     bool updatingProviderFields_ = false;
     bool updatingTextSelectionActionFields_ = false;
+    bool textSelectionDraftNew_ = false;
+    bool textSelectionDraftDirty_ = false;
     QTimer* statusTipTimer_ = nullptr;
 };

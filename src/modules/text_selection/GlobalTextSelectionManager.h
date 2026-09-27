@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QPoint>
 #include <QString>
+#include <QRect>
+#include <cstdint>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -12,6 +14,13 @@
 class SettingModel;
 
 class TextSelectionToolbar;
+template <typename T> class QFutureWatcher;
+
+struct TextSelectionResult {
+    QString text;
+    QRect bounds;
+    bool truncated = false;
+};
 
 class GlobalTextSelectionManager : public QObject
 {
@@ -31,25 +40,21 @@ private:
     static LRESULT CALLBACK mouseHookProc(int nCode, WPARAM wParam, LPARAM lParam);
 
     void handleGlobalMouseEvent(WPARAM wParam, const QPoint &globalPos);
-    void triggerForSelection(const QPoint &globalPos, HWND sourceWindow);
+    void triggerForSelection(const QPoint &globalPos, HWND sourceWindow, uint64_t generation);
     bool installMouseHook();
     void uninstallMouseHook();
     bool popupContainsGlobalPoint(const QPoint &globalPos) const;
     bool isOwnProcessWindow(HWND hwnd) const;
-    QString captureSelectedText(HWND sourceWindow);
-    QString captureSelectedTextWithRetry(HWND sourceWindow);
-
     HHOOK mouseHook_ = nullptr;
     QPoint pressPoint_;
-    QPoint lastClickPoint_;
     HWND dragSourceWindow_ = nullptr;
     bool dragging_ = false;
-    bool doubleClickCandidate_ = false;
-    DWORD lastClickTime_ = 0;
+    uint64_t generation_ = 0;
+    int activeReads_ = 0;
 #endif
 
     void hidePopup();
-    void showPopup(const QPoint &globalPos, const QString &selectedText);
+    void showPopup(const QPoint &globalPos, const TextSelectionResult &result);
 
     QString selectedText_;
     std::unique_ptr<TextSelectionToolbar> popup_;

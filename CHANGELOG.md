@@ -4,6 +4,22 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-27
+
+### Added
+
+- Text-selection actions can now be explicitly saved, cancelled, or reset to their defaults from Settings, with confirmation before deletion or reset.
+
+### Changed
+
+- Global text selection now reads Windows UI Automation selections asynchronously and falls back to a clipboard-preserving copy path when needed, avoiding UI stalls and preserving rich clipboard contents.
+- The text-selection toolbar now follows the selected text bounds, supports Escape and keyboard focus, truncates long action labels, and uses localized built-in action labels and prompts.
+- Closing the assistant window now stops the active request and clears the transient chat session instead of restoring a closed conversation.
+
+### Fixed
+
+- Improved text-selection popup reliability across supported Windows applications and prevented stale selection reads from reopening the toolbar.
+
 ## [0.1.2] - 2026-09-26
 
 ### Added

@@ -4,6 +4,7 @@
 #include <QHBoxLayout>
 #include <QPointer>
 #include <QShowEvent>
+#include <QCloseEvent>
 #include <QSplitter>
 #include <QTimer>
 #include <QApplication>
@@ -330,11 +331,21 @@ ChatWidget::~ChatWidget()
     // partially-destroyed widget between our destructor body and ~QObject().
     if (agent_) {
         agent_->stop();
-        saveSession();
         agent_->disconnect(this);
         delete agent_;
         agent_ = nullptr;
     }
+    ChatSessionStore::clear();
+}
+
+void ChatWidget::closeEvent(QCloseEvent *event)
+{
+    FramelessWidget::closeEvent(event);
+    if (!event->isAccepted() || closing_) return;
+    closing_ = true;
+    if (agent_) agent_->stop();
+    ChatSessionStore::clear();
+    emit closed(this);
 }
 
 void ChatWidget::changeEvent(QEvent *event)
@@ -451,7 +462,6 @@ void ChatWidget::paintEvent(QPaintEvent *event)
 
 void ChatWidget::closeAnimation()
 {
-    emit closed(this);
     close();
 }
 
@@ -1207,7 +1217,7 @@ void ChatWidget::onAssistantPrefixFinalized(const QString &text)
 
 void ChatWidget::saveSession()
 {
-    if (!agent_) {
+    if (closing_ || !agent_) {
         return;
     }
     ChatSessionStore::Session session;

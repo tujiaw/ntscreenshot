@@ -1199,6 +1199,15 @@ void Settings::initLlmTab()
     teTextSelectionActionPrompt_->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
     textSelectionForm->addWidget(leTextSelectionActionLabel_);
     textSelectionForm->addWidget(teTextSelectionActionPrompt_, 1);
+    auto *textSelectionEditorButtons = new QHBoxLayout();
+    btnSaveTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "保存"), textSelectionEditor);
+    btnCancelTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "取消"), textSelectionEditor);
+    auto *btnResetTextSelectionActions = new QPushButton(QCoreApplication::translate("App", "恢复默认动作"), textSelectionEditor);
+    textSelectionEditorButtons->addWidget(btnSaveTextSelectionAction_);
+    textSelectionEditorButtons->addWidget(btnCancelTextSelectionAction_);
+    textSelectionEditorButtons->addStretch();
+    textSelectionEditorButtons->addWidget(btnResetTextSelectionActions);
+    textSelectionForm->addLayout(textSelectionEditorButtons);
     textSelectionEditor->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     textSelectionContentRow->addLayout(textSelectionLeftLayout, 0);
@@ -1218,6 +1227,9 @@ void Settings::initLlmTab()
             this, &Settings::onTextSelectionActionFieldChanged);
     connect(cbTextSelectionEnabled_, &QCheckBox::toggled,
             this, &Settings::onTextSelectionEnabledToggled);
+    connect(btnSaveTextSelectionAction_, &QPushButton::clicked, this, &Settings::onSaveTextSelectionAction);
+    connect(btnCancelTextSelectionAction_, &QPushButton::clicked, this, &Settings::onCancelTextSelectionAction);
+    connect(btnResetTextSelectionActions, &QPushButton::clicked, this, &Settings::onResetTextSelectionActions);
     qInfo() << "Settings::initLlmTab: selection page built";
 
     QWidget* notificationPage = new QWidget();
@@ -1424,6 +1436,7 @@ void Settings::onTextSelectionEnabledToggled(bool checked)
 
 void Settings::onTextSelectionActionSelected(int row)
 {
+    if (textSelectionDraftNew_ || textSelectionDraftDirty_) return;
     updatingTextSelectionActionFields_ = true;
 
     const QList<TextSelectionActionConfig> actions =
@@ -1441,6 +1454,8 @@ void Settings::onTextSelectionActionSelected(int row)
     if (btnDelTextSelectionAction_) {
         btnDelTextSelectionAction_->setEnabled(valid && actions.size() > 1);
     }
+    if (btnSaveTextSelectionAction_) btnSaveTextSelectionAction_->setEnabled(false);
+    if (btnCancelTextSelectionAction_) btnCancelTextSelectionAction_->setEnabled(false);
 
     updatingTextSelectionActionFields_ = false;
 }
@@ -1450,43 +1465,34 @@ void Settings::onTextSelectionActionFieldChanged()
     if (updatingTextSelectionActionFields_ || !listTextSelectionActions_) {
         return;
     }
-
-    const int row = listTextSelectionActions_->currentRow();
-    QList<TextSelectionActionConfig> actions =
-        windowManager_->setting()->textSelectionActions();
-    if (row < 0 || row >= actions.size()) {
-        return;
-    }
-
-    TextSelectionActionConfig &action = actions[row];
-    action.label = leTextSelectionActionLabel_ ? leTextSelectionActionLabel_->text().trimmed() : QString();
-    action.prompt = teTextSelectionActionPrompt_ ? teTextSelectionActionPrompt_->toPlainText().trimmed() : QString();
-
-    windowManager_->setting()->setTextSelectionActions(actions);
-
-    if (QListWidgetItem *item = listTextSelectionActions_->item(row)) {
-        item->setText(action.label.isEmpty() ? QCoreApplication::translate("App", "未命名") : action.label);
-    }
+    textSelectionDraftDirty_ = true;
+    listTextSelectionActions_->setEnabled(false);
+    if (btnDelTextSelectionAction_) btnDelTextSelectionAction_->setEnabled(false);
+    if (btnSaveTextSelectionAction_) btnSaveTextSelectionAction_->setEnabled(true);
+    if (btnCancelTextSelectionAction_) btnCancelTextSelectionAction_->setEnabled(true);
 }
 
 void Settings::onAddTextSelectionAction()
 {
-    QList<TextSelectionActionConfig> actions =
-        windowManager_->setting()->textSelectionActions();
-
-    TextSelectionActionConfig action;
-    action.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    actions.append(action);
-
-    windowManager_->setting()->setTextSelectionActions(actions);
-    const int newRow = actions.size() - 1;
-    loadTextSelectionActions(newRow);
-    showStatusTip(QCoreApplication::translate("App", "已新增划词动作"));
+    if (textSelectionDraftDirty_ || textSelectionDraftNew_) return;
+    textSelectionDraftNew_ = true;
+    textSelectionDraftDirty_ = true;
+    updatingTextSelectionActionFields_ = true;
+    leTextSelectionActionLabel_->clear();
+    teTextSelectionActionPrompt_->clear();
+    leTextSelectionActionLabel_->setEnabled(true);
+    teTextSelectionActionPrompt_->setEnabled(true);
+    updatingTextSelectionActionFields_ = false;
+    listTextSelectionActions_->setEnabled(false);
+    btnDelTextSelectionAction_->setEnabled(false);
+    btnSaveTextSelectionAction_->setEnabled(true);
+    btnCancelTextSelectionAction_->setEnabled(true);
+    leTextSelectionActionLabel_->setFocus();
 }
 
 void Settings::onDelTextSelectionAction()
 {
-    if (!listTextSelectionActions_) {
+    if (!listTextSelectionActions_ || textSelectionDraftDirty_) {
         return;
     }
 
@@ -1502,10 +1508,60 @@ void Settings::onDelTextSelectionAction()
         return;
     }
 
+    if (QMessageBox::question(this, QCoreApplication::translate("App", "删除划词动作"),
+            QCoreApplication::translate("App", "确定删除这个划词动作吗？")) != QMessageBox::Yes) return;
+
     actions.removeAt(row);
     windowManager_->setting()->setTextSelectionActions(actions);
     loadTextSelectionActions(qMin(row, actions.size() - 1));
     showStatusTip(QCoreApplication::translate("App", "已删除划词动作"));
+}
+
+void Settings::onSaveTextSelectionAction()
+{
+    const QString label = leTextSelectionActionLabel_->text().trimmed();
+    if (label.isEmpty()) {
+        showStatusTip(QCoreApplication::translate("App", "按钮文字不能为空"), false);
+        leTextSelectionActionLabel_->setFocus();
+        return;
+    }
+    QList<TextSelectionActionConfig> actions = windowManager_->setting()->textSelectionActions();
+    const int row = listTextSelectionActions_->currentRow();
+    TextSelectionActionConfig action;
+    action.id = textSelectionDraftNew_ ? QUuid::createUuid().toString(QUuid::WithoutBraces)
+                                       : (row >= 0 && row < actions.size() ? actions[row].id : QString());
+    if (action.id.isEmpty()) return;
+    action.label = label;
+    action.prompt = teTextSelectionActionPrompt_->toPlainText().trimmed();
+    const bool wasNew = textSelectionDraftNew_;
+    if (wasNew) actions.append(action);
+    else actions[row] = action;
+    windowManager_->setting()->setTextSelectionActions(actions);
+    textSelectionDraftNew_ = false;
+    textSelectionDraftDirty_ = false;
+    listTextSelectionActions_->setEnabled(true);
+    loadTextSelectionActions(wasNew ? actions.size() - 1 : row);
+    showStatusTip(QCoreApplication::translate("App", "已保存划词动作"));
+}
+
+void Settings::onCancelTextSelectionAction()
+{
+    textSelectionDraftNew_ = false;
+    textSelectionDraftDirty_ = false;
+    listTextSelectionActions_->setEnabled(true);
+    onTextSelectionActionSelected(listTextSelectionActions_->currentRow());
+}
+
+void Settings::onResetTextSelectionActions()
+{
+    if (QMessageBox::question(this, QCoreApplication::translate("App", "恢复默认动作"),
+            QCoreApplication::translate("App", "确定用默认动作替换当前所有自定义动作吗？")) != QMessageBox::Yes) return;
+    textSelectionDraftNew_ = false;
+    textSelectionDraftDirty_ = false;
+    listTextSelectionActions_->setEnabled(true);
+    windowManager_->setting()->resetTextSelectionActions();
+    loadTextSelectionActions(0);
+    showStatusTip(QCoreApplication::translate("App", "已恢复默认动作"));
 }
 
 void Settings::onGitHubFieldChanged()

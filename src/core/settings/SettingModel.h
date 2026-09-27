@@ -140,6 +140,7 @@ public:
 
     QList<TextSelectionActionConfig> textSelectionActions() const;
     void setTextSelectionActions(const QList<TextSelectionActionConfig> &actions);
+    void resetTextSelectionActions();
     bool llmImageTokenSavingEnabled() const;
     void setLlmImageTokenSavingEnabled(bool enabled);
 

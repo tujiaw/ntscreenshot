@@ -3,6 +3,7 @@
 
 #include <QHBoxLayout>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPaintEvent>
@@ -12,6 +13,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QStyle>
+#include <QFontMetrics>
 
 #include "core/theme/OverlayTheme.h"
 #include "core/platform/Util.h"
@@ -199,8 +201,12 @@ void TextSelectionToolbar::showForSelection(const QRect &selectionRect, const QR
     raise();
 }
 
-void TextSelectionToolbar::showNearGlobalPoint(const QPoint &globalPoint)
+void TextSelectionToolbar::showNearGlobalPoint(const QPoint &globalPoint, const QRect &selectionRect)
 {
+    QRect screenRect = Util::desktopRect();
+    if (QScreen *screen = QGuiApplication::screenAt(globalPoint)) {
+        screenRect = screen->availableGeometry();
+    }
     resetCompactPresentation();
     if (chatInput_) {
         chatInput_->clear();
@@ -209,19 +215,25 @@ void TextSelectionToolbar::showNearGlobalPoint(const QPoint &globalPoint)
     refreshCompactSize();
 
     const int gap = Util::scaleSize(kGlobalPointGap);
-    QPoint anchor(globalPoint.x() - width() / 2, globalPoint.y() + gap);
-    QRect screenRect = Util::desktopRect();
-    if (QScreen *screen = QGuiApplication::screenAt(globalPoint)) {
-        screenRect = screen->availableGeometry();
-    }
-
-    if (anchor.y() + height() > screenRect.bottom() + 1 - gap) {
-        anchor.setY(globalPoint.y() - height() - gap);
-    }
+    const QRect target = selectionRect.isValid() ? selectionRect : QRect(globalPoint, QSize(1, 1));
+    QPoint anchor(target.center().x() - width() / 2, target.bottom() + gap);
+    if (anchor.y() + height() > screenRect.bottom() + 1 - gap)
+        anchor.setY(target.top() - height() - gap);
+    if (anchor.y() < screenRect.top()) anchor.setY(target.bottom() + gap);
 
     move(clampTopLevelPointToRect(anchor, size(), screenRect));
     show();
     raise();
+}
+
+void TextSelectionToolbar::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        hide();
+        event->accept();
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }
 
 bool TextSelectionToolbar::containsGlobalPoint(const QPoint &globalPoint) const
@@ -343,7 +355,7 @@ void TextSelectionToolbar::paintEvent(QPaintEvent *event)
 void TextSelectionToolbar::refreshCompactSize()
 {
     // 仅在紧凑态（actionContainer 可见）时重新测量，防止首次显示前 sizeHint 未就绪导致宽度偏小
-    if (!layout_ || !actionContainer_ || !actionContainer_->isVisible()) {
+    if (!layout_ || !actionContainer_ || actionContainer_->isHidden()) {
         return;
     }
 
@@ -358,7 +370,7 @@ void TextSelectionToolbar::refreshCompactSize()
                      + Util::scaleSize(80);
     const int w = qMax(layout_->sizeHint().width(), minW);
 
-    if (w > compactWidth_) {
+    if (w != compactWidth_) {
         compactWidth_ = w;
         setFixedSize(compactWidth_, compactHeight_);
     }
@@ -438,15 +450,12 @@ void TextSelectionToolbar::rebuildActionButtons()
     actionLayout_->setContentsMargins(0, 0, 0, 0);
     actionLayout_->setSpacing(Util::scaleSize(2));
 
-    addActionButton(actionLayout_, QStringLiteral("copy"), QCoreApplication::translate("App", "复制"));
-
-    const QList<TextSelectionActionConfig> effectiveActions = actions_;
-    for (const TextSelectionActionConfig &action : effectiveActions) {
-        if (action.id.trimmed().isEmpty() || action.label.trimmed().isEmpty()) {
-            continue;
-        }
-        addActionButton(actionLayout_, action.id.trimmed(), action.label.trimmed());
+    QList<TextSelectionActionConfig> validActions;
+    for (const auto &action : actions_) {
+        if (!action.id.trimmed().isEmpty() && !action.label.trimmed().isEmpty()) validActions.append(action);
     }
+    for (const auto &action : validActions)
+        addActionButton(actionLayout_, action.id.trimmed(), action.label.trimmed());
 
     layout_->addWidget(actionContainer_);
     addChatInput(layout_);
@@ -481,9 +490,12 @@ void TextSelectionToolbar::addActionButton(QHBoxLayout *layout,
 {
     auto *btn = new QPushButton(text, this);
     btn->setCursor(Qt::PointingHandCursor);
-    btn->setFocusPolicy(Qt::NoFocus);
+    btn->setFocusPolicy(Qt::StrongFocus);
     btn->setFlat(true);
     btn->setMinimumHeight(Util::scaleSize(kButtonHeight));
+    btn->setMaximumWidth(Util::scaleSize(96));
+    btn->setToolTip(text);
+    btn->setText(btn->fontMetrics().elidedText(text, Qt::ElideRight, Util::scaleSize(80)));
     btn->setStyleSheet(buttonStyle(OverlayTheme::isDarkTheme()));
 
     connect(btn, &QPushButton::clicked, this, [this, actionId]() {

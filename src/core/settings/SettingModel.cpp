@@ -108,6 +108,48 @@ static QList<TextSelectionActionConfig> defaultTextSelectionActions()
     };
 }
 
+static bool isBuiltInTextSelectionAction(const TextSelectionActionConfig &action,
+                                         const QString &zhLabel,
+                                         const QString &enLabel,
+                                         const QString &zhPrompt,
+                                         const QString &enPrompt)
+{
+    return (action.label == zhLabel || action.label == enLabel)
+        && (action.prompt == zhPrompt || action.prompt == enPrompt);
+}
+
+static void refreshBuiltInTextSelectionAction(TextSelectionActionConfig &action)
+{
+    QString zhLabel;
+    QString enLabel;
+    QString zhPrompt;
+    QString enPrompt;
+
+    if (action.id == QStringLiteral("ask_ai")) {
+        zhLabel = QStringLiteral("AI 搜索");
+        enLabel = QStringLiteral("AI Search");
+        zhPrompt = QStringLiteral("请基于以上文本进行搜索和解释。");
+        enPrompt = QStringLiteral("Search and explain the text above.");
+    } else if (action.id == QStringLiteral("explain")) {
+        zhLabel = QStringLiteral("解释");
+        enLabel = QStringLiteral("Explain");
+        zhPrompt = QStringLiteral("请解释以上文本。");
+        enPrompt = QStringLiteral("Explain the text above.");
+    } else if (action.id == QStringLiteral("translate")) {
+        zhLabel = QStringLiteral("翻译");
+        enLabel = QStringLiteral("Translate");
+        zhPrompt = QStringLiteral("请翻译以上文本，并给出简短说明。");
+        enPrompt = QStringLiteral("Translate the text above and provide a brief explanation.");
+    } else {
+        return;
+    }
+
+    if (!isBuiltInTextSelectionAction(action, zhLabel, enLabel, zhPrompt, enPrompt)) return;
+    const bool english = QCoreApplication::translate("App", zhLabel.toUtf8().constData()) == enLabel;
+    action.label = english ? enLabel : zhLabel;
+    action.prompt = english ? enPrompt : zhPrompt;
+}
+
 // --------------------------------------------------------------------------
 
 SettingModel::SettingModel(QObject *parent)
@@ -697,6 +739,7 @@ QList<TextSelectionActionConfig> SettingModel::textSelectionActions() const
         if (action.id.isEmpty()) {
             action.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         }
+        refreshBuiltInTextSelectionAction(action);
         actions.append(action);
     }
 
@@ -724,6 +767,11 @@ void SettingModel::setTextSelectionActions(const QList<TextSelectionActionConfig
         settings_.setValue(textSelectionActionKey(i, "PROMPT"), action.prompt.trimmed());
     }
     settings_.sync();
+}
+
+void SettingModel::resetTextSelectionActions()
+{
+    setTextSelectionActions(defaultTextSelectionActions());
 }
 
 bool SettingModel::llmImageTokenSavingEnabled() const
