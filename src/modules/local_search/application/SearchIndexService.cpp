@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "modules/local_search/application/SearchIndexService.h"
 
 #include "core/foundation/AsyncRunner.h"
@@ -158,7 +159,7 @@ ApplicationScanResult scanAppsFolderApplications()
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool uninitializeCom = SUCCEEDED(comResult);
     if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
-        result.error = QStringLiteral("COM 初始化失败：0x%1")
+        result.error = QCoreApplication::translate("App", "COM 初始化失败：0x%1")
                            .arg(static_cast<quint32>(comResult), 8, 16, QLatin1Char('0'));
         return result;
     }
@@ -204,13 +205,13 @@ ApplicationScanResult scanAppsFolderApplications()
             }
             enumerator->Release();
         } else {
-            result.error = QStringLiteral("AppsFolder 枚举失败：0x%1")
+            result.error = QCoreApplication::translate("App", "AppsFolder 枚举失败：0x%1")
                                .arg(static_cast<quint32>(enumResult), 8, 16, QLatin1Char('0'));
         }
         appsFolder->Release();
     } else {
         const HRESULT errorResult = FAILED(folderResult) ? folderResult : bindResult;
-        result.error = QStringLiteral("AppsFolder 打开失败：0x%1")
+        result.error = QCoreApplication::translate("App", "AppsFolder 打开失败：0x%1")
                            .arg(static_cast<quint32>(errorResult), 8, 16, QLatin1Char('0'));
     }
     CoTaskMemFree(appsPidl);
@@ -241,7 +242,7 @@ SearchIndexService::SearchIndexService(std::shared_ptr<SearchIndexStore> store, 
     connect(watcher_, &DirectoryChangeWatcher::rootChanged,
             this, &SearchIndexService::scheduleRefresh);
     connect(watcher_, &DirectoryChangeWatcher::rootUnavailable, this, [this](const QString& root) {
-        setStatus(QStringLiteral("监听异常，即将校验：%1").arg(root));
+        setStatus(QCoreApplication::translate("App", "监听异常，即将校验：%1").arg(root));
         scheduleRefresh(root);
     });
     progressTimer_->setInterval(1000);
@@ -379,10 +380,10 @@ void SearchIndexService::startNext()
     activeRoot_ = root;
     activeProcessed_ = 0;
     setStatus(isApplicationRoot(root)
-                  ? QStringLiteral("正在索引应用…")
+                  ? QCoreApplication::translate("App", "正在索引应用…")
                   : root == kBookmarksRoot
-                      ? QStringLiteral("正在导入浏览器书签…")
-                      : QStringLiteral("正在索引：%1").arg(root));
+                      ? QCoreApplication::translate("App", "正在导入浏览器书签…")
+                      : QCoreApplication::translate("App", "正在索引：%1").arg(root));
     auto items = std::make_shared<QVector<SearchIndexItem>>();
     auto error = std::make_shared<QString>();
     const QStringList exclusions = excludePatterns_;
@@ -412,9 +413,9 @@ void SearchIndexService::startNext()
                 << "scanned items =" << items->size()
                 << "error =" << (error->isEmpty() ? QStringLiteral("none") : *error);
         if (!error->isEmpty()) {
-            setStatus(QStringLiteral("索引失败：%1").arg(*error));
+            setStatus(QCoreApplication::translate("App", "索引失败：%1").arg(*error));
         } else {
-            setStatus(QStringLiteral("索引就绪：%1 项").arg(store_->itemCount()));
+            setStatus(QCoreApplication::translate("App", "索引就绪：%1 项").arg(store_->itemCount()));
             emit indexUpdated();
         }
         completedWeight_ += rootWeights_.value(root, 100);
@@ -439,7 +440,7 @@ void SearchIndexService::scheduleRefresh(const QString& root)
 QString SearchIndexService::statusText() const
 {
     if (!rebuilding_) return statusText_;
-    return QStringLiteral("重建索引 %1% · 已用时 %2 · %3")
+    return QCoreApplication::translate("App", "重建索引 %1% · 已用时 %2 · %3")
         .arg(progressPercent())
         .arg(formatElapsed(rebuildTimer_.isValid() ? rebuildTimer_.elapsed() : 0), statusText_);
 }
@@ -470,7 +471,7 @@ void SearchIndexService::finishRebuild()
             << "elapsed =" << elapsed;
     rebuilding_ = false;
     progressTimer_->stop();
-    statusText_ = QStringLiteral("索引就绪：%1 项 · 耗时 %2").arg(store_->itemCount()).arg(elapsed);
+    statusText_ = QCoreApplication::translate("App", "索引就绪：%1 项 · 耗时 %2").arg(store_->itemCount()).arg(elapsed);
     emit statusChanged(statusText_);
     if (fullRebuildPending_) {
         qInfo() << "SearchIndexService::finishRebuild: fullRebuildPending, triggering rebuild...";

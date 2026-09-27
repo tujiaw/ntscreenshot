@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "GifRecorderWidget.h"
 
 #include "GifEncoderWorker.h"
@@ -198,7 +199,7 @@ void GifRecorderWidget::onEncoderReady(bool success, const QString &error)
     if (!success) {
         state_ = State::Preparing;
         controlPanel_->setPreparing();
-        TipsWidget::popup(nullptr, QStringLiteral("无法开始 GIF 录制\n%1").arg(error), 3, 0, true);
+        TipsWidget::popup(nullptr, QCoreApplication::translate("App", "无法开始 GIF 录制\n%1").arg(error), 3, 0, true);
         return;
     }
 
@@ -310,7 +311,7 @@ void GifRecorderWidget::onEncodingFinished(bool success, const QString &path, co
         }
         closeRecorder();
     } else {
-        TipsWidget::popup(nullptr, QStringLiteral("GIF 保存失败\n%1").arg(error), 4, 0, true);
+        TipsWidget::popup(nullptr, QCoreApplication::translate("App", "GIF 保存失败\n%1").arg(error), 4, 0, true);
         closeRecorder();
     }
 }

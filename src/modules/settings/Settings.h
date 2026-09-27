@@ -43,6 +43,7 @@ private:
     void onBackgroundChanged();
     void onBackgroundAlphaReleased();
     void onThemeChanged(int index);
+    void onLanguageChanged(int index);
     void onGitHubFieldChanged();
     void onPaddleOcrChanged();
     void onChatWindowSettingChanged();

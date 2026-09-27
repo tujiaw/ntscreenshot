@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "app/WindowManager.h"
 
 #include "app/ModuleRegistry.h"
@@ -163,7 +164,7 @@ QString WindowManager::localSearchStatus() const
     if (modules_) {
         if (auto* search = modules_->module<LocalSearchModule>()) return search->statusText();
     }
-    return QStringLiteral("未初始化");
+    return QCoreApplication::translate("App", "未初始化");
 }
 
 void WindowManager::showAllSticker()
@@ -209,10 +210,10 @@ void WindowManager::onTextSelectionActionTriggered(const QString& actionId,
     if (actionId == QStringLiteral("chat")) {
         const QString trimmedInput = inputText.trimmed();
         if (!trimmedInput.isEmpty()) {
-            assistant->showChat(QStringLiteral("AI 对话"),
+            assistant->showChat(QCoreApplication::translate("App", "AI 对话"),
                                 QStringLiteral("%1\n\n%2").arg(selectedText, trimmedInput));
         } else {
-            assistant->showChat(QStringLiteral("AI 对话"));
+            assistant->showChat(QCoreApplication::translate("App", "AI 对话"));
             assistant->quoteText(selectedText);
         }
         return;

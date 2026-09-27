@@ -10,6 +10,14 @@ function(nt_add_qt_test test_name target_name)
     endif()
 endfunction()
 
+add_executable(translation_tests i18n/TranslationTest.cpp)
+target_link_libraries(translation_tests PRIVATE Qt6::Core)
+if(MSVC)
+    target_compile_options(translation_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(english_translation translation_tests
+    "${CMAKE_CURRENT_BINARY_DIR}/../ntscreenshot_en.qm")
+
 add_executable(draw_settings_layout_tests
     capture/DrawSettingsLayoutTest.cpp
     ${NT_SOURCE_DIR}/modules/capture/annotation/DrawSettings.cpp)

@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "app/shell/GlobalHotkeyRegistry.h"
 
 #include "qhotkey.h"
@@ -45,7 +46,7 @@ bool GlobalHotkeyRegistry::setHotkey(const QString &actionId, const QString &key
     if (!shortcut->setRegistered(true)) {
         lastError_ = shortcut->errorString();
         if (lastError_.isEmpty()) {
-            lastError_ = QStringLiteral("快捷键注册失败 (错误码 %1)")
+            lastError_ = QCoreApplication::translate("App", "快捷键注册失败 (错误码 %1)")
                              .arg(::GetLastError());
         }
         qWarning() << "GlobalHotkeyRegistry: failed to register hotkey" << normalizedKey

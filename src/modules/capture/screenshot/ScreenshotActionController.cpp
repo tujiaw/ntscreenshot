@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "ScreenshotActionController.h"
 #include <QApplication>
 #include <QClipboard>
@@ -44,7 +45,7 @@ void ScreenshotActionController::onUploadRequested(const QPixmap &pixmap) {
             if (result.success) {
                 QApplication::clipboard()->setText(result.fullUrl);
             } else {
-                QMessageBox::warning(nullptr, QStringLiteral("上传图床失败"), result.message);
+                QMessageBox::warning(nullptr, QCoreApplication::translate("App", "上传图床失败"), result.message);
             }
         }, Qt::QueuedConnection);
     }).detach();
@@ -53,7 +54,7 @@ void ScreenshotActionController::onUploadRequested(const QPixmap &pixmap) {
 void ScreenshotActionController::onLLMChatRequested(const QString &prompt, const QPixmap &pixmap) {
     if (pixmap.isNull()) return;
     emit sigClose();
-    windowManager_->showLlmChatWindow(QStringLiteral("AI 对话"), prompt, pixmap);
+    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"), prompt, pixmap);
 }
 
 void ScreenshotActionController::onSaveRequested(const QPixmap &pixmap) {
@@ -66,7 +67,7 @@ void ScreenshotActionController::onSaveRequested(const QPixmap &pixmap) {
     
     QPixmap p = pixmap;
     QTimer::singleShot(0, [p, filePath]() {
-        QString fileName = QFileDialog::getSaveFileName(nullptr, QStringLiteral("保存图片"), filePath, "PNG (*.png)");
+        QString fileName = QFileDialog::getSaveFileName(nullptr, QCoreApplication::translate("App", "保存图片"), filePath, "PNG (*.png)");
         if (!fileName.isEmpty()) {
             PinWidget::setSaveDir(QFileInfo(fileName).absoluteDir());
             p.save(fileName, "png");

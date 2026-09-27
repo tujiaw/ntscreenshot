@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "GifEncoderWorker.h"
 
 #include <QFile>
@@ -521,7 +522,7 @@ void GifEncoderWorker::begin(const QString &outputPath, const QSize &frameSize)
     encoder_ = std::make_unique<GifStreamEncoder>(file_.get(), frameSize);
     if (!encoder_->begin()) {
         reset(true);
-        emit sigReady(false, QStringLiteral("无法创建 GIF 文件"));
+        emit sigReady(false, QCoreApplication::translate("App", "无法创建 GIF 文件"));
         return;
     }
 
@@ -533,9 +534,9 @@ void GifEncoderWorker::addFrame(const QImage &image, int delayCentiseconds)
 {
     if (!active_ || !encoder_ || !encoder_->addFrame(image, delayCentiseconds)) {
         const QString failedPath = outputPath_;
-        const QString error = file_ ? file_->errorString() : QStringLiteral("GIF 编码器未启动");
+        const QString error = file_ ? file_->errorString() : QCoreApplication::translate("App", "GIF 编码器未启动");
         reset(true);
-        emit sigFinished(false, failedPath, error.isEmpty() ? QStringLiteral("GIF 帧编码失败") : error);
+        emit sigFinished(false, failedPath, error.isEmpty() ? QCoreApplication::translate("App", "GIF 帧编码失败") : error);
         return;
     }
     emit sigFrameWritten();
@@ -557,18 +558,18 @@ void GifEncoderWorker::finish()
 
     if (!trailerWritten || !flushed) {
         QFile::remove(temporaryPath_);
-        emit sigFinished(false, finalPath, QStringLiteral("写入 GIF 文件失败"));
+        emit sigFinished(false, finalPath, QCoreApplication::translate("App", "写入 GIF 文件失败"));
         return;
     }
 
     if (QFile::exists(finalPath) && !QFile::remove(finalPath)) {
         QFile::remove(temporaryPath_);
-        emit sigFinished(false, finalPath, QStringLiteral("无法覆盖已有文件"));
+        emit sigFinished(false, finalPath, QCoreApplication::translate("App", "无法覆盖已有文件"));
         return;
     }
     if (!QFile::rename(temporaryPath_, finalPath)) {
         QFile::remove(temporaryPath_);
-        emit sigFinished(false, finalPath, QStringLiteral("无法完成 GIF 文件保存"));
+        emit sigFinished(false, finalPath, QCoreApplication::translate("App", "无法完成 GIF 文件保存"));
         return;
     }
 

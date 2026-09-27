@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "BrowserPanel.h"
 #include "modules/assistant/runtime/tools/ToolAbort.h"
 #include <QColor>
@@ -31,6 +32,7 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QElapsedTimer>
 #include <QRegularExpression>
 #include <QUrlQuery>
@@ -42,17 +44,17 @@ QString permissionLabel(QWebEnginePermission::PermissionType type)
 {
     using P = QWebEnginePermission::PermissionType;
     switch (type) {
-    case P::MediaAudioCapture: return QStringLiteral("麦克风");
-    case P::MediaVideoCapture: return QStringLiteral("摄像头");
-    case P::MediaAudioVideoCapture: return QStringLiteral("摄像头和麦克风");
-    case P::DesktopVideoCapture: return QStringLiteral("屏幕共享");
-    case P::DesktopAudioVideoCapture: return QStringLiteral("屏幕与音频共享");
-    case P::MouseLock: return QStringLiteral("锁定鼠标");
-    case P::Notifications: return QStringLiteral("发送通知");
-    case P::Geolocation: return QStringLiteral("位置信息");
-    case P::ClipboardReadWrite: return QStringLiteral("读写剪贴板");
-    case P::LocalFontsAccess: return QStringLiteral("本地字体");
-    default: return QStringLiteral("未知权限");
+    case P::MediaAudioCapture: return QCoreApplication::translate("App", "麦克风");
+    case P::MediaVideoCapture: return QCoreApplication::translate("App", "摄像头");
+    case P::MediaAudioVideoCapture: return QCoreApplication::translate("App", "摄像头和麦克风");
+    case P::DesktopVideoCapture: return QCoreApplication::translate("App", "屏幕共享");
+    case P::DesktopAudioVideoCapture: return QCoreApplication::translate("App", "屏幕与音频共享");
+    case P::MouseLock: return QCoreApplication::translate("App", "锁定鼠标");
+    case P::Notifications: return QCoreApplication::translate("App", "发送通知");
+    case P::Geolocation: return QCoreApplication::translate("App", "位置信息");
+    case P::ClipboardReadWrite: return QCoreApplication::translate("App", "读写剪贴板");
+    case P::LocalFontsAccess: return QCoreApplication::translate("App", "本地字体");
+    default: return QCoreApplication::translate("App", "未知权限");
     }
 }
 
@@ -366,13 +368,13 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
         b->setFixedSize(kNavButtonPx, kNavButtonPx);
         return b;
     };
-    auto *collapse = navButton(QStringLiteral("collapse.png"), QStringLiteral("收起浏览器，恢复对话窗口宽度"));
-    auto *back = navButton(QStringLiteral("back.png"), QStringLiteral("后退"));
-    auto *forward = navButton(QStringLiteral("forward.png"), QStringLiteral("前进"));
-    auto *reload = navButton(QStringLiteral("refresh.png"), QStringLiteral("刷新页面"));
-    auto *home = navButton(QStringLiteral("home.png"), QStringLiteral("回到主页"));
+    auto *collapse = navButton(QStringLiteral("collapse.png"), QCoreApplication::translate("App", "收起浏览器，恢复对话窗口宽度"));
+    auto *back = navButton(QStringLiteral("back.png"), QCoreApplication::translate("App", "后退"));
+    auto *forward = navButton(QStringLiteral("forward.png"), QCoreApplication::translate("App", "前进"));
+    auto *reload = navButton(QStringLiteral("refresh.png"), QCoreApplication::translate("App", "刷新页面"));
+    auto *home = navButton(QStringLiteral("home.png"), QCoreApplication::translate("App", "回到主页"));
     address_ = new QLineEdit(this);
-    address_->setPlaceholderText(QStringLiteral("搜索或输入网址"));
+    address_->setPlaceholderText(QCoreApplication::translate("App", "搜索或输入网址"));
     address_->setFixedHeight(kAddressHeightPx);
     // 全局 QLineEdit 样式带 4px 上下内边距 + 1px 边框，配上 28px 的固定高度会把
     // 文字裁掉一半；这里收紧内边距，让 32px 里的可用高度足够放下 14px 的字。
@@ -383,7 +385,7 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     bar->addWidget(reload);
     bar->addWidget(home);
     bar->addWidget(address_, 1);
-    auto *external = navButton(QStringLiteral("open_external.png"), QStringLiteral("在系统浏览器中打开"));
+    auto *external = navButton(QStringLiteral("open_external.png"), QCoreApplication::translate("App", "在系统浏览器中打开"));
     bar->addWidget(external);
     connect(collapse, &QPushButton::clicked, this, &BrowserPanel::collapseRequested);
     layout->addWidget(header);
@@ -395,8 +397,8 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     authenticationCountdown_->setTextFormat(Qt::PlainText);
     authenticationCountdown_->setWordWrap(true);
     authenticationLayout->addWidget(authenticationCountdown_, 1);
-    auto *continueButton = new QPushButton(QStringLiteral("已完成，继续"), authenticationBar_);
-    auto *skipButton = new QPushButton(QStringLiteral("跳过登录"), authenticationBar_);
+    auto *continueButton = new QPushButton(QCoreApplication::translate("App", "已完成，继续"), authenticationBar_);
+    auto *skipButton = new QPushButton(QCoreApplication::translate("App", "跳过登录"), authenticationBar_);
     skipButton->setObjectName(QStringLiteral("browserSkipAuthentication"));
     authenticationLayout->addWidget(continueButton);
     authenticationLayout->addWidget(skipButton);
@@ -433,9 +435,9 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     connect(view_,&QWebEngineView::loadFinished,this,[this](bool ok){
         loading_ = false;
         settled_.start(); settleMs_ = 1200;
-        if (!ok && request_ && !manual_) finish(QStringLiteral("网页加载失败，可点击刷新重试。"),true);
+        if (!ok && request_ && !manual_) finish(QCoreApplication::translate("App", "网页加载失败，可点击刷新重试。"),true);
     });
-    connect(view_->page(),&QWebEnginePage::renderProcessTerminated,this,[this]{ loading_ = false; finish(QStringLiteral("浏览器渲染进程退出，请刷新重试。"),true); });
+    connect(view_->page(),&QWebEnginePage::renderProcessTerminated,this,[this]{ loading_ = false; finish(QCoreApplication::translate("App", "浏览器渲染进程退出，请刷新重试。"),true); });
     connect(view_->page(),&QWebEnginePage::newWindowRequested,this,[this](QWebEngineNewWindowRequest &r){
         // target=_blank 很常见，直接在本视图里打开，不必因此打断 AI。
         const auto url = r.requestedUrl();
@@ -443,38 +445,38 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
     });
     connect(view_->page(),&QWebEnginePage::authenticationRequired,this,[this](const QUrl &, QAuthenticator *auth){
         if (authenticationWaitSkipped_) return;
-        takeOver(QStringLiteral("网站需要 HTTP 身份认证，请输入账号和密码。"));
+        takeOver(QCoreApplication::translate("App", "网站需要 HTTP 身份认证，请输入账号和密码。"));
         bool ok = false;
-        const QString user = QInputDialog::getText(this,QStringLiteral("网站认证"),QStringLiteral("账号"),QLineEdit::Normal,{},&ok);
+        const QString user = QInputDialog::getText(this,QCoreApplication::translate("App", "网站认证"),QCoreApplication::translate("App", "账号"),QLineEdit::Normal,{},&ok);
         if (!ok) return;
-        const QString password = QInputDialog::getText(this,QStringLiteral("网站认证"),QStringLiteral("密码"),QLineEdit::Password,{},&ok);
+        const QString password = QInputDialog::getText(this,QCoreApplication::translate("App", "网站认证"),QCoreApplication::translate("App", "密码"),QLineEdit::Password,{},&ok);
         if (ok) { auth->setUser(user); auth->setPassword(password); }
     });
     connect(view_->page(),&QWebEnginePage::permissionRequested,this,[this](QWebEnginePermission permission){
         if (authenticationWaitSkipped_) { permission.deny(); return; }
-        takeOver(QStringLiteral("网站请求设备权限，请确认后继续。"));
-        const auto answer = QMessageBox::question(this,QStringLiteral("网站权限"),
-            QStringLiteral("允许 %1 使用%2？").arg(permission.origin().toDisplayString(),permissionLabel(permission.permissionType())),
+        takeOver(QCoreApplication::translate("App", "网站请求设备权限，请确认后继续。"));
+        const auto answer = QMessageBox::question(this,QCoreApplication::translate("App", "网站权限"),
+            QCoreApplication::translate("App", "允许 %1 使用%2？").arg(permission.origin().toDisplayString(),permissionLabel(permission.permissionType())),
             QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
         if (answer == QMessageBox::Yes) permission.grant(); else permission.deny();
     });
     connect(view_->page(),&QWebEnginePage::webAuthUxRequested,this,[this](QWebEngineWebAuthUxRequest *request){
         if (authenticationWaitSkipped_) { request->cancel(); return; }
-        takeOver(QStringLiteral("网站需要安全密钥或通行密钥认证，请完成认证后继续。"));
+        takeOver(QCoreApplication::translate("App", "网站需要安全密钥或通行密钥认证，请完成认证后继续。"));
         QPointer<QWebEngineWebAuthUxRequest> guard(request);
         const auto handle = [this,guard]{
             if (!guard) return;
             using State = QWebEngineWebAuthUxRequest::WebAuthUxState;
             bool ok = false;
             if (guard->state() == State::SelectAccount) {
-                const auto account = QInputDialog::getItem(this,QStringLiteral("通行密钥认证"),QStringLiteral("选择账号"),guard->userNames(),0,false,&ok);
+                const auto account = QInputDialog::getItem(this,QCoreApplication::translate("App", "通行密钥认证"),QCoreApplication::translate("App", "选择账号"),guard->userNames(),0,false,&ok);
                 if (guard) { if (ok) guard->setSelectedAccount(account); else guard->cancel(); }
             } else if (guard->state() == State::CollectPin) {
-                const auto pin = QInputDialog::getText(this,QStringLiteral("安全密钥认证"),QStringLiteral("输入安全密钥 PIN"),QLineEdit::Password,{},&ok);
+                const auto pin = QInputDialog::getText(this,QCoreApplication::translate("App", "安全密钥认证"),QCoreApplication::translate("App", "输入安全密钥 PIN"),QLineEdit::Password,{},&ok);
                 if (guard) { if (ok) guard->setPin(pin); else guard->cancel(); }
             } else if (guard->state() == State::RequestFailed) {
                 // 没有底部状态栏了，认证失败这类结果直接发到对话里让用户看到。
-                emit attentionRequired(QStringLiteral("安全密钥认证失败，请在网站重试或使用其他登录方式。"));
+                emit attentionRequired(QCoreApplication::translate("App", "安全密钥认证失败，请在网站重试或使用其他登录方式。"));
                 guard->cancel();
             }
         };
@@ -492,7 +494,7 @@ BrowserPanel::BrowserPanel(QWidget *parent, int authenticationWaitMs)
             return;
         }
         if (!request_) return;
-        if (request_->elapsed.elapsed() > 30000) { finish(QStringLiteral("浏览器操作超时，可点击刷新重试。"),true); view_->stop(); return; }
+        if (request_->elapsed.elapsed() > 30000) { finish(QCoreApplication::translate("App", "浏览器操作超时，可点击刷新重试。"),true); view_->stop(); return; }
         if (!loading_ && !evaluating_ && (!settled_.isValid() || settled_.elapsed() >= settleMs_)) observe();
     });
     timer_->start();
@@ -502,14 +504,14 @@ BrowserPanel::~BrowserPanel()
 {
     qApp->removeEventFilter(this);
     ++generation_;
-    finish(QStringLiteral("浏览器已关闭"));
+    finish(QCoreApplication::translate("App", "浏览器已关闭"));
     {
         QMutexLocker lock(&queuedRequestsMutex_);
         for (const auto &request : std::as_const(queuedRequests_)) {
             if (!request) continue;
             request->cancelled = true;
             QMutexLocker requestLock(&request->mutex);
-            request->result = QStringLiteral("浏览器已关闭");
+            request->result = QCoreApplication::translate("App", "浏览器已关闭");
             request->done = true;
             request->ready.wakeAll();
         }
@@ -521,7 +523,7 @@ BrowserPanel::~BrowserPanel()
 
 QString BrowserPanel::execute(const QJsonObject &args, LlmTools::ToolAbort *abort)
 {
-    if (QThread::currentThread() == thread()) return QStringLiteral("浏览工具须由 Agent 工作线程调用");
+    if (QThread::currentThread() == thread()) return QCoreApplication::translate("App", "浏览工具须由 Agent 工作线程调用");
     auto request = std::make_shared<Request>();
     {
         QMutexLocker lock(&queuedRequestsMutex_);
@@ -544,7 +546,7 @@ QString BrowserPanel::execute(const QJsonObject &args, LlmTools::ToolAbort *abor
             QMetaObject::invokeMethod(this, [this, request] {
                 if (request_ == request) cancel();
             }, Qt::QueuedConnection);
-            return QStringLiteral("浏览器操作已取消");
+            return QCoreApplication::translate("App", "浏览器操作已取消");
         }
         request->ready.wait(&request->mutex,50);
     }
@@ -553,14 +555,14 @@ QString BrowserPanel::execute(const QJsonObject &args, LlmTools::ToolAbort *abor
 
 void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request> &request)
 {
-    finish(QStringLiteral("浏览器操作已被替换"));
+    finish(QCoreApplication::translate("App", "浏览器操作已被替换"));
     request_ = request;
     request_->args = args;
     request_->elapsed.start();
     emit activityRequested();
     const QString action = args.value("action").toString();
     if (!QStringList{"open","read","click","fill","select","scroll","back","wait_for","wait_user"}.contains(action)) {
-        finish(QStringLiteral("不支持的浏览器操作")); return;
+        finish(QCoreApplication::translate("App", "不支持的浏览器操作")); return;
     }
     if (manual_) return;
     if (action == "wait_user") {
@@ -571,7 +573,7 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
             settleMs_ = 0;
         } else {
             const QString reason = args.value("reason").toString().trimmed();
-            if (reason.isEmpty()) { finish(QStringLiteral("wait_user 需要 reason：请说明任务为何必须登录；仅出现登录组件不构成理由。")); return; }
+            if (reason.isEmpty()) { finish(QCoreApplication::translate("App", "wait_user 需要 reason：请说明任务为何必须登录；仅出现登录组件不构成理由。")); return; }
             takeOver(reason.left(500));
         }
         return;
@@ -579,7 +581,7 @@ void BrowserPanel::start(const QJsonObject &args, const std::shared_ptr<Request>
     if (action == "open") {
         const QUrl url(args.value("url").toString());
         if (!url.isValid() || url.host().isEmpty() || !url.userInfo().isEmpty() || (url.scheme() != "https" && url.scheme() != "http")) {
-            finish(QStringLiteral("仅支持不含账号密码的有效 HTTP/HTTPS 地址")); return;
+            finish(QCoreApplication::translate("App", "仅支持不含账号密码的有效 HTTP/HTTPS 地址")); return;
         }
         request_->args = QJsonObject{{"action","read"}};
         view_->load(url);
@@ -625,10 +627,28 @@ void BrowserPanel::installHomeThemeScript()
     // 必须在 DocumentReady 注入：文档创建时 <html> 还没被解析出来，那时设的属性
     // 会被解析器新建的元素整个丢掉（实测仍停在 HTML 里写死的 light）。
     // 带上 URL 判断，免得给用户访问的每个网站都塞一个 data- 属性。
+    const QJsonObject labels{
+        {QStringLiteral("title"), QCoreApplication::translate("App", "浏览器主页")},
+        {QStringLiteral("heading"), QCoreApplication::translate("App", "浏览网页")},
+        {QStringLiteral("hint"), QCoreApplication::translate("App", "搜索网页，或在对话中告诉 AI 你想找什么。")},
+        {QStringLiteral("search"), QCoreApplication::translate("App", "搜索")},
+        {QStringLiteral("placeholder"), QCoreApplication::translate("App", "输入搜索关键词")},
+        {QStringLiteral("privacy"), QCoreApplication::translate("App", "需要登录或验证码时，AI 会请你接手。")},
+    };
     const QString source = QStringLiteral(
         "if(location.href.indexOf('qrc:/html/browser-home.html')===0){"
-        "document.documentElement.setAttribute('data-nt-theme','%1');}")
-        .arg(browserIsDarkTheme() ? QStringLiteral("dark") : QStringLiteral("light"));
+        "const t=%2;"
+        "document.documentElement.setAttribute('data-nt-theme','%1');"
+        "document.documentElement.lang=t.search==='搜索'?'zh-CN':'en';"
+        "document.title=t.title;"
+        "document.querySelector('h1').textContent=t.heading;"
+        "document.querySelector('.hint').textContent=t.hint;"
+        "const input=document.querySelector('input[name=q]');"
+        "input.setAttribute('aria-label',t.search);input.placeholder=t.placeholder;"
+        "document.querySelector('button[type=submit]').textContent=t.search;"
+        "document.querySelector('.privacy').textContent=t.privacy;}")
+        .arg(browserIsDarkTheme() ? QStringLiteral("dark") : QStringLiteral("light"),
+             QString::fromUtf8(QJsonDocument(labels).toJson(QJsonDocument::Compact)));
 
     QWebEngineScript script;
     script.setName(QStringLiteral("ntHomeTheme"));
@@ -670,7 +690,7 @@ void BrowserPanel::observe()
                 settled_.start();
                 settleMs_ = 0;
             } else {
-                takeOver(QStringLiteral("当前操作涉及认证或需要本人填写的字段，请在右侧处理。"));
+                takeOver(QCoreApplication::translate("App", "当前操作涉及认证或需要本人填写的字段，请在右侧处理。"));
             }
         } else if (object.value("waitFor").toBool()) {
             const int timeoutMs = qBound(250, request_->args.value("timeoutMs").toInt(10000), 30000);
@@ -680,7 +700,7 @@ void BrowserPanel::observe()
                 settleMs_ = 0;
             } else if (request->elapsed.elapsed() >= timeoutMs) {
                 finish(QString::fromUtf8(QJsonDocument(QJsonObject{
-                    {QStringLiteral("error"), QStringLiteral("等待目标超时")},
+                    {QStringLiteral("error"), QCoreApplication::translate("App", "等待目标超时")},
                     {QStringLiteral("code"), QStringLiteral("wait_timeout")},
                     {QStringLiteral("target"), object.value("target")}
                 }).toJson(QJsonDocument::Compact)));
@@ -696,8 +716,8 @@ void BrowserPanel::observe()
             if (!request->authenticationStatus.isEmpty()) {
                 object.insert(QStringLiteral("authenticationStatus"), request->authenticationStatus);
                 object.insert(QStringLiteral("guidance"), request->authenticationStatus == QStringLiteral("resumed")
-                    ? QStringLiteral("认证等待已结束，请核对当前页面并继续任务，不假设登录成功，也不要因残留登录组件再次暂停。")
-                    : QStringLiteral("请根据当前页面继续任务，不假设登录成功。本轮不再请求等待登录；优先公开页面、访客入口或其他公开来源，不绕过访问控制。若确实必须登录，说明已完成部分、受限原因及用户可执行的建议。"));
+                    ? QCoreApplication::translate("App", "认证等待已结束，请核对当前页面并继续任务，不假设登录成功，也不要因残留登录组件再次暂停。")
+                    : QCoreApplication::translate("App", "请根据当前页面继续任务，不假设登录成功。本轮不再请求等待登录；优先公开页面、访客入口或其他公开来源，不绕过访问控制。若确实必须登录，说明已完成部分、受限原因及用户可执行的建议。"));
             }
             finish(QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact)));
         }
@@ -713,7 +733,7 @@ void BrowserPanel::takeOver(const QString &reason)
     authenticationBar_->show();
     updateAuthenticationCountdown();
     ++generation_;
-    if (notify) emit attentionRequired(reason + QStringLiteral(" 无操作 %1 秒后将尝试未登录方式继续，也可点击“跳过登录”。").arg(authenticationWaitMs_ / 1000));
+    if (notify) emit attentionRequired(reason + QCoreApplication::translate("App", " 无操作 %1 秒后将尝试未登录方式继续，也可点击“跳过登录”。").arg(authenticationWaitMs_ / 1000));
 }
 
 void BrowserPanel::resume()
@@ -742,7 +762,7 @@ void BrowserPanel::resetAuthenticationWait()
 void BrowserPanel::updateAuthenticationCountdown()
 {
     const qint64 remaining = qMax<qint64>(0, authenticationWaitMs_ - manualWait_.elapsed());
-    authenticationCountdown_->setText(QStringLiteral("等待你完成认证：%1 秒后尝试未登录方式继续。网页操作会重新计时。").arg((remaining + 999) / 1000));
+    authenticationCountdown_->setText(QCoreApplication::translate("App", "等待你完成认证：%1 秒后尝试未登录方式继续。网页操作会重新计时。").arg((remaining + 999) / 1000));
 }
 
 bool BrowserPanel::eventFilter(QObject *watched, QEvent *event)
@@ -786,7 +806,7 @@ void BrowserPanel::checkAutoResume()
 
 void BrowserPanel::cancel()
 {
-    finish(QStringLiteral("浏览器操作已取消，不要自动重试，等待用户指示。"));
+    finish(QCoreApplication::translate("App", "浏览器操作已取消，不要自动重试，等待用户指示。"));
     view_->stop();
     // 取消后不再挂起，否则用户的下一条指令会被卡在“等待接管”上。
     manual_ = false;

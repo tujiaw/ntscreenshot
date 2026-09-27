@@ -1,107 +1,107 @@
 # ntscreenshot
 
-[English](README.en.md)
+[简体中文](README.zh-CN.md)
 
-![ntscreenshot — 开源 Windows 截图工具](docs/assets/social-preview.jpg)
+![ntscreenshot — open-source screenshot tool for Windows](docs/assets/social-preview.jpg)
 
-**Windows 上开源、离线优先的截图与贴图工具。** 选区、标注、贴图、长图和 GIF 录制一步到位；剪贴板历史与本地搜索都在本机完成。AI / OCR 可按需开启，默认不联网。
+**An open-source, privacy-first screenshot and pinning tool for Windows.** Capture, annotate, pin, scroll, and record GIFs in one workflow. Clipboard history and local search stay on your machine; AI and OCR are opt-in and off by default.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.md)
-[![Qt](https://img.shields.io/badge/Qt-6-41CD52.svg?logo=qt)](docs/building.md)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.en.md)
+[![Qt](https://img.shields.io/badge/Qt-6-41CD52.svg?logo=qt)](docs/building.en.md)
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[立即下载 Windows 绿色版](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [查看更新](https://github.com/tujiaw/ntscreenshot/releases/latest) · [常见问题](#faq) · [从源码构建](docs/building.md)
+**[Download the Windows portable build](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [What's new](https://github.com/tujiaw/ntscreenshot/releases/latest) · [FAQ](#faq) · [Build from source](docs/building.en.md)
 
-解压 `ntscreenshot-x64-Release.zip`，运行 `ntscreenshot.exe`。无需安装。若 Releases 还没有附件，按 [构建指南](docs/building.md) 自行编译。
+Extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe`. No installer. If a release has no assets yet, follow the [build guide](docs/building.en.md).
 
-## 功能
+## Features
 
-### 截图与标注
+### Capture and annotate
 
-按 `F5` 框选屏幕。窗口吸附、像素级微调、放大镜和取色（`C` 复制颜色）都在选区里完成。
+Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier, and a color picker (`C` copies the color) stay in the overlay.
 
-- 画笔、直线、箭头、矩形、椭圆、文字、马赛克、撤销
-- 复制、保存、贴图；滚动长截图、GIF 录制
-- 识别二维码 / 条码；可选 OCR 和 AI
+- Pen, line, arrow, rectangle, ellipse, text, mosaic, undo
+- Copy, save, or pin; scrolling capture and GIF recording
+- QR / barcode recognition; optional OCR and AI
 
-![区域截图与标注](screenshot.png)
+![Region capture and annotation](screenshot.png)
 
-### 本地搜索
+### Local search
 
-一个输入框搜本机应用、文件、目录和浏览器书签。键盘操作：方向键选择，Enter 打开。
+One box for local apps, files, folders, and browser bookmarks. Arrow keys select, Enter opens.
 
-![本地搜索](local-search.png)
+![Local search](local-search.png)
 
-### 贴图与效率
+### Pinning and productivity
 
-- `F6` 把剪贴板图片钉在桌面上，支持多图和边框
-- 本机剪贴板历史
-- 划词工具栏：选中文字后出现快捷操作
+- `F6` pins a clipboard image on the desktop, with multi-pin and border options
+- Local clipboard history
+- A text-selection toolbar for quick actions on highlighted text
 
-### 设置
+### Settings
 
-托盘打开设置。开机自启动、浅色 / 深色主题、截图 / 贴图 / 对话快捷键、透明度、取色格式都在这里改。
+Open Settings from the tray. Startup, light / dark theme, capture / pin / chat hotkeys, overlay opacity, and color format live here. The interface defaults to English; choose English or Chinese under General Settings → Display language, then restart the app.
 
-![设置](settings.png)
+![Settings](settings.png)
 
-### AI 助手（可选）
+### AI assistant (optional)
 
-默认关闭。在设置里填入你自己的接口后，用对话快捷键打开。不配密钥则不会联网。
+Off by default. Add your own endpoint in Settings, then open chat with the hotkey. No key means no network calls.
 
-对话输入栏的模型旁有“联网”开关。开启后，模型可以搜索及读取动态网页，无需额外的搜索 API Key，也可以使用 `browser_use` 操作右侧浏览器。点击标题栏“浏览器”可展开或收起右侧浏览器面板，支持地址栏、前进后退、刷新、回到主页，以及 AI 点击、普通填表和滚动。同一对话内保留临时登录会话，关闭对话后清除。
+Enable **Web** beside the model selector to allow search, page reading, and `browser_use` actions. The **浏览器** button in the title bar shows a browser panel to the right of chat, with an address bar, back / forward / reload, a Home button that returns to the built-in start page, AI clicks, ordinary form filling, and scrolling. Its temporary login session lasts for the conversation and is cleared when the conversation closes.
 
-需要密码、验证码或扫码时，AI 会暂停并在对话里说明原因，你在右侧完成后它会自己接着做；也可以直接操作网页暂停 AI，页面离开认证环节后自动继续。要中断 AI 请用输入框的停止按钮。认证识别不能覆盖所有网站；部分站点不允许内嵌浏览器登录，外部打开后的登录状态不会自动同步回来。后台搜索和右侧浏览器的登录会话互相独立。
+Password, verification-code, and QR login challenges pause automation and explain why in the conversation. Finish them in the panel and AI picks the task back up on its own; you can also pause AI by interacting with the page directly, and it resumes once the page leaves the challenge. Use the stop button in the chat input to cancel the current AI request. Authentication detection cannot cover every site. Some services prohibit embedded-browser login; external-browser sessions do not automatically transfer back. Background search and the browser panel use separate sessions.
 
-![AI 对话](ai-chat.png)
+![AI chat](ai-chat.png)
 
-## 30 秒上手
+## 30-second start
 
-1. 启动后看系统托盘，先打开设置确认快捷键。
-2. `F5` 截图：拖选区，用底部工具栏标注，再复制、保存或贴图。
-3. `F6` 贴图。
-4. OCR 或 AI 只在需要时到设置里打开，用你自己的密钥。
+1. Launch the app, find it in the tray, and confirm hotkeys in Settings.
+2. `F5` to capture: drag a region, annotate from the toolbar, then copy, save, or pin.
+3. `F6` to pin.
+4. Enable OCR or AI in Settings only if you need them, using your own keys.
 
-| 快捷键 | 作用 |
+| Hotkey | Action |
 | --- | --- |
-| `F5` | 截图 |
-| `F6` | 贴图 |
+| `F5` | Screenshot |
+| `F6` | Pin |
 
-快捷键可改。与游戏或其它软件冲突时换一组即可。
+Change hotkeys if they clash with a game or another app.
 
-## 为什么用它
+## Why ntscreenshot
 
-系统自带截图只能快拷，做不了贴图、长图和本机搜索。商业工具功能全，但往往不开源、要订阅或会上传。ntscreenshot 把这些高频能力放进一个开源托盘应用，数据默认留在你的电脑上。
+The built-in snipping tool is fine for a quick copy. It does not pin images, stitch long pages, or search local files. Commercial tools are polished, but they are often closed-source or subscription-based. ntscreenshot puts the daily workflow in one open-source tray app, and keeps data on your machine by default.
 
-## 平台
+## Platforms
 
-| 平台 | 状态 |
+| Platform | Status |
 | --- | --- |
-| Windows 10 / 11 x64 | 支持 |
-| Linux | 暂未提供 |
-| macOS | 暂未提供 |
+| Windows 10 / 11 x64 | Supported |
+| Linux | Not available |
+| macOS | Not available |
 
 <a id="faq"></a>
 
-## 常见问题
+## FAQ
 
-- 杀毒软件报警、F5 没反应、启动后没有窗口：[FAQ](docs/faq.md)
-- OCR / AI / 数据存在哪：[FAQ](docs/faq.md) · [隐私说明](PRIVACY.md)
+- Antivirus flags, dead hotkeys, no window after launch: [FAQ](docs/faq.en.md)
+- OCR / AI / where data lives: [FAQ](docs/faq.en.md) · [Privacy](PRIVACY.en.md)
 
-截图、贴图、剪贴板和本地搜索默认离线。只有你主动配置并调用联网功能时，内容才会发往你指定的服务。详见 [隐私说明](PRIVACY.md)。
+Capture, pinning, clipboard history, and local search run offline by default. Text or images leave the machine only when you enable and invoke a network feature. See [Privacy](PRIVACY.en.md).
 
-## 文档
+## Docs
 
-- [常见问题](docs/faq.md)
-- [从源码构建](docs/building.md)
-- [文档目录](docs/README.md)
-- [更新日志](CHANGELOG.md)
+- [FAQ](docs/faq.en.md)
+- [Build from source](docs/building.en.md)
+- [Docs index](docs/README.md)
+- [Changelog](CHANGELOG.md)
 
-## 参与
+## Contributing
 
-欢迎缺陷报告、文档改进和 Pull Request。请先阅读 [贡献指南](CONTRIBUTING.md) 与 [行为准则](CODE_OF_CONDUCT.md)。安全问题按 [安全策略](SECURITY.md) 私下告知。
+Bug reports, documentation fixes, and pull requests are welcome. Read [Contributing](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [Security](SECURITY.md).
 
-[Apache License 2.0](LICENSE)。版权见 [NOTICE](NOTICE)，第三方组件见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[Apache License 2.0](LICENSE). Copyright: [NOTICE](NOTICE). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-如果 ntscreenshot 对你有帮助，欢迎点右上角 **Star**。
+If ntscreenshot helps you, a **Star** is the simplest way to support the project.

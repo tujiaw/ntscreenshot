@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "shared/foundation/IgnorePatternMatcher.h"
 
 #include <QDir>
@@ -29,12 +30,12 @@ QString globToRegularExpression(const QString& glob, QString* error)
         } else if (character == u'[') {
             const qsizetype closing = glob.indexOf(u']', i + 1);
             if (closing < 0) {
-                if (error) *error = QStringLiteral("缺少右方括号 ]");
+                if (error) *error = QCoreApplication::translate("App", "缺少右方括号 ]");
                 return {};
             }
             QString characterClass = glob.mid(i + 1, closing - i - 1);
             if (characterClass.isEmpty()) {
-                if (error) *error = QStringLiteral("字符范围不能为空");
+                if (error) *error = QCoreApplication::translate("App", "字符范围不能为空");
                 return {};
             }
             if (characterClass.startsWith(u'!')) characterClass[0] = u'^';
@@ -94,7 +95,7 @@ bool IgnorePatternMatcher::compileRule(const QString& source, Rule* rule, QStrin
         pattern.remove(0, 1);
     }
     if (pattern.isEmpty()) {
-        if (error) *error = QStringLiteral("规则不能为空");
+        if (error) *error = QCoreApplication::translate("App", "规则不能为空");
         return false;
     }
 
@@ -104,7 +105,7 @@ bool IgnorePatternMatcher::compileRule(const QString& source, Rule* rule, QStrin
     rule->directoryOnly = pattern.endsWith(u'/');
     if (rule->directoryOnly) pattern.chop(1);
     if (pattern.isEmpty()) {
-        if (error) *error = QStringLiteral("规则必须包含文件或目录名称");
+        if (error) *error = QCoreApplication::translate("App", "规则必须包含文件或目录名称");
         return false;
     }
 
@@ -122,7 +123,7 @@ bool IgnorePatternMatcher::compileRule(const QString& source, Rule* rule, QStrin
     rule->descendantExpression =
         QRegularExpression(prefix + body + QStringLiteral("/.*$"), options);
     if (!rule->exactExpression.isValid() || !rule->descendantExpression.isValid()) {
-        if (error) *error = QStringLiteral("无法解析该规则");
+        if (error) *error = QCoreApplication::translate("App", "无法解析该规则");
         return false;
     }
     return true;

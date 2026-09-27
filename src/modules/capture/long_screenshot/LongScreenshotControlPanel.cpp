@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "LongScreenshotControlPanel.h"
 #include <QHBoxLayout>
 #include <QPainter>
@@ -39,7 +40,7 @@ void LongScreenshotControlPanel::setupUI()
     finishButton_ = new QPushButton(
         ThemeIcon::icon(QStringLiteral("ok.png"), IconTone::OnAccent, iconSize), QString(), this);
     finishButton_->setObjectName(QStringLiteral("longScreenshotFinishButton"));
-    finishButton_->setToolTip(QStringLiteral("完成"));
+    finishButton_->setToolTip(QCoreApplication::translate("App", "完成"));
     finishButton_->setFixedSize(btnSize, btnSize);
     finishButton_->setIconSize(QSize(iconSize, iconSize));
     UiStyler::setRole(finishButton_, UiRole::PrimaryButton);
@@ -48,7 +49,7 @@ void LongScreenshotControlPanel::setupUI()
     cancelButton_ = new QPushButton(
         ThemeIcon::icon(QStringLiteral("remove.png"), IconTone::Danger, iconSize), QString(), this);
     cancelButton_->setObjectName(QStringLiteral("longScreenshotCancelButton"));
-    cancelButton_->setToolTip(QStringLiteral("取消 (ESC)"));
+    cancelButton_->setToolTip(QCoreApplication::translate("App", "取消 (ESC)"));
     cancelButton_->setFixedSize(btnSize, btnSize);
     cancelButton_->setIconSize(QSize(iconSize, iconSize));
     UiStyler::setRole(cancelButton_, UiRole::DangerButton);

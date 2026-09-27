@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "modules/assistant/ui/ChatInputWidget.h"
 
 #include <QApplication>
@@ -179,7 +180,7 @@ QIcon createQuotedImageThumbnail(const QPixmap &image)
 void showTextPreviewDialog(QWidget *parent, const QString &text)
 {
     QDialog dialog(parent);
-    dialog.setWindowTitle(QStringLiteral("预览引用文本"));
+    dialog.setWindowTitle(QCoreApplication::translate("App", "预览引用文本"));
     dialog.resize(Util::scaleSize(520), Util::scaleSize(320));
 
     auto *layout = new QVBoxLayout(&dialog);
@@ -202,7 +203,7 @@ void showImagePreviewDialog(QWidget *parent, const QPixmap &image, const QString
     }
 
     QDialog dialog(parent);
-    dialog.setWindowTitle(title.isEmpty() ? QStringLiteral("预览引用图片") : title);
+    dialog.setWindowTitle(title.isEmpty() ? QCoreApplication::translate("App", "预览引用图片") : title);
 
     QRect availableGeometry;
     if (const QScreen *screen = QApplication::primaryScreen()) {
@@ -295,13 +296,13 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
     addButton_->setObjectName(QStringLiteral("chatInputGhostButton"));
     addButton_->setText(QStringLiteral("+"));
     addButton_->setCursor(Qt::PointingHandCursor);
-    addButton_->setToolTip(QStringLiteral("选择图片引用"));
+    addButton_->setToolTip(QCoreApplication::translate("App", "选择图片引用"));
     connect(addButton_, &QToolButton::clicked, this, &ChatInputWidget::onAddButtonClicked);
 
     modelButton_ = new QToolButton(surface);
     modelButton_->setObjectName(QStringLiteral("chatInputGhostButton"));
     modelButton_->setCursor(Qt::PointingHandCursor);
-    modelButton_->setToolTip(QStringLiteral("切换模型"));
+    modelButton_->setToolTip(QCoreApplication::translate("App", "切换模型"));
     refreshModelButton();
     connect(modelButton_, &QToolButton::clicked, this, &ChatInputWidget::showModelMenu);
 
@@ -322,7 +323,7 @@ ChatInputWidget::ChatInputWidget(SettingModel* settings, QWidget *parent)
     clearButton_->setIconSize(QSize(Util::scaleSize(kChatInputTogglePx), Util::scaleSize(kChatInputTogglePx)));
     clearButton_->setIcon(ThemeIcon::icon(QStringLiteral("clear.png"), IconTone::Muted, 18));
     clearButton_->setCursor(Qt::PointingHandCursor);
-    clearButton_->setToolTip(QStringLiteral("清空历史"));
+    clearButton_->setToolTip(QCoreApplication::translate("App", "清空历史"));
     connect(clearButton_, &QToolButton::clicked, this, &ChatInputWidget::sigClearRequested);
 
     toolbarLayout->addWidget(addButton_);
@@ -496,7 +497,7 @@ void ChatInputWidget::onAddButtonClicked()
 {
     const QString filePath = QFileDialog::getOpenFileName(
         this,
-        QStringLiteral("选择图片"),
+        QCoreApplication::translate("App", "选择图片"),
         QString(),
         QStringLiteral("Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif)"));
     if (filePath.isEmpty()) {
@@ -632,16 +633,16 @@ void ChatInputWidget::updateSendButtonState()
         const bool hasPayload = !trimmedInputText().isEmpty() || !quotedReferences_.isEmpty();
         if (hasPayload) {
             sendButton_->setIcon(chatSendIcon());
-            sendButton_->setToolTip(QStringLiteral("加入待发送队列"));
+            sendButton_->setToolTip(QCoreApplication::translate("App", "加入待发送队列"));
         } else {
             sendButton_->setIcon(chatStopIcon());
-            sendButton_->setToolTip(QStringLiteral("中断生成"));
+            sendButton_->setToolTip(QCoreApplication::translate("App", "中断生成"));
         }
         return;
     }
 
     sendButton_->setIcon(chatSendIcon());
-    sendButton_->setToolTip(QStringLiteral("发送"));
+    sendButton_->setToolTip(QCoreApplication::translate("App", "发送"));
     sendButton_->setEnabled(
         !trimmedInputText().isEmpty() ||
         !quotedReferences_.isEmpty());
@@ -653,15 +654,15 @@ void ChatInputWidget::refreshToggleButtons()
         const bool enabled = webButton_->isChecked();
         webButton_->setIcon(chatToggleIcon(QStringLiteral("web.png"), enabled));
         webButton_->setToolTip(enabled
-            ? QStringLiteral("联网已开启：模型可搜索、读取网页（点击关闭）")
-            : QStringLiteral("联网已关闭：点击允许模型搜索、读取网页（与浏览器二选一）"));
+            ? QCoreApplication::translate("App", "联网已开启：模型可搜索、读取网页（点击关闭）")
+            : QCoreApplication::translate("App", "联网已关闭：点击允许模型搜索、读取网页（与浏览器二选一）"));
     }
     if (browserButton_) {
         const bool enabled = browserButton_->isChecked();
         browserButton_->setIcon(chatToggleIcon(QStringLiteral("chrome.png"), enabled));
         browserButton_->setToolTip(enabled
-            ? QStringLiteral("浏览器已开启：模型可操作右侧浏览器（点击关闭）")
-            : QStringLiteral("浏览器已关闭：点击允许模型操作右侧浏览器（与联网二选一）"));
+            ? QCoreApplication::translate("App", "浏览器已开启：模型可操作右侧浏览器（点击关闭）")
+            : QCoreApplication::translate("App", "浏览器已关闭：点击允许模型操作右侧浏览器（与联网二选一）"));
     }
     if (clearButton_) {
         clearButton_->setIcon(ThemeIcon::icon(QStringLiteral("clear.png"), IconTone::Muted, 18));
@@ -686,7 +687,7 @@ void ChatInputWidget::refreshModelButton()
 
     const LlmProviderConfig active = settings_->llmActiveProvider();
     const QString display = active.name.isEmpty() ? active.model : active.name;
-    modelButton_->setText(display.isEmpty() ? QStringLiteral("模型") : display);
+    modelButton_->setText(display.isEmpty() ? QCoreApplication::translate("App", "模型") : display);
 }
 
 void ChatInputWidget::rebuildQuotedAttachmentsUi()
@@ -721,8 +722,8 @@ void ChatInputWidget::rebuildQuotedAttachmentsUi()
         previewButton->setFocusPolicy(Qt::NoFocus);
         previewButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         previewButton->setToolTip(item.type == QuotedReferenceItem::Type::Image
-            ? QStringLiteral("%1\n点击预览").arg(item.displayName)
-            : QStringLiteral("%1\n\n点击预览").arg(item.text));
+            ? QCoreApplication::translate("App", "%1\n点击预览").arg(item.displayName)
+            : QCoreApplication::translate("App", "%1\n\n点击预览").arg(item.text));
         previewButton->setIcon(item.type == QuotedReferenceItem::Type::Image
             ? createQuotedImageThumbnail(item.image)
             : QIcon());
@@ -739,7 +740,7 @@ void ChatInputWidget::rebuildQuotedAttachmentsUi()
         removeButton->setText(QStringLiteral("×"));
         removeButton->setCursor(Qt::PointingHandCursor);
         removeButton->setFocusPolicy(Qt::NoFocus);
-        removeButton->setToolTip(QStringLiteral("移除引用"));
+        removeButton->setToolTip(QCoreApplication::translate("App", "移除引用"));
         connect(removeButton, &QToolButton::clicked, this, [this, i]() {
             if (i >= 0 && i < quotedReferences_.size()) {
                 quotedReferences_.removeAt(i);

@@ -39,7 +39,7 @@ try {
 
   Remove-Item -LiteralPath (Join-Path $fixture '.env')
   $required = @(
-    'README.md', 'README.en.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md',
+    'README.md', 'README.zh-CN.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md',
     'CODE_OF_CONDUCT.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md',
     'CMakeLists.txt', 'vcpkg.json'
   )

@@ -9,6 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     WebEngineWidgets
     WebChannel
     Sql
+    LinguistTools
 )
 find_package(OpenCV REQUIRED COMPONENTS
     core

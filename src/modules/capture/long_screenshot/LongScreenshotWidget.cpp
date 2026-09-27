@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "LongScreenshotWidget.h"
 #include "LongScreenshotControlPanel.h"
 #include <QPainter>
@@ -78,7 +79,7 @@ void LongScreenshotWidget::updateInfoLabel()
     // Keep the panel's content width stable while capturing. Appending and
     // removing a warning here changes its size/position and makes the hint
     // visibly jump between frames.
-    QString text = QString(QStringLiteral("已截取: %1 帧")).arg(capturedFrames_.size());
+    QString text = QString(QCoreApplication::translate("App", "已截取: %1 帧")).arg(capturedFrames_.size());
     controlPanel_->setInfoText(text);
 
     if (!finishRequested_ && !controlPanel_->isVisible()) {
@@ -138,7 +139,7 @@ void LongScreenshotWidget::startCapture()
         // Use the final text shape before positioning, then freeze the
         // top-level panel size. Resizing a floating native window while the
         // frame count changes can make Windows re-center it visually.
-        controlPanel_->setInfoText(QStringLiteral("已截取: 0 帧"));
+        controlPanel_->setInfoText(QCoreApplication::translate("App", "已截取: 0 帧"));
         controlPanel_->setFixedSize(controlPanel_->size());
         positionControlPanel();
         controlPanel_->show();
@@ -478,7 +479,7 @@ void LongScreenshotWidget::finishCapture()
     completionRequested_ = true;
 
     if (capturedFrames_.isEmpty()) {
-        TipsWidget::popup(this, QStringLiteral("未截取到图像"), 2, 0, true);
+        TipsWidget::popup(this, QCoreApplication::translate("App", "未截取到图像"), 2, 0, true);
         emit sigWindowClosed();
         close();
         return;
@@ -501,9 +502,9 @@ void LongScreenshotWidget::finishCapture()
         QTimer::singleShot(0, [windowManager, finalImage, pos]() { PinWidget::popup(windowManager, finalImage, pos); });
 
         // 弹出成功提示
-        TipsWidget::popup(nullptr, QString(QStringLiteral("长截图完成\n已复制到剪贴板")), 3, 0, true);
+        TipsWidget::popup(nullptr, QString(QCoreApplication::translate("App", "长截图完成\n已复制到剪贴板")), 3, 0, true);
     } else {
-        TipsWidget::popup(this, QStringLiteral("拼接失败"), 2, 0, true);
+        TipsWidget::popup(this, QCoreApplication::translate("App", "拼接失败"), 2, 0, true);
         emit sigWindowClosed();
         close();
     }

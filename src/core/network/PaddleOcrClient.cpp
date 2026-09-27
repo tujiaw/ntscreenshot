@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "PaddleOcrClient.h"
 
 #include <QHttpMultiPart>
@@ -23,7 +24,7 @@ QString responseError(QNetworkReply* reply, const QJsonObject& object)
         return apiMessage;
     }
     const QString networkMessage = reply->errorString().trimmed();
-    return networkMessage.isEmpty() ? QStringLiteral("OCR 服务请求失败") : networkMessage;
+    return networkMessage.isEmpty() ? QCoreApplication::translate("App", "OCR 服务请求失败") : networkMessage;
 }
 
 void appendTextValues(const QJsonValue& value, QStringList& output)
@@ -83,10 +84,10 @@ PaddleOcrClient::PaddleOcrClient(QObject* parent)
 
 void PaddleOcrClient::recognize(const QByteArray& pngData, const PaddleOcrConfig& config)
 {
-    if (pngData.isEmpty()) return fail(QStringLiteral("截图数据为空"));
-    if (!config.enabled) return fail(QStringLiteral("OCR 功能未启用"));
+    if (pngData.isEmpty()) return fail(QCoreApplication::translate("App", "截图数据为空"));
+    if (!config.enabled) return fail(QCoreApplication::translate("App", "OCR 功能未启用"));
     if (!QUrl(config.jobUrl).isValid() || config.token.isEmpty() || config.model.isEmpty()) {
-        return fail(QStringLiteral("请先完善 PaddleOCR 配置"));
+        return fail(QCoreApplication::translate("App", "请先完善 PaddleOCR 配置"));
     }
 
     config_ = config;
@@ -129,7 +130,7 @@ void PaddleOcrClient::recognize(const QByteArray& pngData, const PaddleOcrConfig
         jobId_ = object.value(QStringLiteral("data")).toObject()
                      .value(QStringLiteral("jobId")).toString().trimmed();
         reply->deleteLater();
-        if (jobId_.isEmpty()) return fail(QStringLiteral("OCR 服务未返回任务编号"));
+        if (jobId_.isEmpty()) return fail(QCoreApplication::translate("App", "OCR 服务未返回任务编号"));
         pollTimer_->start();
     });
 }
@@ -137,7 +138,7 @@ void PaddleOcrClient::recognize(const QByteArray& pngData, const PaddleOcrConfig
 void PaddleOcrClient::pollStatus()
 {
     if (finished_) return;
-    if (elapsed_.elapsed() >= kPollTimeoutMs) return fail(QStringLiteral("OCR 识别超时，请稍后重试"));
+    if (elapsed_.elapsed() >= kPollTimeoutMs) return fail(QCoreApplication::translate("App", "OCR 识别超时，请稍后重试"));
 
     const QUrl url(config_.jobUrl + QLatin1Char('/') + jobId_);
     QNetworkReply* reply = manager_->get(authorizedRequest(url, config_.token));
@@ -157,15 +158,15 @@ void PaddleOcrClient::pollStatus()
         if (state == QStringLiteral("done")) {
             const QString resultUrl = data.value(QStringLiteral("resultUrl")).toObject()
                                           .value(QStringLiteral("jsonUrl")).toString();
-            if (resultUrl.isEmpty()) return fail(QStringLiteral("OCR 结果地址为空"));
+            if (resultUrl.isEmpty()) return fail(QCoreApplication::translate("App", "OCR 结果地址为空"));
             return fetchResult(QUrl(resultUrl));
         }
         if (state == QStringLiteral("failed")) {
             const QString error = data.value(QStringLiteral("errorMsg")).toString();
-            return fail(error.isEmpty() ? QStringLiteral("OCR 识别失败") : error);
+            return fail(error.isEmpty() ? QCoreApplication::translate("App", "OCR 识别失败") : error);
         }
         if (state != QStringLiteral("pending") && state != QStringLiteral("running")) {
-            return fail(QStringLiteral("OCR 返回了未知任务状态"));
+            return fail(QCoreApplication::translate("App", "OCR 返回了未知任务状态"));
         }
         pollTimer_->start();
     });
@@ -185,7 +186,7 @@ void PaddleOcrClient::fetchResult(const QUrl& url)
         }
         const QString text = parseResultText(body);
         reply->deleteLater();
-        if (text.isEmpty()) return fail(QStringLiteral("未识别到文字"));
+        if (text.isEmpty()) return fail(QCoreApplication::translate("App", "未识别到文字"));
         finished_ = true;
         emit succeeded(text);
     });
@@ -196,5 +197,5 @@ void PaddleOcrClient::fail(const QString& error)
     if (finished_) return;
     finished_ = true;
     pollTimer_->stop();
-    emit failed(error.isEmpty() ? QStringLiteral("OCR 识别失败") : error);
+    emit failed(error.isEmpty() ? QCoreApplication::translate("App", "OCR 识别失败") : error);
 }

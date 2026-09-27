@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "TipsWidget.h"
 #include <QTimer>
 #include <QPainter>
@@ -154,7 +155,7 @@ void TipsWidget::mousePressEvent(QMouseEvent *ev)
     if (isClickedCopy_ && ev->button() == Qt::LeftButton) {
         QClipboard *clipboard = QApplication::clipboard();
         clipboard->setText(this->text());
-        TipsWidget::popup(parentWidget(), QStringLiteral("复制到剪切板"), 1, -1 * this->height() - 5);
+        TipsWidget::popup(parentWidget(), QCoreApplication::translate("App", "复制到剪切板"), 1, -1 * this->height() - 5);
         return;
     }
     QLabel::mousePressEvent(ev);

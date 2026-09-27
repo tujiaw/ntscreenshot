@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "MainWidget.h"
 
 #include "app/shell/GlobalHotkeyRegistry.h"
@@ -107,7 +108,7 @@ void MainWidget::slotPinShortcut()
 
 void MainWidget::slotChatShortcut()
 {
-    windowManager_->showLlmChatWindow(QStringLiteral("AI 对话"));
+    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"));
 }
 
 void MainWidget::slotLocalSearchShortcut()

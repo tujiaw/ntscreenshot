@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "HttpServerController.h"
 
 #include <QElapsedTimer>
@@ -178,16 +179,16 @@ bool HttpServerController::start(const Params& params)
     lastError_.clear();
     const QString program = pythonProgram();
     if (program.isEmpty()) {
-        lastError_ = QStringLiteral("未检测到可用的 Python 解释器，请先安装 Python 3 并加入 PATH。");
+        lastError_ = QCoreApplication::translate("App", "未检测到可用的 Python 解释器，请先安装 Python 3 并加入 PATH。");
         return false;
     }
     const QFileInfo dirInfo(params.directory);
     if (params.directory.isEmpty() || !dirInfo.isDir()) {
-        lastError_ = QStringLiteral("共享目录无效或不存在，请重新选择。");
+        lastError_ = QCoreApplication::translate("App", "共享目录无效或不存在，请重新选择。");
         return false;
     }
     if (params.port < 1 || params.port > 65535) {
-        lastError_ = QStringLiteral("端口必须在 1~65535 之间。");
+        lastError_ = QCoreApplication::translate("App", "端口必须在 1~65535 之间。");
         return false;
     }
 
@@ -225,7 +226,7 @@ bool HttpServerController::start(const Params& params)
             return;
         }
         if (error == QProcess::FailedToStart) {
-            const QString message = QStringLiteral("无法启动 Python：%1").arg(proc->errorString());
+            const QString message = QCoreApplication::translate("App", "无法启动 Python：%1").arg(proc->errorString());
             running_ = false;
             proc_ = nullptr;
             proc->deleteLater();
@@ -258,14 +259,14 @@ bool HttpServerController::start(const Params& params)
             // lastError_; raising errorOccurred here as well would double up the
             // dialog for a single failed start.
             startFailure_ = errorText.isEmpty()
-                ? QStringLiteral("HTTP 服务已退出（退出码 %1）").arg(exitCode)
+                ? QCoreApplication::translate("App", "HTTP 服务已退出（退出码 %1）").arg(exitCode)
                 : errorText;
             return;
         }
         if (!userStopped
             && (exitStatus == QProcess::CrashExit || exitCode != 0)) {
             emit errorOccurred(errorText.isEmpty()
-                                   ? QStringLiteral("HTTP 服务已退出（退出码 %1）").arg(exitCode)
+                                   ? QCoreApplication::translate("App", "HTTP 服务已退出（退出码 %1）").arg(exitCode)
                                    : errorText);
         }
     });
@@ -279,7 +280,7 @@ bool HttpServerController::start(const Params& params)
             proc->deleteLater();
         }
         lastError_ = startFailure_.isEmpty()
-            ? QStringLiteral("无法启动 Python：%1").arg(proc->errorString())
+            ? QCoreApplication::translate("App", "无法启动 Python：%1").arg(proc->errorString())
             : startFailure_;
         startFailure_.clear();
         return false;
@@ -335,7 +336,7 @@ bool HttpServerController::start(const Params& params)
     lastError_ = killedByUs ? QString() : startFailure_;
     startFailure_.clear();
     if (lastError_.isEmpty()) {
-        lastError_ = QStringLiteral("端口 %1 未能在 %2 秒内开始监听，可能已被其他程序占用或被防火墙拦截。")
+        lastError_ = QCoreApplication::translate("App", "端口 %1 未能在 %2 秒内开始监听，可能已被其他程序占用或被防火墙拦截。")
                          .arg(params_.port)
                          .arg(kListenProbeMs / 1000.0, 0, 'g', 2);
     }

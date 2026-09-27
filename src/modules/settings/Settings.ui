@@ -69,6 +69,27 @@
          </item>
         </layout>
        </item>
+      <item>
+       <layout class="QHBoxLayout" name="languageLayout">
+        <item>
+         <widget class="QLabel" name="labelLanguage">
+          <property name="text"><string>界面语言：</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="cbLanguage">
+          <item><property name="text"><string>English</string></property></item>
+          <item><property name="text"><string>中文</string></property></item>
+         </widget>
+        </item>
+        <item>
+         <spacer name="languageSpacer">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_7">
          <property name="spacing">
@@ -1084,12 +1105,6 @@
      <item>
       <widget class="QPushButton" name="pbRevert">
        <property name="minimumSize">
-        <size>
-         <width>75</width>
-         <height>25</height>
-        </size>
-       </property>
-       <property name="maximumSize">
         <size>
          <width>75</width>
          <height>25</height>

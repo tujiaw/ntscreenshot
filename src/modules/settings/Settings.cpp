@@ -1,4 +1,5 @@
 #include <QFutureWatcher>
+#include <QCoreApplication>
 #include <QtConcurrent/QtConcurrentRun>
 #include "Settings.h"
 #include <QDebug>
@@ -111,7 +112,12 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
 	// construction — QSqlDatabase::addDatabase is not re-entrant safe.
 	SearchIndexStore::pauseBackgroundAccess();
 	ui.setupUi(this);
-	ui.labelBuildTime->setText(QStringLiteral("编译时间：") + QStringLiteral(__DATE__) + QStringLiteral(" ") + QStringLiteral(__TIME__));
+	// Keep language names in their native scripts even if a translation catalog
+	// contains an empty or unfinished entry for an already-English UI string.
+	ui.cbLanguage->setItemText(0, QStringLiteral("English"));
+	ui.cbLanguage->setItemText(1, QStringLiteral("中文"));
+	ui.cbLanguage->setMinimumWidth(Util::scaleSize(124));
+	ui.labelBuildTime->setText(QCoreApplication::translate("App", "编译时间：") + QStringLiteral(__DATE__) + QStringLiteral(" ") + QStringLiteral(__TIME__));
 	SearchIndexStore::resumeBackgroundAccess();
 	qInfo() << "Settings: UI setup done, initializing tabs...";
 
@@ -125,9 +131,9 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
 	    btn->setToolTip(tooltip);
 	    btn->setStyleSheet(QStringLiteral("padding: 0px;"));
 	};
-	setupStatusBtn(ui.pbScreenshotStatus, ":/images/ok.png", QStringLiteral("快捷键注册状态"));
-	setupStatusBtn(ui.pbPinStatus, ":/images/ok.png", QStringLiteral("快捷键注册状态"));
-	setupStatusBtn(ui.pbChatStatus, ":/images/remove.png", QStringLiteral("清除对话窗口快捷键"));
+	setupStatusBtn(ui.pbScreenshotStatus, ":/images/ok.png", QCoreApplication::translate("App", "快捷键注册状态"));
+	setupStatusBtn(ui.pbPinStatus, ":/images/ok.png", QCoreApplication::translate("App", "快捷键注册状态"));
+	setupStatusBtn(ui.pbChatStatus, ":/images/remove.png", QCoreApplication::translate("App", "清除对话窗口快捷键"));
 
     // 适配路径相关按钮
     int pathBtnWidth = Util::scaleSize(75);
@@ -137,12 +143,9 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     ui.pbModifyImagePath->setMinimumSize(pathBtnWidth, pathBtnHeight);
     ui.pbModifyImagePath->setMaximumSize(pathBtnWidth, pathBtnHeight);
 
-    // 适配恢复默认按钮
-    ui.pbRevert->setMinimumSize(pathBtnWidth, pathBtnHeight);
-    ui.pbRevert->setMaximumSize(pathBtnWidth, pathBtnHeight);
     QPixmap tipsPixmap(QString(":/images/tips.png"));
     ui.labelTips->setPixmap(tipsPixmap);
-    ui.labelTips->setToolTip(QStringLiteral("在输入框上按下要设置的快捷键"));
+    ui.labelTips->setToolTip(QCoreApplication::translate("App", "在输入框上按下要设置的快捷键"));
     qInfo() << "Settings: initializing tabs...";
     initTablePath();
     qInfo() << "Settings: initTablePath done";
@@ -159,9 +162,11 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
 
     // 使用系统原生标题栏（与 AI Fill Settings 一致），仅设置标题与关闭清理
     setAttribute(Qt::WA_DeleteOnClose, true);
-    setWindowTitle(QStringLiteral("设置"));
+    setWindowTitle(QCoreApplication::translate("App", "设置"));
 
     connect(ui.cbAutoStart, &QCheckBox::clicked, this, &Settings::onAutoStartClicked);
+    connect(ui.cbLanguage, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &Settings::onLanguageChanged);
     connect(ui.cbAutoPin, &QCheckBox::clicked, this, &Settings::onAutoPin);
     connect(ui.cbPinNoBorder, &QCheckBox::clicked, this, &Settings::onPinNoBorder);
     connect(ui.pbRevert, &QPushButton::clicked, this, &Settings::onRevertClicked);
@@ -188,7 +193,7 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     connect(sbChatToolCallLimit_, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int limit) {
         windowManager_->setting()->setChatToolCallLimit(limit);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("工具调用次数上限已更新"));
+        showStatusTip(QCoreApplication::translate("App", "工具调用次数上限已更新"));
     });
     connect(ui.kseScreenshot, &QKeySequenceEdit::editingFinished, this, &Settings::updateScreenshotGlobalKey);
     connect(ui.ksePin, &QKeySequenceEdit::editingFinished, this, &Settings::updatePinKey);
@@ -247,14 +252,14 @@ void Settings::applyModernLayout()
         return nullptr;
     };
 
-    QWidget* generalPage = pageByTitle(QStringLiteral("常规设置"));
-    QWidget* imagePage = pageByTitle(QStringLiteral("图片"));
-    QWidget* pathPage = pageByTitle(QStringLiteral("路径"));
-    QWidget* llmHostPage = pageByTitle(QStringLiteral("大模型对话"));
-    QWidget* githubPage = pageByTitle(QStringLiteral("GitHub图床"));
-    QWidget* localSearchPage = pageByTitle(QStringLiteral("本地搜索"));
-    QWidget* httpServerPage = pageByTitle(QStringLiteral("HTTP 服务"));
-    QWidget* aboutPage = pageByTitle(QStringLiteral("关于"));
+    QWidget* generalPage = pageByTitle(QCoreApplication::translate("App", "常规设置"));
+    QWidget* imagePage = pageByTitle(QCoreApplication::translate("App", "图片"));
+    QWidget* pathPage = pageByTitle(QCoreApplication::translate("App", "路径"));
+    QWidget* llmHostPage = pageByTitle(QCoreApplication::translate("App", "大模型对话"));
+    QWidget* githubPage = pageByTitle(QCoreApplication::translate("App", "GitHub图床"));
+    QWidget* localSearchPage = pageByTitle(QCoreApplication::translate("App", "本地搜索"));
+    QWidget* httpServerPage = pageByTitle(QCoreApplication::translate("App", "HTTP 服务"));
+    QWidget* aboutPage = pageByTitle(QCoreApplication::translate("App", "关于"));
     QTabWidget* llmTabs = llmHostPage
         ? llmHostPage->findChild<QTabWidget*>(QString(), Qt::FindDirectChildrenOnly)
         : nullptr;
@@ -279,11 +284,11 @@ void Settings::applyModernLayout()
     navigation->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     navigation->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     navigation->setFocusPolicy(Qt::NoFocus);
-    navigation->addItems({QStringLiteral("常规"), QStringLiteral("截图与输出"),
-                          QStringLiteral("本地搜索"), QStringLiteral("AI 助手"),
-                          QStringLiteral("划词"), QStringLiteral("HTTP 服务"),
-                          QStringLiteral("路径记录"),
-                          QStringLiteral("关于")});
+    navigation->addItems({QCoreApplication::translate("App", "常规"), QCoreApplication::translate("App", "截图与输出"),
+                          QCoreApplication::translate("App", "本地搜索"), QCoreApplication::translate("App", "AI 助手"),
+                          QCoreApplication::translate("App", "划词"), QCoreApplication::translate("App", "HTTP 服务"),
+                          QCoreApplication::translate("App", "路径记录"),
+                          QCoreApplication::translate("App", "关于")});
 
     auto* content = new QWidget(shell);
     auto* contentLayout = new QVBoxLayout(content);
@@ -334,53 +339,53 @@ void Settings::applyModernLayout()
         QList<QPair<QString, std::function<void()>>> subPages;
         switch (row) {
         case 0:
-            titleLabel->setText(QStringLiteral("常规"));
-            subtitleLabel->setText(QStringLiteral("管理外观、启动和快捷键"));
+            titleLabel->setText(QCoreApplication::translate("App", "常规"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "管理外观、启动和快捷键"));
             legacyTabs->setCurrentWidget(generalPage);
             break;
         case 1:
-            titleLabel->setText(QStringLiteral("截图与输出"));
-            subtitleLabel->setText(QStringLiteral("管理图片保存、OCR 与图床"));
+            titleLabel->setText(QCoreApplication::translate("App", "截图与输出"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "管理图片保存、OCR 与图床"));
             legacyTabs->setCurrentWidget(imagePage);
             subPages = {
-                {QStringLiteral("图片与 OCR"), [=] { legacyTabs->setCurrentWidget(imagePage); }},
-                {QStringLiteral("GitHub 图床"), [=] { legacyTabs->setCurrentWidget(githubPage); }}
+                {QCoreApplication::translate("App", "图片与 OCR"), [=] { legacyTabs->setCurrentWidget(imagePage); }},
+                {QCoreApplication::translate("App", "GitHub 图床"), [=] { legacyTabs->setCurrentWidget(githubPage); }}
             };
             break;
         case 2:
-            titleLabel->setText(QStringLiteral("本地搜索"));
-            subtitleLabel->setText(QStringLiteral("管理索引范围、排除规则和搜索引擎"));
+            titleLabel->setText(QCoreApplication::translate("App", "本地搜索"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "管理索引范围、排除规则和搜索引擎"));
             legacyTabs->setCurrentWidget(localSearchPage);
             break;
         case 3:
-            titleLabel->setText(QStringLiteral("AI 助手"));
-            subtitleLabel->setText(QStringLiteral("配置模型与对话窗口"));
+            titleLabel->setText(QCoreApplication::translate("App", "AI 助手"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "配置模型与对话窗口"));
             legacyTabs->setCurrentWidget(llmHostPage);
             if (llmTabs) {
                 llmTabs->setCurrentIndex(0);
             }
             break;
         case 4:
-            titleLabel->setText(QStringLiteral("划词"));
-            subtitleLabel->setText(QStringLiteral("配置划词操作"));
+            titleLabel->setText(QCoreApplication::translate("App", "划词"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "配置划词操作"));
             legacyTabs->setCurrentWidget(llmHostPage);
             if (llmTabs) {
                 llmTabs->setCurrentIndex(1);
             }
             break;
         case 5:
-            titleLabel->setText(QStringLiteral("HTTP 服务"));
-            subtitleLabel->setText(QStringLiteral("共享本地目录并管理后台服务"));
+            titleLabel->setText(QCoreApplication::translate("App", "HTTP 服务"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "共享本地目录并管理后台服务"));
             legacyTabs->setCurrentWidget(httpServerPage);
             break;
         case 6:
-            titleLabel->setText(QStringLiteral("路径记录"));
-            subtitleLabel->setText(QStringLiteral("查看并复制常用保存路径"));
+            titleLabel->setText(QCoreApplication::translate("App", "路径记录"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "查看并复制常用保存路径"));
             legacyTabs->setCurrentWidget(pathPage);
             break;
         default:
-            titleLabel->setText(QStringLiteral("关于"));
-            subtitleLabel->setText(QStringLiteral("版本信息与项目说明"));
+            titleLabel->setText(QCoreApplication::translate("App", "关于"));
+            subtitleLabel->setText(QCoreApplication::translate("App", "版本信息与项目说明"));
             legacyTabs->setCurrentWidget(aboutPage);
             break;
         }
@@ -394,15 +399,22 @@ void Settings::applyModernLayout()
     navigation->setCurrentRow(0);
 
     UiStyler::setRole(ui.pbRevert, UiRole::SecondaryButton);
-    ui.pbRevert->setFixedSize(Util::scaleSize(88), Util::scaleSize(34));
+    // Keep the existing height, but let longer translations use their natural width.
+    ui.pbRevert->setFixedHeight(Util::scaleSize(34));
+    ui.pbRevert->setMinimumWidth(qMax(Util::scaleSize(88),
+        ui.pbRevert->fontMetrics().horizontalAdvance(ui.pbRevert->text()) + Util::scaleSize(36)));
     ui.labelStatusTip->setObjectName(QStringLiteral("settingsStatusTip"));
-    setWindowTitle(QStringLiteral("ntscreenshot 设置"));
+    setWindowTitle(QCoreApplication::translate("App", "ntscreenshot 设置"));
 }
 
 void Settings::readData()
 {
     qInfo() << "Settings::readData: start";
     SettingModel *setting = windowManager_->setting();
+    {
+        const QSignalBlocker blocker(ui.cbLanguage);
+        ui.cbLanguage->setCurrentIndex(setting->uiLanguage() == QStringLiteral("zh") ? 1 : 0);
+    }
     ui.cbAutoStart->setCheckState(setting->autoStart() ? Qt::Checked : Qt::Unchecked);
     ui.cbAutoPin->setCheckState(setting->autoPin() ? Qt::Checked : Qt::Unchecked);
     ui.cbPinNoBorder->setCheckState(setting->pinNoBorder() ? Qt::Checked : Qt::Unchecked);
@@ -497,41 +509,41 @@ void Settings::initLocalSearchTab()
     Util::scaleLayoutMargins(toolbarLayout, 12, 7, 12, 7);
     toolbarLayout->setSpacing(Util::scaleSize(6));
 
-    auto* shortcutLabel = new QLabel(QStringLiteral("快捷键"), toolbar);
-    shortcutLabel->setToolTip(QStringLiteral("用于快速显示本地搜索窗口"));
+    auto* shortcutLabel = new QLabel(QCoreApplication::translate("App", "快捷键"), toolbar);
+    shortcutLabel->setToolTip(QCoreApplication::translate("App", "用于快速显示本地搜索窗口"));
     kseLocalSearch_ = new QKeySequenceEdit(toolbar);
     kseLocalSearch_->setFixedWidth(Util::scaleSize(170));
     kseLocalSearch_->setToolTip(
-        QStringLiteral("默认 Alt+Space；快捷键冲突时可改为 Ctrl+Alt+Space"));
+        QCoreApplication::translate("App", "默认 Alt+Space；快捷键冲突时可改为 Ctrl+Alt+Space"));
     auto* presetAltSpace = new QPushButton(QStringLiteral("Alt+Space"), toolbar);
-    presetAltSpace->setToolTip(QStringLiteral("使用默认快捷键 Alt+Space"));
+    presetAltSpace->setToolTip(QCoreApplication::translate("App", "使用默认快捷键 Alt+Space"));
 
     auto* separator = new QFrame(toolbar);
     separator->setFrameShape(QFrame::VLine);
     separator->setFrameShadow(QFrame::Sunken);
 
-    auto* bookmarksLabel = new QLabel(QStringLiteral("书签"), toolbar);
-    bookmarksLabel->setToolTip(QStringLiteral("启用后会将浏览器书签写入本地搜索索引"));
+    auto* bookmarksLabel = new QLabel(QCoreApplication::translate("App", "书签"), toolbar);
+    bookmarksLabel->setToolTip(QCoreApplication::translate("App", "启用后会将浏览器书签写入本地搜索索引"));
     cbLocalSearchChromeBookmarks_ = new QCheckBox(QStringLiteral("Chrome"), toolbar);
     cbLocalSearchEdgeBookmarks_ = new QCheckBox(QStringLiteral("Edge"), toolbar);
-    cbLocalSearchChromeBookmarks_->setToolTip(QStringLiteral("索引 Chrome 书签"));
-    cbLocalSearchEdgeBookmarks_->setToolTip(QStringLiteral("索引 Edge 书签"));
+    cbLocalSearchChromeBookmarks_->setToolTip(QCoreApplication::translate("App", "索引 Chrome 书签"));
+    cbLocalSearchEdgeBookmarks_->setToolTip(QCoreApplication::translate("App", "索引 Edge 书签"));
 
-    auto* engineLabel = new QLabel(QStringLiteral("搜索引擎"), toolbar);
+    auto* engineLabel = new QLabel(QCoreApplication::translate("App", "搜索引擎"), toolbar);
     cbLocalSearchWebEngine_ = new QComboBox(toolbar);
     cbLocalSearchWebEngine_->setFixedWidth(Util::scaleSize(270));
-    cbLocalSearchWebEngine_->setToolTip(QStringLiteral("输入 < 前缀进行网页搜索时使用的搜索引擎"));
+    cbLocalSearchWebEngine_->setToolTip(QCoreApplication::translate("App", "输入 < 前缀进行网页搜索时使用的搜索引擎"));
     const auto engines = SettingModel::localSearchWebEngines();
     for (const auto& engine : engines) {
         const QIcon icon = engine.iconPath.isEmpty() ? QIcon() : QIcon(engine.iconPath);
         cbLocalSearchWebEngine_->addItem(icon, engine.name, engine.id);
     }
 
-    cbLocalSearchPinyin_ = new QCheckBox(QStringLiteral("拼音搜索"), toolbar);
-    cbLocalSearchPinyin_->setToolTip(QStringLiteral("支持输入中文拼音检索文件/目录/应用"));
+    cbLocalSearchPinyin_ = new QCheckBox(QCoreApplication::translate("App", "拼音搜索"), toolbar);
+    cbLocalSearchPinyin_->setToolTip(QCoreApplication::translate("App", "支持输入中文拼音检索文件/目录/应用"));
 
-    auto* rebuild = new QPushButton(QStringLiteral("重建索引"), toolbar);
-    rebuild->setToolTip(QStringLiteral("重新扫描目录、应用和已启用的浏览器书签"));
+    auto* rebuild = new QPushButton(QCoreApplication::translate("App", "重建索引"), toolbar);
+    rebuild->setToolTip(QCoreApplication::translate("App", "重新扫描目录、应用和已启用的浏览器书签"));
 
     labelLocalSearchStatus_ = new QLabel(toolbar);
     labelLocalSearchStatus_->setStyleSheet(
@@ -576,7 +588,7 @@ void Settings::initLocalSearchTab()
     Util::scaleLayoutMargins(rootsLayout, 12, 10, 12, 12);
     rootsLayout->setSpacing(Util::scaleSize(8));
     auto* rootsHint = new QLabel(
-        QStringLiteral("仅添加经常需要搜索的位置；目录变化会在后台自动同步。"), rootsTab);
+        QCoreApplication::translate("App", "仅添加经常需要搜索的位置；目录变化会在后台自动同步。"), rootsTab);
     rootsHint->setWordWrap(true);
     rootsHint->setStyleSheet(
         QStringLiteral("color:%1;").arg(ThemeManager::tokens().textSecondary.name()));
@@ -589,24 +601,24 @@ void Settings::initLocalSearchTab()
     rootsRow->addWidget(listLocalSearchRoots_, 1);
     auto* rootButtons = new QVBoxLayout();
     rootButtons->setSpacing(Util::scaleSize(6));
-    auto* addRoot = new QPushButton(QStringLiteral("添加目录"), rootsTab);
-    auto* removeRoot = new QPushButton(QStringLiteral("删除选中"), rootsTab);
-    auto* restoreRoots = new QPushButton(QStringLiteral("恢复默认"), rootsTab);
-    restoreRoots->setToolTip(QStringLiteral("恢复桌面、文档、下载、图片、音乐、视频和 OneDrive"));
+    auto* addRoot = new QPushButton(QCoreApplication::translate("App", "添加目录"), rootsTab);
+    auto* removeRoot = new QPushButton(QCoreApplication::translate("App", "删除选中"), rootsTab);
+    auto* restoreRoots = new QPushButton(QCoreApplication::translate("App", "恢复默认"), rootsTab);
+    restoreRoots->setToolTip(QCoreApplication::translate("App", "恢复桌面、文档、下载、图片、音乐、视频和 OneDrive"));
     rootButtons->addWidget(addRoot);
     rootButtons->addWidget(removeRoot);
     rootButtons->addStretch();
     rootButtons->addWidget(restoreRoots);
     rootsRow->addLayout(rootButtons);
     rootsLayout->addLayout(rootsRow, 1);
-    listTabs->addTab(rootsTab, QStringLiteral("索引目录"));
+    listTabs->addTab(rootsTab, QCoreApplication::translate("App", "索引目录"));
 
     auto* excludesTab = new QWidget();
     auto* excludesLayout = new QVBoxLayout(excludesTab);
     Util::scaleLayoutMargins(excludesLayout, 12, 10, 12, 12);
     excludesLayout->setSpacing(Util::scaleSize(8));
     auto* excludesHint = new QLabel(
-        QStringLiteral("每行一条规则，按索引根目录的相对路径匹配。"),
+        QCoreApplication::translate("App", "每行一条规则，按索引根目录的相对路径匹配。"),
         excludesTab);
     excludesHint->setWordWrap(true);
     excludesHint->setStyleSheet(
@@ -621,40 +633,40 @@ void Settings::initLocalSearchTab()
     excludesRow->addWidget(teLocalSearchExcludes_, 1);
     auto* rulesButtons = new QVBoxLayout();
     rulesButtons->setSpacing(Util::scaleSize(6));
-    auto* saveRules = new QPushButton(QStringLiteral("保存"), excludesTab);
-    auto* resetRules = new QPushButton(QStringLiteral("恢复默认"), excludesTab);
-    resetRules->setToolTip(QStringLiteral("恢复后点击\"保存\"以应用"));
+    auto* saveRules = new QPushButton(QCoreApplication::translate("App", "保存"), excludesTab);
+    auto* resetRules = new QPushButton(QCoreApplication::translate("App", "恢复默认"), excludesTab);
+    resetRules->setToolTip(QCoreApplication::translate("App", "恢复后点击\"保存\"以应用"));
     rulesButtons->addWidget(saveRules);
     rulesButtons->addStretch();
     rulesButtons->addWidget(resetRules);
     excludesRow->addLayout(rulesButtons);
     excludesLayout->addLayout(excludesRow, 1);
-    listTabs->addTab(excludesTab, QStringLiteral("排除规则"));
+    listTabs->addTab(excludesTab, QCoreApplication::translate("App", "排除规则"));
 
     layout->addWidget(listTabs, 1);
 
     const int aboutIndex = ui.tabWidget->indexOf(ui.tab_2);
     if (aboutIndex >= 0) {
-        ui.tabWidget->insertTab(aboutIndex, page, QStringLiteral("本地搜索"));
+        ui.tabWidget->insertTab(aboutIndex, page, QCoreApplication::translate("App", "本地搜索"));
     } else {
-        ui.tabWidget->addTab(page, QStringLiteral("本地搜索"));
+        ui.tabWidget->addTab(page, QCoreApplication::translate("App", "本地搜索"));
     }
 
     const auto applyLocalSearchHotkey = [this](const QString& key) {
         if (windowManager_->setLocalSearchGlobalKey(key)) {
             windowManager_->setting()->setLocalSearchGlobalKey(key);
             emit windowManager_->sigSettingChanged();
-            showStatusTip(QStringLiteral("本地搜索快捷键已更新"));
+            showStatusTip(QCoreApplication::translate("App", "本地搜索快捷键已更新"));
             return;
         }
 
         const QString reason = windowManager_->lastHotkeyError();
         const QString detail = reason.isEmpty()
-            ? QStringLiteral("快捷键注册失败，可能被占用")
-            : QStringLiteral("快捷键注册失败：%1").arg(reason);
+            ? QCoreApplication::translate("App", "快捷键注册失败，可能被占用")
+            : QCoreApplication::translate("App", "快捷键注册失败：%1").arg(reason);
         showStatusTip(detail, false);
-        QMessageBox::warning(this, QStringLiteral("快捷键冲突"),
-                             detail + QStringLiteral("\n请更换组合键。"));
+        QMessageBox::warning(this, QCoreApplication::translate("App", "快捷键冲突"),
+                             detail + QCoreApplication::translate("App", "\n请更换组合键。"));
         kseLocalSearch_->setKeySequence(QKeySequence::fromString(
             windowManager_->setting()->localSearchGlobalKey(), QKeySequence::NativeText));
     };
@@ -674,7 +686,7 @@ void Settings::initLocalSearchTab()
         if (cbLocalSearchEdgeBookmarks_->isChecked()) sources.push_back(QStringLiteral("edge"));
         windowManager_->setting()->setLocalSearchBookmarkSources(sources);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("书签来源已更新，索引将自动重建"));
+        showStatusTip(QCoreApplication::translate("App", "书签来源已更新，索引将自动重建"));
     };
     connect(cbLocalSearchChromeBookmarks_, &QCheckBox::toggled,
             this, [saveBookmarkSources](bool) { saveBookmarkSources(); });
@@ -685,23 +697,23 @@ void Settings::initLocalSearchTab()
         const QString id = cbLocalSearchWebEngine_->currentData().toString();
         windowManager_->setting()->setLocalSearchWebEngine(id);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("搜索引擎已更新"));
+        showStatusTip(QCoreApplication::translate("App", "搜索引擎已更新"));
     });
     connect(cbLocalSearchPinyin_, &QCheckBox::toggled, this, [this](bool checked) {
         windowManager_->setting()->setLocalSearchPinyinEnabled(checked);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(checked ? QStringLiteral("已启用拼音搜索")
-                              : QStringLiteral("已关闭拼音搜索"));
+        showStatusTip(checked ? QCoreApplication::translate("App", "已启用拼音搜索")
+                              : QCoreApplication::translate("App", "已关闭拼音搜索"));
     });
     connect(addRoot, &QPushButton::clicked, this, [this]() {
-        const QString path = QFileDialog::getExistingDirectory(this, QStringLiteral("选择索引目录"));
+        const QString path = QFileDialog::getExistingDirectory(this, QCoreApplication::translate("App", "选择索引目录"));
         if (path.isEmpty()) return;
         QStringList roots = windowManager_->setting()->localSearchRoots();
         if (!roots.contains(path, Qt::CaseInsensitive)) roots.push_back(path);
         windowManager_->setting()->setLocalSearchRoots(roots);
         loadLocalSearchSettings();
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("已添加索引目录"));
+        showStatusTip(QCoreApplication::translate("App", "已添加索引目录"));
     });
     connect(removeRoot, &QPushButton::clicked, this, [this]() {
         const int row = listLocalSearchRoots_->currentRow();
@@ -711,18 +723,18 @@ void Settings::initLocalSearchTab()
         windowManager_->setting()->setLocalSearchRoots(roots);
         loadLocalSearchSettings();
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("已移除索引目录"));
+        showStatusTip(QCoreApplication::translate("App", "已移除索引目录"));
     });
     connect(restoreRoots, &QPushButton::clicked, this, [this]() {
         const auto answer = QMessageBox::question(
-            this, QStringLiteral("恢复默认"),
-            QStringLiteral("将用默认目录替换当前索引目录，是否继续？"));
+            this, QCoreApplication::translate("App", "恢复默认"),
+            QCoreApplication::translate("App", "将用默认目录替换当前索引目录，是否继续？"));
         if (answer != QMessageBox::Yes) return;
         windowManager_->setting()->setLocalSearchRoots(
             SettingModel::defaultLocalSearchRoots());
         loadLocalSearchSettings();
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("已恢复推荐索引目录"));
+        showStatusTip(QCoreApplication::translate("App", "已恢复推荐索引目录"));
     });
 
     const auto savePatterns = [this]() -> bool {
@@ -736,8 +748,8 @@ void Settings::initLocalSearchTab()
             if (!value.startsWith(u'#')) {
                 QString error;
                 if (!IgnorePatternMatcher::validate(value, &error)) {
-                    showStatusTip(QStringLiteral("排除规则无效"), false);
-                    QMessageBox::warning(this, QStringLiteral("排除规则无效"),
+                    showStatusTip(QCoreApplication::translate("App", "排除规则无效"), false);
+                    QMessageBox::warning(this, QCoreApplication::translate("App", "排除规则无效"),
                                          QStringLiteral("%1\n%2").arg(value, error));
                     return false;
                 }
@@ -750,19 +762,19 @@ void Settings::initLocalSearchTab()
         return true;
     };
     connect(saveRules, &QPushButton::clicked, this, [this, savePatterns]() {
-        if (savePatterns()) showStatusTip(QStringLiteral("排除规则已保存，索引将自动更新"));
+        if (savePatterns()) showStatusTip(QCoreApplication::translate("App", "排除规则已保存，索引将自动更新"));
     });
     connect(resetRules, &QPushButton::clicked, this, [this]() {
         teLocalSearchExcludes_->setPlainText(
             SettingModel::defaultLocalSearchExcludePatterns().join('\n'));
         teLocalSearchExcludes_->setFocus();
-        showStatusTip(QStringLiteral("已恢复默认排除规则，点击保存生效"));
+        showStatusTip(QCoreApplication::translate("App", "已恢复默认排除规则，点击保存生效"));
     });
     connect(rebuild, &QPushButton::clicked, this, [this, savePatterns]() {
         if (!savePatterns()) return;
         windowManager_->rebuildLocalSearchIndex();
-        labelLocalSearchStatus_->setText(QStringLiteral("已请求重建…"));
-        showStatusTip(QStringLiteral("索引重建已开始"));
+        labelLocalSearchStatus_->setText(QCoreApplication::translate("App", "已请求重建…"));
+        showStatusTip(QCoreApplication::translate("App", "索引重建已开始"));
     });
 
     auto* statusTimer = new QTimer(page);
@@ -803,9 +815,9 @@ void Settings::loadLocalSearchSettings()
 void Settings::initTablePath()
 {
     const QList<QPair<QString, QString>> data = {
-        {QStringLiteral("程序"), Util::getRunDir()},
-        {QStringLiteral("配置"), Util::getConfigDir()},
-        {QStringLiteral("日志"), Util::getLogsDir()}
+        {QCoreApplication::translate("App", "程序"), Util::getRunDir()},
+        {QCoreApplication::translate("App", "配置"), Util::getConfigDir()},
+        {QCoreApplication::translate("App", "日志"), Util::getLogsDir()}
     };
 
     ui.tablePath->setFrameShape(QFrame::NoFrame);
@@ -819,11 +831,20 @@ void Settings::initTablePath()
     ui.tablePath->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui.tablePath->setShowGrid(false);
     ui.tablePath->setMouseTracking(true);
-    ui.tablePath->horizontalHeader()->setStretchLastSection(true);
+    auto* header = ui.tablePath->horizontalHeader();
+    header->setStretchLastSection(false);
     ui.tablePath->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui.tablePath->setRowCount(data.size());
     ui.tablePath->setColumnCount(2);
     ui.tablePath->setTextElideMode(Qt::ElideMiddle);
+    header->setSectionResizeMode(0, QHeaderView::Fixed);
+    header->setSectionResizeMode(1, QHeaderView::Stretch);
+
+    int labelWidth = 0;
+    for (const auto& entry : data) {
+        labelWidth = qMax(labelWidth, ui.tablePath->fontMetrics().horizontalAdvance(entry.first));
+    }
+    ui.tablePath->setColumnWidth(0, labelWidth + Util::scaleSize(28));
 
     connect(ui.tablePath, &QTableWidget::cellDoubleClicked, this, &Settings::onTablePathDoubleClicked);
     for (int row = 0; row < data.size(); row++) {
@@ -835,10 +856,10 @@ void Settings::initTablePath()
 void Settings::initThemeSelector()
 {
     QHBoxLayout *themeLayout = new QHBoxLayout();
-    QLabel *themeLabel = new QLabel(QStringLiteral("皮肤:"), this);
+    QLabel *themeLabel = new QLabel(QCoreApplication::translate("App", "皮肤:"), this);
     cbTheme_ = new QComboBox(this);
-    cbTheme_->addItem(QStringLiteral("黑色"), static_cast<int>(AppTheme::Dark));
-    cbTheme_->addItem(QStringLiteral("白色"), static_cast<int>(AppTheme::Light));
+    cbTheme_->addItem(QCoreApplication::translate("App", "黑色"), static_cast<int>(AppTheme::Dark));
+    cbTheme_->addItem(QCoreApplication::translate("App", "白色"), static_cast<int>(AppTheme::Light));
     themeLayout->addWidget(themeLabel);
     themeLayout->addWidget(cbTheme_);
     themeLayout->addStretch();
@@ -855,16 +876,16 @@ void Settings::updateScreenshotGlobalKey()
         windowManager_->setting()->setScreenshotGlobalKey(key);
         setStatusIcon(ui.pbScreenshotStatus, true);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("截图快捷键已更新"));
+        showStatusTip(QCoreApplication::translate("App", "截图快捷键已更新"));
     } else {
         setStatusIcon(ui.pbScreenshotStatus, false);
         if (key.isEmpty()) {
-            showStatusTip(QStringLiteral("快捷键不能为空"), false);
+            showStatusTip(QCoreApplication::translate("App", "快捷键不能为空"), false);
         } else {
             const QString reason = windowManager_->lastHotkeyError();
             showStatusTip(reason.isEmpty()
-                              ? QStringLiteral("快捷键注册失败，可能被占用")
-                              : QStringLiteral("快捷键注册失败：%1").arg(reason),
+                              ? QCoreApplication::translate("App", "快捷键注册失败，可能被占用")
+                              : QCoreApplication::translate("App", "快捷键注册失败：%1").arg(reason),
                           false);
         }
     }
@@ -877,16 +898,16 @@ void Settings::updatePinKey()
         windowManager_->setting()->setPinGlobalKey(key);
         setStatusIcon(ui.pbPinStatus, true);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("贴图快捷键已更新"));
+        showStatusTip(QCoreApplication::translate("App", "贴图快捷键已更新"));
     } else {
         setStatusIcon(ui.pbPinStatus, false);
         if (key.isEmpty()) {
-            showStatusTip(QStringLiteral("快捷键不能为空"), false);
+            showStatusTip(QCoreApplication::translate("App", "快捷键不能为空"), false);
         } else {
             const QString reason = windowManager_->lastHotkeyError();
             showStatusTip(reason.isEmpty()
-                              ? QStringLiteral("快捷键注册失败，可能被占用")
-                              : QStringLiteral("快捷键注册失败：%1").arg(reason),
+                              ? QCoreApplication::translate("App", "快捷键注册失败，可能被占用")
+                              : QCoreApplication::translate("App", "快捷键注册失败：%1").arg(reason),
                           false);
         }
     }
@@ -899,15 +920,15 @@ void Settings::updateChatKey()
         windowManager_->setting()->setChatGlobalKey(key);
         setStatusIcon(ui.pbChatStatus, true);
         emit windowManager_->sigSettingChanged();
-        showStatusTip(QStringLiteral("对话快捷键已更新"));
+        showStatusTip(QCoreApplication::translate("App", "对话快捷键已更新"));
     } else if (key.isEmpty()) {
         clearChatGlobalKey();
     } else {
         setStatusIcon(ui.pbChatStatus, false);
         const QString reason = windowManager_->lastHotkeyError();
         showStatusTip(reason.isEmpty()
-                          ? QStringLiteral("快捷键注册失败，可能被占用")
-                          : QStringLiteral("快捷键注册失败：%1").arg(reason),
+                          ? QCoreApplication::translate("App", "快捷键注册失败，可能被占用")
+                          : QCoreApplication::translate("App", "快捷键注册失败：%1").arg(reason),
                       false);
     }
 }
@@ -919,28 +940,28 @@ void Settings::clearChatGlobalKey()
     ui.kseChat->setKeySequence(QKeySequence());
     setStatusIcon(ui.pbChatStatus, false);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(QStringLiteral("对话快捷键已清除"));
+    showStatusTip(QCoreApplication::translate("App", "对话快捷键已清除"));
 }
 
 void Settings::onAutoStartClicked(bool checked)
 {
     windowManager_->setting()->setAutoStart(checked);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(checked ? QStringLiteral("已开启开机自启动") : QStringLiteral("已关闭开机自启动"));
+    showStatusTip(checked ? QCoreApplication::translate("App", "已开启开机自启动") : QCoreApplication::translate("App", "已关闭开机自启动"));
 }
 
 void Settings::onAutoPin(bool checked)
 {
     windowManager_->setting()->setAutoPin(checked);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(checked ? QStringLiteral("已开启自动贴图") : QStringLiteral("已关闭自动贴图"));
+    showStatusTip(checked ? QCoreApplication::translate("App", "已开启自动贴图") : QCoreApplication::translate("App", "已关闭自动贴图"));
 }
 
 void Settings::onPinNoBorder(bool checked)
 {
     windowManager_->setting()->setPinNoBorder(checked);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(checked ? QStringLiteral("已开启贴图无边框") : QStringLiteral("已关闭贴图无边框"));
+    showStatusTip(checked ? QCoreApplication::translate("App", "已开启贴图无边框") : QCoreApplication::translate("App", "已关闭贴图无边框"));
 }
 
 void Settings::onRevertClicked()
@@ -949,7 +970,7 @@ void Settings::onRevertClicked()
     readData();
     CDarkStyle::assign(windowManager_->setting()->themeMode());
     emit windowManager_->sigSettingChanged();
-    showStatusTip(QStringLiteral("已恢复默认设置"));
+    showStatusTip(QCoreApplication::translate("App", "已恢复默认设置"));
 }
 
 void Settings::onTablePathDoubleClicked(int row, int col)
@@ -974,7 +995,7 @@ void Settings::onAutoSaveChanged()
     bool autoSave = ui.cbAutoSave->isChecked();
     ui.pbModifyImagePath->setEnabled(autoSave);
     windowManager_->setting()->setAutoSaveImage(autoSave, ui.leSavePath->text().trimmed());
-    showStatusTip(autoSave ? QStringLiteral("已开启自动保存") : QStringLiteral("已关闭自动保存"));
+    showStatusTip(autoSave ? QCoreApplication::translate("App", "已开启自动保存") : QCoreApplication::translate("App", "已关闭自动保存"));
 }
 
 void Settings::onOpenImagePath()
@@ -984,11 +1005,11 @@ void Settings::onOpenImagePath()
 
 void Settings::onModifyImagePath()
 {
-	QString newDir = QFileDialog::getExistingDirectory(nullptr, QStringLiteral("选择截图保存目录"));
+	QString newDir = QFileDialog::getExistingDirectory(nullptr, QCoreApplication::translate("App", "选择截图保存目录"));
 	if (!newDir.isEmpty()) {
 		ui.leSavePath->setText(newDir);
 		onAutoSaveChanged();
-		showStatusTip(QStringLiteral("保存路径已更新"));
+		showStatusTip(QCoreApplication::translate("App", "保存路径已更新"));
 	}
 }
 
@@ -999,13 +1020,20 @@ void Settings::onBackgroundChanged()
         ui.hsBackgroundAlpha->setValue(160);
     }
     windowManager_->setting()->setBackgroundColor(ui.cbBackground->isChecked(), ui.hsBackgroundAlpha->value());
-    showStatusTip(QStringLiteral("截图背景设置已更新"));
+    showStatusTip(QCoreApplication::translate("App", "截图背景设置已更新"));
 }
 
 void Settings::onBackgroundAlphaReleased()
 {
     windowManager_->setting()->setBackgroundColor(ui.cbBackground->isChecked(), ui.hsBackgroundAlpha->value());
-    showStatusTip(QStringLiteral("背景透明度已更新"));
+    showStatusTip(QCoreApplication::translate("App", "背景透明度已更新"));
+}
+
+void Settings::onLanguageChanged(int index)
+{
+    windowManager_->setting()->setUiLanguage(index == 1 ? QStringLiteral("zh")
+                                                        : QStringLiteral("en"));
+    showStatusTip(tr("语言已保存，重启应用后生效"));
 }
 
 void Settings::onThemeChanged(int index)
@@ -1028,7 +1056,7 @@ void Settings::onThemeChanged(int index)
     setting->setThemeMode(themeMode);
     CDarkStyle::assign(themeMode);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(themeMode == AppTheme::Dark ? QStringLiteral("已切换为黑色主题") : QStringLiteral("已切换为白色主题"));
+    showStatusTip(themeMode == AppTheme::Dark ? QCoreApplication::translate("App", "已切换为黑色主题") : QCoreApplication::translate("App", "已切换为白色主题"));
 }
 
 void Settings::initLlmTab()
@@ -1063,9 +1091,9 @@ void Settings::initLlmTab()
     cbLlmProviders_ = new QComboBox(generalPage);
     int smallBtnW = Util::scaleSize(50);
     int smallBtnH = Util::scaleSize(25);
-    QPushButton* btnAddProvider = new QPushButton(QStringLiteral("新增"), generalPage);
+    QPushButton* btnAddProvider = new QPushButton(QCoreApplication::translate("App", "新增"), generalPage);
     btnAddProvider->setFixedSize(smallBtnW, smallBtnH);
-    QPushButton* btnDelProvider = new QPushButton(QStringLiteral("删除"), generalPage);
+    QPushButton* btnDelProvider = new QPushButton(QCoreApplication::translate("App", "删除"), generalPage);
     btnDelProvider->setFixedSize(smallBtnW, smallBtnH);
     selectorRow->addWidget(cbLlmProviders_, 1);
     selectorRow->addWidget(btnAddProvider);
@@ -1078,21 +1106,21 @@ void Settings::initLlmTab()
     ui.leLlmApiBaseUrl->setPlaceholderText(QStringLiteral("https://api.xxx.com/v1"));
     ui.leLlmApiKey = new QLineEdit(generalPage);
     ui.leLlmApiKey->setEchoMode(QLineEdit::Password);
-    ui.leLlmApiKey->setPlaceholderText(QStringLiteral("请输入 API Key"));
+    ui.leLlmApiKey->setPlaceholderText(QCoreApplication::translate("App", "请输入 API Key"));
     ui.leLlmModel = new QLineEdit(generalPage);
-    ui.leLlmModel->setPlaceholderText(QStringLiteral("例如：gpt-4o-mini"));
+    ui.leLlmModel->setPlaceholderText(QCoreApplication::translate("App", "例如：gpt-4o-mini"));
     ui.dsbLlmTemperature = new QDoubleSpinBox(generalPage);
     ui.dsbLlmTemperature->setRange(0.0, 2.0);
     ui.dsbLlmTemperature->setSingleStep(0.1);
     ui.dsbLlmTemperature->setDecimals(2);
-    generalLayout->addRow(QStringLiteral("大模型厂商:"),    selectorRow);
-    generalLayout->addRow(QStringLiteral("名称:"),         leLlmProviderName_);
+    generalLayout->addRow(QCoreApplication::translate("App", "大模型厂商:"),    selectorRow);
+    generalLayout->addRow(QCoreApplication::translate("App", "名称:"),         leLlmProviderName_);
     generalLayout->addRow(QStringLiteral("API Base URL:"), ui.leLlmApiBaseUrl);
     generalLayout->addRow(QStringLiteral("API Key:"),      ui.leLlmApiKey);
     generalLayout->addRow(QStringLiteral("Model:"),        ui.leLlmModel);
     generalLayout->addRow(QStringLiteral("Temperature:"),  ui.dsbLlmTemperature);
     generalVLayout->addLayout(generalLayout);
-    cbImageTokenSaving_ = new QCheckBox(QStringLiteral("图片省token"), generalPage);
+    cbImageTokenSaving_ = new QCheckBox(QCoreApplication::translate("App", "图片省token"), generalPage);
     cbImageTokenSaving_->setChecked(true);
     generalVLayout->addWidget(cbImageTokenSaving_);
     connect(cbImageTokenSaving_, &QCheckBox::toggled, this, &Settings::onImageTokenSavingToggled);
@@ -1116,11 +1144,11 @@ void Settings::initLlmTab()
     textSelectionLayout->setContentsMargins(10, 10, 10, 10);
     textSelectionLayout->setSpacing(8);
 
-    cbTextSelectionEnabled_ = new QCheckBox(QStringLiteral("启用划词功能"), textSelectionPage);
+    cbTextSelectionEnabled_ = new QCheckBox(QCoreApplication::translate("App", "启用划词功能"), textSelectionPage);
     textSelectionLayout->addWidget(cbTextSelectionEnabled_);
 
-    textSelectionLayout->addWidget(new QLabel(QStringLiteral("配置划词工具栏按钮及对应 Prompt："), textSelectionPage));
-    auto *textSelectionHint = new QLabel(QStringLiteral("新增或修改后，下次划词弹出工具栏时立即生效。"), textSelectionPage);
+    textSelectionLayout->addWidget(new QLabel(QCoreApplication::translate("App", "配置划词工具栏按钮及对应 Prompt："), textSelectionPage));
+    auto *textSelectionHint = new QLabel(QCoreApplication::translate("App", "新增或修改后，下次划词弹出工具栏时立即生效。"), textSelectionPage);
     textSelectionHint->setStyleSheet(
         QStringLiteral("color:%1; font-size:12px;").arg(ThemeManager::tokens().textSecondary.name()));
     textSelectionLayout->addWidget(textSelectionHint);
@@ -1139,7 +1167,7 @@ void Settings::initLlmTab()
     listTextSelectionActions_->setWordWrap(false);
     listTextSelectionActions_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     const int actionTextWidth = listTextSelectionActions_->fontMetrics().horizontalAdvance(
-        QStringLiteral("按钮文字字"));
+        QCoreApplication::translate("App", "按钮文字字"));
     const int actionListWidth = actionTextWidth
         + Util::scaleSize(28)
         + listTextSelectionActions_->frameWidth() * 2
@@ -1150,9 +1178,9 @@ void Settings::initLlmTab()
     QVBoxLayout* textSelectionButtonLayout = new QVBoxLayout();
     textSelectionButtonLayout->setContentsMargins(0, 0, 0, 0);
     textSelectionButtonLayout->setSpacing(6);
-    QPushButton* btnAddTextSelectionAction = new QPushButton(QStringLiteral("新增"), textSelectionPage);
+    QPushButton* btnAddTextSelectionAction = new QPushButton(QCoreApplication::translate("App", "新增"), textSelectionPage);
     btnAddTextSelectionAction->setFixedSize(smallBtnW, smallBtnH);
-    btnDelTextSelectionAction_ = new QPushButton(QStringLiteral("删除"), textSelectionPage);
+    btnDelTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "删除"), textSelectionPage);
     btnDelTextSelectionAction_->setFixedSize(smallBtnW, smallBtnH);
     textSelectionButtonLayout->addWidget(btnAddTextSelectionAction);
     textSelectionButtonLayout->addWidget(btnDelTextSelectionAction_);
@@ -1163,7 +1191,7 @@ void Settings::initLlmTab()
     textSelectionForm->setContentsMargins(0, 0, 0, 2);
     textSelectionForm->setSpacing(8);
     leTextSelectionActionLabel_ = new QLineEdit(textSelectionEditor);
-    leTextSelectionActionLabel_->setPlaceholderText(QStringLiteral("按钮文字"));
+    leTextSelectionActionLabel_->setPlaceholderText(QCoreApplication::translate("App", "按钮文字"));
     teTextSelectionActionPrompt_ = new QPlainTextEdit(textSelectionEditor);
     teTextSelectionActionPrompt_->setPlaceholderText(QStringLiteral("Prompt"));
     teTextSelectionActionPrompt_->setMinimumHeight(Util::scaleSize(120));
@@ -1208,25 +1236,25 @@ void Settings::initLlmTab()
     notificationSizeRow->addWidget(new QLabel(QStringLiteral("×"), notificationPage));
     notificationSizeRow->addWidget(ui.sbNotifyHeight);
     notificationSizeRow->addStretch();
-    notificationForm->addRow(QStringLiteral("窗口大小："), notificationSizeRow);
+    notificationForm->addRow(QCoreApplication::translate("App", "窗口大小："), notificationSizeRow);
     ui.cbNotifyPosition = new QComboBox(notificationPage);
-    ui.cbNotifyPosition->addItems({QStringLiteral("左上"), QStringLiteral("右上"),
-                                   QStringLiteral("左下"), QStringLiteral("右下")});
-    notificationForm->addRow(QStringLiteral("展示位置："), ui.cbNotifyPosition);
+    ui.cbNotifyPosition->addItems({QCoreApplication::translate("App", "左上"), QCoreApplication::translate("App", "右上"),
+                                   QCoreApplication::translate("App", "左下"), QCoreApplication::translate("App", "右下")});
+    notificationForm->addRow(QCoreApplication::translate("App", "展示位置："), ui.cbNotifyPosition);
     sbChatToolCallLimit_ = new QSpinBox(notificationPage);
     sbChatToolCallLimit_->setRange(1, 100);
     sbChatToolCallLimit_->setValue(10);
-    sbChatToolCallLimit_->setSuffix(QStringLiteral(" 次"));
+    sbChatToolCallLimit_->setSuffix(QCoreApplication::translate("App", " 次"));
     sbChatToolCallLimit_->setToolTip(
-        QStringLiteral("单次对话请求允许执行的工具调用总数；达到上限后，AI 将基于已有上下文直接作答。"));
-    notificationForm->addRow(QStringLiteral("工具调用次数上限："), sbChatToolCallLimit_);
+        QCoreApplication::translate("App", "单次对话请求允许执行的工具调用总数；达到上限后，AI 将基于已有上下文直接作答。"));
+    notificationForm->addRow(QCoreApplication::translate("App", "工具调用次数上限："), sbChatToolCallLimit_);
     notificationPageLayout->addLayout(notificationForm);
     notificationPageLayout->addStretch();
     qInfo() << "Settings::initLlmTab: notification page built";
 
-    tabWidget->addTab(generalPage, QStringLiteral("厂商配置"));
-    tabWidget->addTab(textSelectionPage, QStringLiteral("划词设置"));
-    tabWidget->addTab(notificationPage, QStringLiteral("对话窗口"));
+    tabWidget->addTab(generalPage, QCoreApplication::translate("App", "厂商配置"));
+    tabWidget->addTab(textSelectionPage, QCoreApplication::translate("App", "划词设置"));
+    tabWidget->addTab(notificationPage, QCoreApplication::translate("App", "对话窗口"));
     qInfo() << "Settings::initLlmTab: first tabs added";
 
     const int notificationTabIndex = ui.tabWidget->indexOf(ui.tab_notification);
@@ -1248,7 +1276,7 @@ void Settings::loadLlmProviders()
 
     cbLlmProviders_->clear();
     for (const auto &p : providers) {
-        cbLlmProviders_->addItem(p.name.isEmpty() ? QStringLiteral("未命名") : p.name);
+        cbLlmProviders_->addItem(p.name.isEmpty() ? QCoreApplication::translate("App", "未命名") : p.name);
     }
     cbLlmProviders_->setCurrentIndex(activeIndex);
 
@@ -1303,9 +1331,9 @@ void Settings::onLlmProviderFieldChanged()
 
     // Keep combo box display name in sync
     updatingProviderFields_ = true;
-    cbLlmProviders_->setItemText(index, p.name.isEmpty() ? QStringLiteral("未命名") : p.name);
+    cbLlmProviders_->setItemText(index, p.name.isEmpty() ? QCoreApplication::translate("App", "未命名") : p.name);
     updatingProviderFields_ = false;
-    showStatusTip(QStringLiteral("厂商配置已保存"));
+    showStatusTip(QCoreApplication::translate("App", "厂商配置已保存"));
 }
 
 void Settings::onAddLlmProvider()
@@ -1314,14 +1342,14 @@ void Settings::onAddLlmProvider()
     auto providers = setting->llmProviders();
 
     LlmProviderConfig newProvider;
-    newProvider.name        = QStringLiteral("新厂商");
+    newProvider.name        = QCoreApplication::translate("App", "新厂商");
     newProvider.temperature = 0.7;
     providers.append(newProvider);
 
     setting->setLlmProviders(providers);
     setting->setLlmActiveProviderIndex(providers.size() - 1);
     loadLlmProviders();
-    showStatusTip(QStringLiteral("已添加新厂商"));
+    showStatusTip(QCoreApplication::translate("App", "已添加新厂商"));
 }
 
 void Settings::onDelLlmProvider()
@@ -1329,7 +1357,7 @@ void Settings::onDelLlmProvider()
     auto *setting  = windowManager_->setting();
     auto providers = setting->llmProviders();
     if (providers.size() <= 1) {
-        showStatusTip(QStringLiteral("至少保留一个厂商"), false);
+        showStatusTip(QCoreApplication::translate("App", "至少保留一个厂商"), false);
         return;
     }
 
@@ -1340,7 +1368,7 @@ void Settings::onDelLlmProvider()
     setting->setLlmProviders(providers);
     setting->setLlmActiveProviderIndex(qMin(index, providers.size() - 1));
     loadLlmProviders();
-    showStatusTip(QStringLiteral("已删除厂商"));
+    showStatusTip(QCoreApplication::translate("App", "已删除厂商"));
 }
 
 void Settings::loadTextSelectionActions(int preferredRow)
@@ -1358,7 +1386,7 @@ void Settings::loadTextSelectionActions(int preferredRow)
         listTextSelectionActions_->clear();
         for (const TextSelectionActionConfig &action : actions) {
             auto *item = new QListWidgetItem(
-                action.label.trimmed().isEmpty() ? QStringLiteral("未命名") : action.label.trimmed());
+                action.label.trimmed().isEmpty() ? QCoreApplication::translate("App", "未命名") : action.label.trimmed());
             item->setData(Qt::UserRole, action.id);
             listTextSelectionActions_->addItem(item);
         }
@@ -1384,14 +1412,14 @@ void Settings::loadTextSelectionActions(int preferredRow)
 void Settings::onImageTokenSavingToggled(bool checked)
 {
     windowManager_->setting()->setLlmImageTokenSavingEnabled(checked);
-    showStatusTip(checked ? QStringLiteral("已开启图片省token") : QStringLiteral("已关闭图片省token"));
+    showStatusTip(checked ? QCoreApplication::translate("App", "已开启图片省token") : QCoreApplication::translate("App", "已关闭图片省token"));
 }
 
 void Settings::onTextSelectionEnabledToggled(bool checked)
 {
     windowManager_->setting()->setTextSelectionEnabled(checked);
     emit windowManager_->sigSettingChanged();
-    showStatusTip(checked ? QStringLiteral("已启用划词功能") : QStringLiteral("已关闭划词功能"));
+    showStatusTip(checked ? QCoreApplication::translate("App", "已启用划词功能") : QCoreApplication::translate("App", "已关闭划词功能"));
 }
 
 void Settings::onTextSelectionActionSelected(int row)
@@ -1437,7 +1465,7 @@ void Settings::onTextSelectionActionFieldChanged()
     windowManager_->setting()->setTextSelectionActions(actions);
 
     if (QListWidgetItem *item = listTextSelectionActions_->item(row)) {
-        item->setText(action.label.isEmpty() ? QStringLiteral("未命名") : action.label);
+        item->setText(action.label.isEmpty() ? QCoreApplication::translate("App", "未命名") : action.label);
     }
 }
 
@@ -1453,7 +1481,7 @@ void Settings::onAddTextSelectionAction()
     windowManager_->setting()->setTextSelectionActions(actions);
     const int newRow = actions.size() - 1;
     loadTextSelectionActions(newRow);
-    showStatusTip(QStringLiteral("已新增划词动作"));
+    showStatusTip(QCoreApplication::translate("App", "已新增划词动作"));
 }
 
 void Settings::onDelTextSelectionAction()
@@ -1465,7 +1493,7 @@ void Settings::onDelTextSelectionAction()
     QList<TextSelectionActionConfig> actions =
         windowManager_->setting()->textSelectionActions();
     if (actions.size() <= 1) {
-        showStatusTip(QStringLiteral("至少保留一个划词动作"), false);
+        showStatusTip(QCoreApplication::translate("App", "至少保留一个划词动作"), false);
         return;
     }
 
@@ -1477,7 +1505,7 @@ void Settings::onDelTextSelectionAction()
     actions.removeAt(row);
     windowManager_->setting()->setTextSelectionActions(actions);
     loadTextSelectionActions(qMin(row, actions.size() - 1));
-    showStatusTip(QStringLiteral("已删除划词动作"));
+    showStatusTip(QCoreApplication::translate("App", "已删除划词动作"));
 }
 
 void Settings::onGitHubFieldChanged()
@@ -1510,7 +1538,7 @@ void Settings::onChatWindowSettingChanged()
     SettingModel *setting = windowManager_->setting();
     setting->setNotificationWindowSize(QSize(ui.sbNotifyWidth->value(), ui.sbNotifyHeight->value()));
     setting->setTrayNotificationPosition(static_cast<TrayNotificationPosition>(ui.cbNotifyPosition->currentIndex()));
-    showStatusTip(QStringLiteral("对话窗口设置已更新"));
+    showStatusTip(QCoreApplication::translate("App", "对话窗口设置已更新"));
 }
 
 void Settings::initHttpServerTab()
@@ -1522,7 +1550,7 @@ void Settings::initHttpServerTab()
     layout->setSpacing(Util::scaleSize(12));
 
     auto* hint = new QLabel(
-        QStringLiteral("启动后，局域网内设备可访问此目录；关闭设置窗口不会停止服务。"),
+        QCoreApplication::translate("App", "启动后，局域网内设备可访问此目录；关闭设置窗口不会停止服务。"),
         page);
     hint->setObjectName(QStringLiteral("httpServerHint"));
     hint->setWordWrap(true);
@@ -1543,7 +1571,7 @@ void Settings::initHttpServerTab()
     Util::scaleLayoutMargins(configLayout, 16, 14, 16, 16);
     configLayout->setSpacing(Util::scaleSize(12));
 
-    auto* configTitle = new QLabel(QStringLiteral("服务配置"), configPanel);
+    auto* configTitle = new QLabel(QCoreApplication::translate("App", "服务配置"), configPanel);
     configTitle->setObjectName(QStringLiteral("httpServerSectionTitle"));
     configLayout->addWidget(configTitle);
 
@@ -1554,14 +1582,14 @@ void Settings::initHttpServerTab()
     };
 
     // -d/--directory
-    configLayout->addWidget(makeFieldLabel(QStringLiteral("共享目录")));
+    configLayout->addWidget(makeFieldLabel(QCoreApplication::translate("App", "共享目录")));
     auto* dirRow = new QHBoxLayout();
     dirRow->setSpacing(Util::scaleSize(8));
     leHttpDirectory_ = new QLineEdit(configPanel);
     leHttpDirectory_->setReadOnly(true);
-    leHttpDirectory_->setPlaceholderText(QStringLiteral("选择要共享的目录"));
+    leHttpDirectory_->setPlaceholderText(QCoreApplication::translate("App", "选择要共享的目录"));
     leHttpDirectory_->setMinimumHeight(Util::scaleSize(34));
-    btnHttpBrowse_ = new QPushButton(QStringLiteral("选择目录"), configPanel);
+    btnHttpBrowse_ = new QPushButton(QCoreApplication::translate("App", "选择目录"), configPanel);
     btnHttpBrowse_->setMinimumHeight(Util::scaleSize(34));
     btnHttpBrowse_->setFixedWidth(Util::scaleSize(88));
     UiStyler::setRole(btnHttpBrowse_, UiRole::SecondaryButton);
@@ -1574,24 +1602,24 @@ void Settings::initHttpServerTab()
     parameterGrid->setContentsMargins(0, 0, 0, 0);
     parameterGrid->setHorizontalSpacing(Util::scaleSize(10));
     parameterGrid->setVerticalSpacing(Util::scaleSize(6));
-    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("绑定地址")), 0, 0);
-    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("端口")), 0, 1);
-    parameterGrid->addWidget(makeFieldLabel(QStringLiteral("协议")), 0, 2);
+    parameterGrid->addWidget(makeFieldLabel(QCoreApplication::translate("App", "绑定地址")), 0, 0);
+    parameterGrid->addWidget(makeFieldLabel(QCoreApplication::translate("App", "端口")), 0, 1);
+    parameterGrid->addWidget(makeFieldLabel(QCoreApplication::translate("App", "协议")), 0, 2);
 
     leHttpBind_ = new QLineEdit(configPanel);
     leHttpBind_->setPlaceholderText(QStringLiteral("0.0.0.0 / 127.0.0.1 / ::"));
     leHttpBind_->setToolTip(
-        QStringLiteral("python http.server 的 --bind；0.0.0.0 表示局域网内可访问"));
+        QCoreApplication::translate("App", "python http.server 的 --bind；0.0.0.0 表示局域网内可访问"));
     leHttpBind_->setMinimumHeight(Util::scaleSize(34));
     sbHttpPort_ = new QSpinBox(configPanel);
     sbHttpPort_->setRange(1, 65535);
     sbHttpPort_->setValue(8000);
-    sbHttpPort_->setToolTip(QStringLiteral("python http.server 的 --port"));
+    sbHttpPort_->setToolTip(QCoreApplication::translate("App", "python http.server 的 --port"));
     sbHttpPort_->setMinimumHeight(Util::scaleSize(34));
     cbHttpProtocol_ = new QComboBox(configPanel);
     cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.1"), QStringLiteral("HTTP/1.1"));
     cbHttpProtocol_->addItem(QStringLiteral("HTTP/1.0"), QStringLiteral("HTTP/1.0"));
-    cbHttpProtocol_->setToolTip(QStringLiteral("python http.server 的 --protocol"));
+    cbHttpProtocol_->setToolTip(QCoreApplication::translate("App", "python http.server 的 --protocol"));
     cbHttpProtocol_->setMinimumHeight(Util::scaleSize(34));
     parameterGrid->addWidget(leHttpBind_, 1, 0);
     parameterGrid->addWidget(sbHttpPort_, 1, 1);
@@ -1605,8 +1633,8 @@ void Settings::initHttpServerTab()
     auto* cgiRow = new QHBoxLayout();
     cgiRow->setContentsMargins(0, Util::scaleSize(2), 0, 0);
     cgiRow->setSpacing(Util::scaleSize(8));
-    cbHttpCgi_ = new QCheckBox(QStringLiteral("启用 CGI 脚本"), configPanel);
-    auto* cgiHint = new QLabel(QStringLiteral("仅在信任共享目录内容时启用"), configPanel);
+    cbHttpCgi_ = new QCheckBox(QCoreApplication::translate("App", "启用 CGI 脚本"), configPanel);
+    auto* cgiHint = new QLabel(QCoreApplication::translate("App", "仅在信任共享目录内容时启用"), configPanel);
     cgiHint->setObjectName(QStringLiteral("httpServerFieldHelp"));
     cgiRow->addWidget(cbHttpCgi_);
     cgiRow->addWidget(cgiHint);
@@ -1636,12 +1664,12 @@ void Settings::initHttpServerTab()
     labelHttpStatusDot_ = new QLabel(statusPanel);
     labelHttpStatusDot_->setObjectName(QStringLiteral("httpServerStatusDot"));
     labelHttpStatusDot_->setFixedSize(Util::scaleSize(8), Util::scaleSize(8));
-    labelHttpStatus_ = new QLabel(QStringLiteral("服务已停止"), statusPanel);
+    labelHttpStatus_ = new QLabel(QCoreApplication::translate("App", "服务已停止"), statusPanel);
     labelHttpStatus_->setObjectName(QStringLiteral("httpServerStatusText"));
-    btnHttpOpen_ = new QPushButton(QStringLiteral("在浏览器中打开"), statusPanel);
+    btnHttpOpen_ = new QPushButton(QCoreApplication::translate("App", "在浏览器中打开"), statusPanel);
     btnHttpOpen_->setObjectName(QStringLiteral("httpServerOpenButton"));
-    btnHttpStart_ = new QPushButton(QStringLiteral("启动服务"), statusPanel);
-    btnHttpStop_ = new QPushButton(QStringLiteral("停止"), statusPanel);
+    btnHttpStart_ = new QPushButton(QCoreApplication::translate("App", "启动服务"), statusPanel);
+    btnHttpStop_ = new QPushButton(QCoreApplication::translate("App", "停止"), statusPanel);
     for (QPushButton* button : {btnHttpOpen_, btnHttpStart_, btnHttpStop_}) {
         button->setMinimumHeight(Util::scaleSize(34));
     }
@@ -1666,16 +1694,16 @@ void Settings::initHttpServerTab()
     teHttpAddress_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     teHttpAddress_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     teHttpAddress_->setFixedHeight(Util::scaleSize(68));
-    teHttpAddress_->setPlainText(QStringLiteral("启动后将在这里显示访问地址"));
+    teHttpAddress_->setPlainText(QCoreApplication::translate("App", "启动后将在这里显示访问地址"));
     statusLayout->addWidget(teHttpAddress_);
     layout->addWidget(statusPanel);
     layout->addStretch();
 
     const int aboutIndex = ui.tabWidget->indexOf(ui.tab_2);
     if (aboutIndex >= 0) {
-        ui.tabWidget->insertTab(aboutIndex, page, QStringLiteral("HTTP 服务"));
+        ui.tabWidget->insertTab(aboutIndex, page, QCoreApplication::translate("App", "HTTP 服务"));
     } else {
-        ui.tabWidget->addTab(page, QStringLiteral("HTTP 服务"));
+        ui.tabWidget->addTab(page, QCoreApplication::translate("App", "HTTP 服务"));
     }
 
     // 预填默认参数：一次点击「启动」即可用。首次使用且无保存目录时，
@@ -1716,7 +1744,7 @@ void Settings::initHttpServerTab()
 
     connect(btnHttpBrowse_, &QPushButton::clicked, this, [this]() {
         const QString path = QFileDialog::getExistingDirectory(
-            this, QStringLiteral("选择要共享的目录"), leHttpDirectory_->text());
+            this, QCoreApplication::translate("App", "选择要共享的目录"), leHttpDirectory_->text());
         if (path.isEmpty()) {
             return;
         }
@@ -1727,7 +1755,7 @@ void Settings::initHttpServerTab()
         const QString dir = leHttpDirectory_->text().trimmed();
         const QFileInfo dirInfo(dir);
         if (dir.isEmpty() || !dirInfo.isDir()) {
-            showStatusTip(QStringLiteral("请先选择一个有效的共享目录"), false);
+            showStatusTip(QCoreApplication::translate("App", "请先选择一个有效的共享目录"), false);
             return;
         }
 
@@ -1745,7 +1773,7 @@ void Settings::initHttpServerTab()
         // why before starting rather than after the user stares at a blank page.
         if (HttpServerController::isBrowserBlockedPort(params.port)) {
             QMessageBox box(QMessageBox::Warning,
-                            QStringLiteral("端口 %1 无法用浏览器打开").arg(params.port),
+                            QCoreApplication::translate("App", "端口 %1 无法用浏览器打开").arg(params.port),
                             QStringLiteral(
                                 "端口 %1 属于浏览器受限端口（SSH 等系统服务的常用端口），"
                                 "Chrome、Edge、Firefox 会直接拒绝访问并提示 ERR_UNSAFE_PORT。\n\n"
@@ -1755,8 +1783,8 @@ void Settings::initHttpServerTab()
                                 .arg(params.port),
                             QMessageBox::NoButton, this);
             QPushButton* proceed =
-                box.addButton(QStringLiteral("仍然启动"), QMessageBox::AcceptRole);
-            box.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+                box.addButton(QCoreApplication::translate("App", "仍然启动"), QMessageBox::AcceptRole);
+            box.addButton(QCoreApplication::translate("App", "取消"), QMessageBox::RejectRole);
             box.setDefaultButton(proceed);
             box.exec();
             if (box.clickedButton() != proceed) {
@@ -1777,24 +1805,24 @@ void Settings::initHttpServerTab()
         // start() waits for the port to actually accept connections, so this can
         // block for a moment; showing the intermediate state keeps the window from
         // looking frozen while it does.
-        labelHttpStatus_->setText(QStringLiteral("正在启动…"));
+        labelHttpStatus_->setText(QCoreApplication::translate("App", "正在启动…"));
         setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("starting"));
         setStyleProperty(labelHttpStatus_, "status", QStringLiteral("starting"));
         labelHttpStatus_->repaint();
 
         if (server->start(params)) {
-            showStatusTip(QStringLiteral("HTTP 服务已启动"));
+            showStatusTip(QCoreApplication::translate("App", "HTTP 服务已启动"));
             return;
         }
 
         const QString reason = server->lastError();
         refreshHttpServerState();
-        showHttpServerError(QStringLiteral("无法启动 HTTP 服务"), reason);
+        showHttpServerError(QCoreApplication::translate("App", "无法启动 HTTP 服务"), reason);
     });
 
     connect(btnHttpStop_, &QPushButton::clicked, this, [this]() {
         windowManager_->httpServer()->stop();
-        showStatusTip(QStringLiteral("HTTP 服务已停止"));
+        showStatusTip(QCoreApplication::translate("App", "HTTP 服务已停止"));
     });
 
     connect(btnHttpOpen_, &QPushButton::clicked, this, [this]() {
@@ -1811,7 +1839,7 @@ void Settings::initHttpServerTab()
         // dying later). Failures during start() come back through lastError() and
         // are reported by the click handler instead, so they are not shown twice.
         refreshHttpServerState();
-        showHttpServerError(QStringLiteral("HTTP 服务已停止"), message);
+        showHttpServerError(QCoreApplication::translate("App", "HTTP 服务已停止"), message);
     });
 
     refreshHttpServerState();
@@ -1827,9 +1855,10 @@ void Settings::updateHttpPortWarning()
     labelHttpPortWarning_->setVisible(blocked);
     if (blocked) {
         labelHttpPortWarning_->setText(
-            QStringLiteral("端口 %1 是浏览器受限端口（SSH 等系统服务的常用端口），"
-                           "Chrome/Edge/Firefox 会拒绝访问并提示 ERR_UNSAFE_PORT。"
-                           "服务可以启动，但只有 curl 等工具能访问；建议改用 8000、8080 等端口。")
+            QCoreApplication::translate("App",
+                "端口 %1 是浏览器受限端口（SSH 等系统服务的常用端口），"
+                "Chrome/Edge/Firefox 会拒绝访问并提示 ERR_UNSAFE_PORT。"
+                "服务可以启动，但只有 curl 等工具能访问；建议改用 8000、8080 等端口。")
                 .arg(port));
     }
 }
@@ -1837,7 +1866,7 @@ void Settings::updateHttpPortWarning()
 void Settings::showHttpServerError(const QString& title, const QString& detail)
 {
     const QString summary =
-        detail.trimmed().isEmpty() ? QStringLiteral("HTTP 服务启动失败。") : summarizeHttpServerError(detail);
+        detail.trimmed().isEmpty() ? QCoreApplication::translate("App", "HTTP 服务启动失败。") : summarizeHttpServerError(detail);
     if (labelHttpStatus_) {
         labelHttpStatus_->setText(summary);
         setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("error"));
@@ -1886,15 +1915,15 @@ void Settings::refreshHttpServerState()
     btnHttpOpen_->setEnabled(running);
 
     if (!running) {
-        labelHttpStatus_->setText(QStringLiteral("服务已停止"));
+        labelHttpStatus_->setText(QCoreApplication::translate("App", "服务已停止"));
         setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("stopped"));
         setStyleProperty(labelHttpStatus_, "status", QStringLiteral("stopped"));
-        teHttpAddress_->setPlainText(QStringLiteral("启动后将在这里显示访问地址"));
+        teHttpAddress_->setPlainText(QCoreApplication::translate("App", "启动后将在这里显示访问地址"));
         httpPrimaryUrl_.clear();
         return;
     }
 
-    labelHttpStatus_->setText(QStringLiteral("服务运行中"));
+    labelHttpStatus_->setText(QCoreApplication::translate("App", "服务运行中"));
     setStyleProperty(labelHttpStatusDot_, "status", QStringLiteral("running"));
     setStyleProperty(labelHttpStatus_, "status", QStringLiteral("running"));
     const int port = controller->port();

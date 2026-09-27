@@ -16,6 +16,8 @@
 
 #include <QIcon>
 #include <QTimer>
+#include <QTranslator>
+#include <QSettings>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -55,6 +57,17 @@ int main(int argc, char *argv[])
 #else
     CDarkStyle::setFontFamily(QString(), false);
 #endif
+    // Install the translator before any settings defaults or UI labels are created.
+    QTranslator englishTranslator;
+    QSettings languageSettings(Util::getConfigPath(), QSettings::IniFormat);
+    if (languageSettings.value(QStringLiteral("UI_LANGUAGE"), QStringLiteral("en")).toString()
+        != QStringLiteral("zh")) {
+        if (englishTranslator.load(QStringLiteral(":/i18n/ntscreenshot_en.qm"))) {
+            a.installTranslator(&englishTranslator);
+        } else {
+            qWarning() << "English UI translation could not be loaded";
+        }
+    }
     qInfo() << "main: creating WindowManager...";
 	WindowManager windowManager;
     qInfo() << "main: WindowManager created, registering modules...";

@@ -23,6 +23,10 @@ add_executable(ntscreenshot)
 add_subdirectory(src)
 nt_configure_target(ntscreenshot)
 
+qt_add_translations(ntscreenshot
+    TS_FILES "${NT_SOURCE_DIR}/resource/i18n/ntscreenshot_en.ts"
+    RESOURCE_PREFIX "/i18n")
+
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)

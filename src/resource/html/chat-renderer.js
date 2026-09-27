@@ -5,6 +5,7 @@
   const helpers = ChatApp.helpers;
   const actions = ChatApp.actions;
   const markdown = ChatApp.markdown;
+  const i18n = global.ntI18n || {};
 
   function scrollContainer() {
     return document.scrollingElement || document.documentElement;
@@ -109,8 +110,8 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'chat-scroll-bottom-btn';
-    btn.setAttribute('aria-label', '滚动到底部');
-    btn.setAttribute('title', '滚动到底部');
+    btn.setAttribute('aria-label', i18n.scrollBottom || '滚动到底部');
+    btn.setAttribute('title', i18n.scrollBottom || '滚动到底部');
     btn.setAttribute('aria-hidden', 'true');
     btn.innerHTML = ChatApp.icons.chevronDown;
     btn.addEventListener('click', function () {
@@ -529,7 +530,7 @@
       tail.className = 'bubble-streaming-tail';
       tail.setAttribute('role', 'button');
       tail.setAttribute('tabindex', '0');
-      tail.setAttribute('title', '点击滚动到底部');
+      tail.setAttribute('title', i18n.clickScrollBottom || '点击滚动到底部');
       const dots = document.createElement('div');
       dots.className = 'typing-dots';
       for (let i = 0; i < 3; i++) {
@@ -813,7 +814,7 @@
 
       const lbl = document.createElement('div');
       lbl.className = 'chat-tool-card-label';
-      lbl.textContent = '结果';
+      lbl.textContent = i18n.result || '结果';
       details.appendChild(lbl);
 
       const resPre = document.createElement('pre');
@@ -826,7 +827,7 @@
       const detail = document.createElement('button');
       detail.type = 'button';
       detail.className = 'chat-tool-card-full-result';
-      detail.textContent = '查看全文';
+      detail.textContent = i18n.viewFull || '查看全文';
       detail.setAttribute('aria-expanded', 'false');
 
       const fullResult = document.createElement('pre');
@@ -839,7 +840,7 @@
         const open = !fullResult.hidden;
         fullResult.hidden = open;
         detail.setAttribute('aria-expanded', open ? 'false' : 'true');
-        detail.textContent = open ? '查看全文' : '收起全文';
+        detail.textContent = open ? (i18n.viewFull || '查看全文') : (i18n.collapseFull || '收起全文');
       });
       details.appendChild(detail);
       details.appendChild(fullResult);

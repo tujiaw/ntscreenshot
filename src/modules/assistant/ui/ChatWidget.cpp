@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "modules/assistant/ui/ChatWidget.h"
 
 #include <QHBoxLayout>
@@ -122,9 +123,9 @@ const QString kRoleError     = QStringLiteral("error");
 
 QString roleLabelFor(const QString &role)
 {
-    if (role == kRoleUser)      return QStringLiteral("你");
-    if (role == kRoleAssistant) return QStringLiteral("助手");
-    if (role == kRoleError)     return QStringLiteral("错误");
+    if (role == kRoleUser)      return QCoreApplication::translate("App", "你");
+    if (role == kRoleAssistant) return QCoreApplication::translate("App", "助手");
+    if (role == kRoleError)     return QCoreApplication::translate("App", "错误");
     return role;
 }
 
@@ -230,14 +231,14 @@ ChatWidget::ChatWidget(
     pinBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
     pinBtn_->setIconSize(QSize(Util::scaleSize(18), Util::scaleSize(18)));
     pinBtn_->setCursor(Qt::PointingHandCursor);
-    pinBtn_->setToolTip(QStringLiteral("置顶"));
+    pinBtn_->setToolTip(QCoreApplication::translate("App", "置顶"));
     connect(pinBtn_, &QPushButton::toggled, this, &ChatWidget::onPinToggled);
 
     maxBtn_ = new QPushButton(titleBar_);
     maxBtn_->setObjectName(QStringLiteral("chatMaximizeButton"));
     maxBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
     maxBtn_->setCursor(Qt::PointingHandCursor);
-    maxBtn_->setToolTip(QStringLiteral("最大化"));
+    maxBtn_->setToolTip(QCoreApplication::translate("App", "最大化"));
     maxBtn_->setText(QString());
     maxBtn_->setIconSize(QSize(Util::scaleSize(18), Util::scaleSize(18)));
     connect(maxBtn_, &QPushButton::clicked, this, [this] {
@@ -252,7 +253,7 @@ ChatWidget::ChatWidget(
     closeBtn_->setObjectName(QStringLiteral("notificationCloseButton"));
     closeBtn_->setFixedSize(Util::scaleSize(28), Util::scaleSize(28));
     closeBtn_->setCursor(Qt::PointingHandCursor);
-    closeBtn_->setToolTip(QStringLiteral("关闭"));
+    closeBtn_->setToolTip(QCoreApplication::translate("App", "关闭"));
     closeBtn_->setText(QString());
     closeBtn_->setIconSize(QSize(Util::scaleSize(18), Util::scaleSize(18)));
     connect(closeBtn_, &QPushButton::clicked, this, &ChatWidget::closeAnimation);
@@ -603,7 +604,26 @@ void ChatWidget::initializeChatUi()
 
     QFile htmlFile(QStringLiteral(":/html/chat.html"));
     if (htmlFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        const QString html = QString::fromUtf8(htmlFile.readAll());
+        QString html = QString::fromUtf8(htmlFile.readAll());
+        const QJsonObject labels{
+            {QStringLiteral("copy"), QCoreApplication::translate("App", "复制")},
+            {QStringLiteral("copyCode"), QCoreApplication::translate("App", "复制代码")},
+            {QStringLiteral("retry"), QCoreApplication::translate("App", "重新生成")},
+            {QStringLiteral("collapse"), QCoreApplication::translate("App", "收起")},
+            {QStringLiteral("expand"), QCoreApplication::translate("App", "展开")},
+            {QStringLiteral("scrollBottom"), QCoreApplication::translate("App", "滚动到底部")},
+            {QStringLiteral("clickScrollBottom"), QCoreApplication::translate("App", "点击滚动到底部")},
+            {QStringLiteral("result"), QCoreApplication::translate("App", "结果")},
+            {QStringLiteral("viewFull"), QCoreApplication::translate("App", "查看全文")},
+            {QStringLiteral("collapseFull"), QCoreApplication::translate("App", "收起全文")},
+        };
+        const QString language = labels.value(QStringLiteral("copy")).toString() == QStringLiteral("复制")
+            ? QStringLiteral("zh-CN") : QStringLiteral("en");
+        html.replace(QStringLiteral("lang=\"zh-CN\""), QStringLiteral("lang=\"") + language + QStringLiteral("\""));
+        const QString labelsScript = QStringLiteral("<script>window.ntI18n=%1;</script>")
+            .arg(QString::fromUtf8(QJsonDocument(labels).toJson(QJsonDocument::Compact)));
+        html.replace(QStringLiteral("<script src=\"chat-core.js\"></script>"),
+                     labelsScript + QStringLiteral("<script src=\"chat-core.js\"></script>"));
         messageView_->setHtml(html, QUrl(QStringLiteral("qrc:/html/")));
     } else {
         messageView_->setHtml(QStringLiteral("<html><body>Failed to load chat.html</body></html>"));
@@ -806,8 +826,8 @@ void ChatWidget::applyPinnedState(bool pinned)
     pinned_ = pinned;
     if (pinBtn_) {
         pinBtn_->setToolTip(pinned_
-            ? QStringLiteral("取消置顶")
-            : QStringLiteral("置顶窗口"));
+            ? QCoreApplication::translate("App", "取消置顶")
+            : QCoreApplication::translate("App", "置顶窗口"));
         if (pinBtn_->isChecked() != pinned_) {
             pinBtn_->setChecked(pinned_);
         }
@@ -870,7 +890,7 @@ void ChatWidget::refreshTitleBarButtons()
     maxBtn_->setIcon(colorizedIcon(isMaximized()
         ? QStringLiteral(":/images/icon_window_restore.png")
         : QStringLiteral(":/images/icon_window_maximize.png"), iconColor));
-    maxBtn_->setToolTip(isMaximized() ? QStringLiteral("还原") : QStringLiteral("最大化"));
+    maxBtn_->setToolTip(isMaximized() ? QCoreApplication::translate("App", "还原") : QCoreApplication::translate("App", "最大化"));
     maxBtn_->setStyleSheet(buildTitleButtonStyle(
         QStringLiteral("chatMaximizeButton"),
         normalBorder,
@@ -1041,7 +1061,7 @@ void ChatWidget::updateQueueDisplay()
 
     // 标题行：显示当前队列深度
     auto *header = new QLabel(
-        QStringLiteral("待发送  %1 / %2").arg(messageQueue_.size()).arg(kMaxQueueSize),
+        QCoreApplication::translate("App", "待发送  %1 / %2").arg(messageQueue_.size()).arg(kMaxQueueSize),
         queuePanel_);
     header->setStyleSheet(QStringLiteral("font-size:%1px; color:%2;")
         .arg(Util::scaleSize(11))
@@ -1057,8 +1077,8 @@ void ChatWidget::updateQueueDisplay()
         const bool hasImages = !item.images.isEmpty();
         const QString imagePrefix = hasImages
             ? (item.images.size() == 1
-                ? QStringLiteral("[图片]")
-                : QStringLiteral("[图片x%1]").arg(item.images.size()))
+                ? QCoreApplication::translate("App", "[图片]")
+                : QCoreApplication::translate("App", "[图片x%1]").arg(item.images.size()))
             : QString();
         const QString raw = !hasImages
             ? item.text
@@ -1091,7 +1111,7 @@ void ChatWidget::updateQueueDisplay()
         removeBtn->setText(QStringLiteral("×"));
         removeBtn->setCursor(Qt::PointingHandCursor);
         removeBtn->setFocusPolicy(Qt::NoFocus);
-        removeBtn->setToolTip(QStringLiteral("从队列移除"));
+        removeBtn->setToolTip(QCoreApplication::translate("App", "从队列移除"));
         removeBtn->setProperty("queueIndex", i);
         connect(removeBtn, &QToolButton::clicked, this, [this]() {
             auto *btn = qobject_cast<QToolButton *>(sender());

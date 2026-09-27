@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "modules/local_search/LocalSearchModule.h"
 
 #include "core/settings/SettingModel.h"
@@ -168,5 +169,5 @@ void LocalSearchModule::rebuildIndex()
 
 QString LocalSearchModule::statusText() const
 {
-    return service_ ? service_->statusText() : QStringLiteral("未初始化");
+    return service_ ? service_->statusText() : QCoreApplication::translate("App", "未初始化");
 }

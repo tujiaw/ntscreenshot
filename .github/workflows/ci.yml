@@ -35,7 +35,7 @@ jobs:
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
-          modules: 'qtpositioning qtwebchannel qtwebengine'
+          modules: 'qtpositioning qtwebchannel qtwebengine qttools'
           cache: true
 
       - name: Set up vcpkg

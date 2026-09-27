@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "LlmToolUtils.h"
 #include "ToolAbort.h"
 
@@ -40,7 +41,7 @@ QString truncateText(const QString &text, int maxChars, bool *truncatedOut)
     }
 
     QString result = text.left(maxChars);
-    result += QStringLiteral("\n\n[内容已截断]");
+    result += QCoreApplication::translate("App", "\n\n[内容已截断]");
     return result;
 }
 
@@ -136,7 +137,7 @@ QJsonObject parseArgumentsJson(const QString &argumentsJson, QString *errorOut)
     const QJsonDocument doc = QJsonDocument::fromJson(argumentsJson.toUtf8(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut) {
-            *errorOut = QStringLiteral("工具参数不是合法 JSON：%1").arg(parseError.errorString());
+            *errorOut = QCoreApplication::translate("App", "工具参数不是合法 JSON：%1").arg(parseError.errorString());
         }
         return {};
     }

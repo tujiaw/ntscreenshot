@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "SystemTray.h"
 #include <QtWidgets>
 #include "app/WindowManager.h"
@@ -11,39 +12,39 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
 {
     this->setIcon(QIcon(":/images/ntscreenshot.ico"));
     menu_ = new QMenu(parent);
-    screenshotAction_ = menu_->addAction(QStringLiteral("截屏"));
+    screenshotAction_ = menu_->addAction(QCoreApplication::translate("App", "截屏"));
     connect(screenshotAction_, &QAction::triggered, this, &SystemTray::onScreenshot);
 
-    pinAction_ = menu_->addAction(QStringLiteral("贴图"));
+    pinAction_ = menu_->addAction(QCoreApplication::translate("App", "贴图"));
     connect(pinAction_, &QAction::triggered, this, &SystemTray::onPin);
 
-    textSelectionAction_ = menu_->addAction(QStringLiteral("划词工具"));
+    textSelectionAction_ = menu_->addAction(QCoreApplication::translate("App", "划词工具"));
     connect(textSelectionAction_, &QAction::triggered, this, &SystemTray::onTextSelection);
 
-    chatAction_ = menu_->addAction(QStringLiteral("对话窗口"));
+    chatAction_ = menu_->addAction(QCoreApplication::translate("App", "对话窗口"));
     connect(chatAction_, &QAction::triggered, this, &SystemTray::onChatAction);
 
-    localSearchAction_ = menu_->addAction(QStringLiteral("本地快速搜索"));
+    localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "本地快速搜索"));
     connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
 
-    clipboardMenu_ = menu_->addMenu(QStringLiteral("剪切板"));
+    clipboardMenu_ = menu_->addMenu(QCoreApplication::translate("App", "剪切板"));
     clipboardAction_ = clipboardMenu_->menuAction();
     connect(clipboardMenu_, &QMenu::aboutToShow, this, &SystemTray::onClipboardMenuAboutToShow);
     if (clipboard_) {
         connect(clipboard_, &ClipboardLiteManager::wakeHotkeyChanged,
                 this, [this](const QString &hotkey) {
                 clipboardAction_->setText(hotkey.isEmpty()
-                                              ? QStringLiteral("剪切板")
-                                              : QStringLiteral("剪切板 %1").arg(hotkey));
+                                              ? QCoreApplication::translate("App", "剪切板")
+                                              : QCoreApplication::translate("App", "剪切板 %1").arg(hotkey));
                 });
     }
 
-    QAction *settingAction = menu_->addAction(QStringLiteral("设置"));
+    QAction *settingAction = menu_->addAction(QCoreApplication::translate("App", "设置"));
     connect(settingAction, &QAction::triggered, this, &SystemTray::onSetting);
 
     menu_->addSeparator();
 
-    QAction *exitAction = menu_->addAction(QStringLiteral("退出"));
+    QAction *exitAction = menu_->addAction(QCoreApplication::translate("App", "退出"));
     connect(exitAction, &QAction::triggered, this, &SystemTray::onExit);
 
     this->setContextMenu(menu_);
@@ -76,7 +77,7 @@ void SystemTray::onPin()
 
 void SystemTray::onChatAction()
 {
-    windowManager_->showLlmChatWindow(QStringLiteral("AI 对话"));
+    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"));
 }
 
 void SystemTray::onLocalSearch()
@@ -106,28 +107,28 @@ void SystemTray::onUpdate()
     const QString chatKey = windowManager_->setting()->chatGlobalKey();
     QStringList tips;
     tips << "ntscreenshot";
-    tips << QStringLiteral("版本v1.0.0");
-    tips << QStringLiteral("截图快捷键：%1").arg(windowManager_->setting()->screenhotGlobalKey());
-    tips << QStringLiteral("贴图快捷键：%1").arg(windowManager_->setting()->pinGlobalKey());
-    tips << QStringLiteral("贴图数目：%1").arg(windowManager_->allStickerCount());
+    tips << QCoreApplication::translate("App", "版本v1.0.0");
+    tips << QCoreApplication::translate("App", "截图快捷键：%1").arg(windowManager_->setting()->screenhotGlobalKey());
+    tips << QCoreApplication::translate("App", "贴图快捷键：%1").arg(windowManager_->setting()->pinGlobalKey());
+    tips << QCoreApplication::translate("App", "贴图数目：%1").arg(windowManager_->allStickerCount());
     if (!chatKey.isEmpty()) {
-        tips << QStringLiteral("对话窗口快捷键：%1").arg(chatKey);
+        tips << QCoreApplication::translate("App", "对话窗口快捷键：%1").arg(chatKey);
     }
     this->setToolTip(tips.join("\r\n"));
 
-    screenshotAction_->setText(QStringLiteral("截屏 %1").arg(windowManager_->setting()->screenhotGlobalKey()));
-    textSelectionAction_->setText(QStringLiteral("划词工具"));
+    screenshotAction_->setText(QCoreApplication::translate("App", "截屏 %1").arg(windowManager_->setting()->screenhotGlobalKey()));
+    textSelectionAction_->setText(QCoreApplication::translate("App", "划词工具"));
     MenuCheckMark::apply(textSelectionAction_, windowManager_->setting()->textSelectionEnabled());
-    pinAction_->setText(QStringLiteral("贴图 %1").arg(windowManager_->setting()->pinGlobalKey()));
+    pinAction_->setText(QCoreApplication::translate("App", "贴图 %1").arg(windowManager_->setting()->pinGlobalKey()));
     chatAction_->setText(chatKey.isEmpty()
-                             ? QStringLiteral("对话窗口")
-                             : QStringLiteral("对话窗口 %1").arg(chatKey));
+                             ? QCoreApplication::translate("App", "对话窗口")
+                             : QCoreApplication::translate("App", "对话窗口 %1").arg(chatKey));
     const QString searchKey = windowManager_->setting()->localSearchGlobalKey();
     localSearchAction_->setText(searchKey.isEmpty()
-                                    ? QStringLiteral("本地快速搜索")
-                                    : QStringLiteral("本地快速搜索 %1").arg(searchKey));
+                                    ? QCoreApplication::translate("App", "本地快速搜索")
+                                    : QCoreApplication::translate("App", "本地快速搜索 %1").arg(searchKey));
     const QString clipboardKey = clipboard_ ? clipboard_->ActiveShowHotkeyLabel() : QString();
     clipboardAction_->setText(clipboardKey.isEmpty()
-                                  ? QStringLiteral("剪切板")
-                                  : QStringLiteral("剪切板 %1").arg(clipboardKey));
+                                  ? QCoreApplication::translate("App", "剪切板")
+                                  : QCoreApplication::translate("App", "剪切板 %1").arg(clipboardKey));
 }

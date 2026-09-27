@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "TextSelectionToolbar.h"
 
 #include <QHBoxLayout>
@@ -437,7 +438,7 @@ void TextSelectionToolbar::rebuildActionButtons()
     actionLayout_->setContentsMargins(0, 0, 0, 0);
     actionLayout_->setSpacing(Util::scaleSize(2));
 
-    addActionButton(actionLayout_, QStringLiteral("copy"), QStringLiteral("复制"));
+    addActionButton(actionLayout_, QStringLiteral("copy"), QCoreApplication::translate("App", "复制"));
 
     const QList<TextSelectionActionConfig> effectiveActions = actions_;
     for (const TextSelectionActionConfig &action : effectiveActions) {
@@ -497,7 +498,7 @@ void TextSelectionToolbar::addChatInput(QHBoxLayout *layout)
     const int compactInputWidth = Util::scaleSize(80);
 
     chatInput_ = new QLineEdit(this);
-    chatInput_->setPlaceholderText(QStringLiteral("问问AI"));
+    chatInput_->setPlaceholderText(QCoreApplication::translate("App", "问问AI"));
     chatInput_->setMinimumWidth(compactInputWidth);
     chatInput_->setMaximumWidth(compactInputWidth);
     chatInput_->setFixedHeight(Util::scaleSize(28));

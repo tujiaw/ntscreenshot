@@ -138,7 +138,7 @@ QString trimmedUtf8Body(const QByteArray &body)
     QString text = QString::fromUtf8(body).trimmed();
     constexpr int kMaxErrorBodyChars = 4000;
     if (text.size() > kMaxErrorBodyChars) {
-        text = text.left(kMaxErrorBodyChars) + QStringLiteral("\n...（响应内容过长，已截断）");
+        text = text.left(kMaxErrorBodyChars) + QCoreApplication::translate("App", "\n...（响应内容过长，已截断）");
     }
     return text;
 }
@@ -194,18 +194,18 @@ QString formatNetworkReplyError(QNetworkReply *reply, const QByteArray &body)
     const QString providerMessage = extractErrorMessageFromBody(body);
 
     QStringList lines;
-    lines << QStringLiteral("大模型请求失败");
+    lines << QCoreApplication::translate("App", "大模型请求失败");
     if (httpStatus > 0) {
-        lines << QStringLiteral("HTTP 状态码：%1").arg(httpStatus);
+        lines << QCoreApplication::translate("App", "HTTP 状态码：%1").arg(httpStatus);
     }
     if (!networkError.isEmpty()) {
-        lines << QStringLiteral("网络错误：%1").arg(networkError);
+        lines << QCoreApplication::translate("App", "网络错误：%1").arg(networkError);
     }
     if (!providerMessage.isEmpty() && providerMessage != bodyText) {
-        lines << QStringLiteral("服务端错误：%1").arg(providerMessage);
+        lines << QCoreApplication::translate("App", "服务端错误：%1").arg(providerMessage);
     }
     if (!bodyText.isEmpty()) {
-        lines << QStringLiteral("服务端响应：\n%1").arg(bodyText);
+        lines << QCoreApplication::translate("App", "服务端响应：\n%1").arg(bodyText);
     }
     return lines.join(QLatin1Char('\n'));
 }
@@ -220,7 +220,7 @@ QString extractAssistantText(const QByteArray& responseData, QString* errorOut)
     const auto doc = QJsonDocument::fromJson(responseData, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut) {
-            *errorOut = QStringLiteral("响应不是合法 JSON：%1").arg(parseError.errorString());
+            *errorOut = QCoreApplication::translate("App", "响应不是合法 JSON：%1").arg(parseError.errorString());
         }
         return QString();
     }
@@ -231,7 +231,7 @@ QString extractAssistantText(const QByteArray& responseData, QString* errorOut)
         const auto errObj = root.value(KEY_ERROR).toObject();
         const auto msg = errObj.value(KEY_MESSAGE).toString();
         if (errorOut) {
-            *errorOut = msg.isEmpty() ? QStringLiteral("请求失败（error 字段存在但无 message）") : msg;
+            *errorOut = msg.isEmpty() ? QCoreApplication::translate("App", "请求失败（error 字段存在但无 message）") : msg;
         }
         return QString();
     }
@@ -239,7 +239,7 @@ QString extractAssistantText(const QByteArray& responseData, QString* errorOut)
     const auto choicesVal = root.value(KEY_CHOICES);
     if (!choicesVal.isArray() || choicesVal.toArray().isEmpty()) {
         if (errorOut) {
-            *errorOut = QStringLiteral("响应缺少 choices 或为空");
+            *errorOut = QCoreApplication::translate("App", "响应缺少 choices 或为空");
         }
         return QString();
     }
@@ -249,7 +249,7 @@ QString extractAssistantText(const QByteArray& responseData, QString* errorOut)
     const auto content = extractAssistantTextFromMessageObject(msgObj);
 
     if (content.isEmpty() && errorOut) {
-        *errorOut = QStringLiteral("响应 content 为空");
+        *errorOut = QCoreApplication::translate("App", "响应 content 为空");
     }
     return content;
 }
@@ -273,7 +273,7 @@ bool extractAssistantMessage(const QByteArray &responseData,
     const QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut) {
-            *errorOut = QStringLiteral("响应不是合法 JSON：%1").arg(parseError.errorString());
+            *errorOut = QCoreApplication::translate("App", "响应不是合法 JSON：%1").arg(parseError.errorString());
         }
         return false;
     }
@@ -281,7 +281,7 @@ bool extractAssistantMessage(const QByteArray &responseData,
     const QJsonObject root = doc.object();
     if (root.contains(KEY_ERROR) && root.value(KEY_ERROR).isObject()) {
         if (errorOut) {
-            *errorOut = root.value(KEY_ERROR).toObject().value(KEY_MESSAGE).toString(QStringLiteral("请求失败"));
+            *errorOut = root.value(KEY_ERROR).toObject().value(KEY_MESSAGE).toString(QCoreApplication::translate("App", "请求失败"));
         }
         return false;
     }
@@ -290,7 +290,7 @@ bool extractAssistantMessage(const QByteArray &responseData,
     if (choices.isEmpty()) {
         qWarning() << "LLM Protocol Warning: non-streaming response has empty choices";
         if (errorOut) {
-            *errorOut = QStringLiteral("响应缺少 choices 或为空");
+            *errorOut = QCoreApplication::translate("App", "响应缺少 choices 或为空");
         }
         return false;
     }
@@ -355,7 +355,7 @@ QString extractAssistantDeltaText(const QByteArray &chunkData, QString *errorOut
     const QJsonDocument doc = QJsonDocument::fromJson(chunkData, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut) {
-            *errorOut = QStringLiteral("流式响应不是合法 JSON：%1").arg(parseError.errorString());
+            *errorOut = QCoreApplication::translate("App", "流式响应不是合法 JSON：%1").arg(parseError.errorString());
         }
         return QString();
     }
@@ -363,7 +363,7 @@ QString extractAssistantDeltaText(const QByteArray &chunkData, QString *errorOut
     const QJsonObject root = doc.object();
     if (root.contains(KEY_ERROR) && root.value(KEY_ERROR).isObject()) {
         if (errorOut) {
-            *errorOut = root.value(KEY_ERROR).toObject().value(KEY_MESSAGE).toString(QStringLiteral("流式请求失败"));
+            *errorOut = root.value(KEY_ERROR).toObject().value(KEY_MESSAGE).toString(QCoreApplication::translate("App", "流式请求失败"));
         }
         return QString();
     }
@@ -532,7 +532,7 @@ void OpenAIChat::retryLastResponse()
 void OpenAIChat::sendMessage(const QString &message)
 {
     if (message.trimmed().isEmpty()) {
-        emit sigError(QStringLiteral("发送内容不能为空"));
+        emit sigError(QCoreApplication::translate("App", "发送内容不能为空"));
         return;
     }
 
@@ -549,15 +549,15 @@ void OpenAIChat::postConversation()
     const LlmProviderConfig provider = settings_->llmActiveProvider();
 
     if (provider.apiKey.isEmpty()) {
-        emit sigError(QStringLiteral("未配置 API Key：请在设置中配置。"));
+        emit sigError(QCoreApplication::translate("App", "未配置 API Key：请在设置中配置。"));
         return;
     }
     if (provider.apiBaseUrl.isEmpty()) {
-        emit sigError(QStringLiteral("未配置 API Base URL：请在设置中配置。"));
+        emit sigError(QCoreApplication::translate("App", "未配置 API Base URL：请在设置中配置。"));
         return;
     }
     if (provider.model.isEmpty()) {
-        emit sigError(QStringLiteral("未配置 Model：请在设置中配置。"));
+        emit sigError(QCoreApplication::translate("App", "未配置 Model：请在设置中配置。"));
         return;
     }
 
@@ -668,7 +668,7 @@ void OpenAIChat::postConversation()
 void OpenAIChat::sendImages(const QString &text, const QList<QPixmap> &images)
 {
     if (images.isEmpty()) {
-        emit sigError(QStringLiteral("图片为空，无法发送"));
+        emit sigError(QCoreApplication::translate("App", "图片为空，无法发送"));
         return;
     }
 
@@ -705,7 +705,7 @@ void OpenAIChat::sendImages(const QString &text, const QList<QPixmap> &images)
     }
 
     if (validImageCount == 0) {
-        emit sigError(QStringLiteral("图片处理失败"));
+        emit sigError(QCoreApplication::translate("App", "图片处理失败"));
         return;
     }
 
@@ -720,7 +720,7 @@ void OpenAIChat::sendImages(const QString &text, const QList<QPixmap> &images)
 void OpenAIChat::sendImage(const QString &text, const QPixmap &image)
 {
     if (image.isNull()) {
-        emit sigError(QStringLiteral("图片为空，无法发送"));
+        emit sigError(QCoreApplication::translate("App", "图片为空，无法发送"));
         return;
     }
 
@@ -1001,7 +1001,7 @@ void OpenAIChat::handleNonStreamingReply(const QByteArray &responseData)
                        << "finish_reason =" << (finishReason.isEmpty() ? QStringLiteral("[empty]") : finishReason)
                        << ", message_keys =" << messageObject.keys();
             qDebug() << "LLM Response Error: 响应 content 为空";
-            emit sigError(QStringLiteral("响应 content 为空"));
+            emit sigError(QCoreApplication::translate("App", "响应 content 为空"));
         }
     }
 }
@@ -1035,7 +1035,7 @@ void OpenAIChat::handleActiveReplyTimeout()
         return;
     }
 
-    activeReplyTimeoutReason_ = QStringLiteral("请求超时：大模型在限定时间内未完成响应");
+    activeReplyTimeoutReason_ = QCoreApplication::translate("App", "请求超时：大模型在限定时间内未完成响应");
     qDebug() << "LLM Request Timeout:" << activeReplyTimeoutReason_;
     activeReply_->abort();
 }
@@ -1046,7 +1046,7 @@ void OpenAIChat::handleStreamIdleTimeout()
         return;
     }
 
-    activeReplyTimeoutReason_ = QStringLiteral("流式响应超时：长时间未收到新的返回数据");
+    activeReplyTimeoutReason_ = QCoreApplication::translate("App", "流式响应超时：长时间未收到新的返回数据");
     qDebug() << "LLM Stream Idle Timeout:" << activeReplyTimeoutReason_;
     activeReply_->abort();
 }

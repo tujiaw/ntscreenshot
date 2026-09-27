@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "ConversationHistory.h"
 
 #include <QJsonArray>
@@ -35,7 +36,7 @@ QString extractText(const QJsonValue &contentVal)
                 parts.append(text);
             }
         } else if (type == QLatin1String(kImageUrl)) {
-            parts.append(QStringLiteral("[图片]"));
+            parts.append(QCoreApplication::translate("App", "[图片]"));
         }
     }
     return parts.join(QLatin1Char(' '));
@@ -60,7 +61,7 @@ QJsonValue stripImageContent(const QJsonValue &contentVal)
     if (sawImage) {
         QJsonObject placeholder;
         placeholder.insert(QLatin1String(kType), QLatin1String(kText));
-        placeholder.insert(QLatin1String(kText), QStringLiteral("[图片]"));
+        placeholder.insert(QLatin1String(kText), QCoreApplication::translate("App", "[图片]"));
         stripped.prepend(placeholder);
     }
     if (stripped.size() == 1 && stripped.at(0).toObject().value(QLatin1String(kType)).toString() == QLatin1String(kText)) {
@@ -133,7 +134,7 @@ QString messageToSummaryChunk(const QJsonObject &message)
         if (!message.value(QLatin1String(kToolCalls)).toArray().isEmpty()) {
             body = QStringLiteral("[assistant tool_calls]");
         } else {
-            body = QStringLiteral("(无正文)");
+            body = QCoreApplication::translate("App", "(无正文)");
         }
     }
     const QString label = role.isEmpty() ? QStringLiteral("unknown") : role;

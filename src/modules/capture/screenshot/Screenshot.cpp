@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "Screenshot.h"
 #include "modules/capture/annotation/DrawPanel.h"
 #include "modules/capture/screenshot/ScreenshotActionController.h"
@@ -411,7 +412,7 @@ void ScreenshotWidget::initDrawPanel(void)
             }
             const QVector<CodeScanResult> results = CodeScanner::scan(captureSelection().toImage());
             if (results.isEmpty()) {
-                drawPanel_->showToolMessage(QStringLiteral("未识别到二维码/条码"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "未识别到二维码/条码"), true);
                 return;
             }
 
@@ -426,8 +427,8 @@ void ScreenshotWidget::initDrawPanel(void)
             const QString text = parts.join(QLatin1Char('\n'));
             QApplication::clipboard()->setText(text);
             const QString title = results.size() > 1
-                ? QStringLiteral("识别成功（%1 条，已复制）").arg(results.size())
-                : QStringLiteral("识别成功（已复制）");
+                ? QCoreApplication::translate("App", "识别成功（%1 条，已复制）").arg(results.size())
+                : QCoreApplication::translate("App", "识别成功（已复制）");
             drawPanel_->showToolMessage(title + QLatin1Char('\n') + text, false);
         });
 
@@ -438,11 +439,11 @@ void ScreenshotWidget::initDrawPanel(void)
             QImage src = captureSelection().toImage();
             QImage out = ImageEnhance::apply(src, static_cast<ImageEnhance::Preset>(preset));
             if (out.isNull()) {
-                drawPanel_->showToolMessage(QStringLiteral("图像增强失败"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "图像增强失败"), true);
                 return;
             }
             drawPanel_->drawer()->replaceWithBitmap(out, currentRect_);
-            drawPanel_->showToolMessage(QStringLiteral("已应用图像增强"), false);
+            drawPanel_->showToolMessage(QCoreApplication::translate("App", "已应用图像增强"), false);
         });
 
         connect(drawPanel_.get(), &DrawPanel::sigSmartMask, this, [this, captureSelection]() {
@@ -451,16 +452,16 @@ void ScreenshotWidget::initDrawPanel(void)
             }
             QImage src = captureSelection().toImage();
             if (SmartMask::detectRegions(src).isEmpty()) {
-                drawPanel_->showToolMessage(QStringLiteral("未检测到可打码区域"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "未检测到可打码区域"), true);
                 return;
             }
             QImage out = SmartMask::autoMask(src);
             if (out.isNull()) {
-                drawPanel_->showToolMessage(QStringLiteral("未检测到可打码区域"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "未检测到可打码区域"), true);
                 return;
             }
             drawPanel_->drawer()->replaceWithBitmap(out, currentRect_);
-            drawPanel_->showToolMessage(QStringLiteral("已智能打码"), false);
+            drawPanel_->showToolMessage(QCoreApplication::translate("App", "已智能打码"), false);
         });
 
         connect(drawPanel_.get(), &DrawPanel::sigAutoCrop, this, [this, captureSelection]() {
@@ -470,7 +471,7 @@ void ScreenshotWidget::initDrawPanel(void)
             QImage src = captureSelection().toImage();
             const QRect content = ImageUtil::DetectContentRectAdaptive(src);
             if (!content.isValid() || content.size() == src.size()) {
-                drawPanel_->showToolMessage(QStringLiteral("无需裁边"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "无需裁边"), true);
                 return;
             }
             QImage cropped = src.copy(content);
@@ -485,7 +486,7 @@ void ScreenshotWidget::initDrawPanel(void)
             currentRect_ = newRect;
             onSelectedScreenSizeChanged(newRect.width(), newRect.height());
             update();
-            drawPanel_->showToolMessage(QStringLiteral("已自动裁边"), false);
+            drawPanel_->showToolMessage(QCoreApplication::translate("App", "已自动裁边"), false);
         });
 
         connect(drawPanel_.get(), &DrawPanel::sigExtractColors, this, [this, captureSelection]() {
@@ -494,7 +495,7 @@ void ScreenshotWidget::initDrawPanel(void)
             }
             const QVector<QColor> colors = ImageUtil::DominantColors(captureSelection().toImage(), 5);
             if (colors.isEmpty()) {
-                drawPanel_->showToolMessage(QStringLiteral("未能提取主色"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "未能提取主色"), true);
                 return;
             }
             QStringList hexes;
@@ -503,13 +504,13 @@ void ScreenshotWidget::initDrawPanel(void)
             }
             const QString text = hexes.join(QLatin1Char(' '));
             QApplication::clipboard()->setText(text);
-            drawPanel_->showToolMessage(QStringLiteral("主色已复制") + QLatin1Char('\n') + text, false);
+            drawPanel_->showToolMessage(QCoreApplication::translate("App", "主色已复制") + QLatin1Char('\n') + text, false);
         });
 
         // Initialize menu
         menu_ = new QMenu(this);
 
-        menu_->addAction(QStringLiteral("完成"), this, [this]() {
+        menu_->addAction(QCoreApplication::translate("App", "完成"), this, [this]() {
             QPixmap pixmap = originScreen_->copy(currentRect_);
             if (drawPanel_) {
                 drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
@@ -517,7 +518,7 @@ void ScreenshotWidget::initDrawPanel(void)
             emit actionController_->onSaveToClipboardRequested(pixmap);
         }, QKeySequence("Ctrl+C"));
         
-        menu_->addAction(QStringLiteral("保存"), this, [this]() {
+        menu_->addAction(QCoreApplication::translate("App", "保存"), this, [this]() {
             QPixmap pixmap = originScreen_->copy(currentRect_);
             if (drawPanel_) {
                 drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
@@ -525,7 +526,7 @@ void ScreenshotWidget::initDrawPanel(void)
             emit actionController_->onSaveRequested(pixmap);
         }, QKeySequence("Ctrl+S"));
         
-        menu_->addAction(QStringLiteral("贴图"), this, [this]() {
+        menu_->addAction(QCoreApplication::translate("App", "贴图"), this, [this]() {
             QPixmap pixmap = originScreen_->copy(currentRect_);
             if (drawPanel_) {
                 drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
@@ -533,25 +534,25 @@ void ScreenshotWidget::initDrawPanel(void)
             emit actionController_->onStickerRequested(pixmap, currentRect_.topLeft());
         }, QKeySequence(PIN_KEY));
         
-        menu_->addAction(QStringLiteral("撤销"), drawPanel_->drawer(), &Drawer::undo, QKeySequence("Ctrl+Z"));
+        menu_->addAction(QCoreApplication::translate("App", "撤销"), drawPanel_->drawer(), &Drawer::undo, QKeySequence("Ctrl+Z"));
         
-        menu_->addAction(QStringLiteral("截长图"), this, [this]() {
+        menu_->addAction(QCoreApplication::translate("App", "截长图"), this, [this]() {
             this->onLongScreenshotRequested(currentRect_);
         });
 
-        menu_->addAction(QStringLiteral("录制 GIF"), this, [this]() {
+        menu_->addAction(QCoreApplication::translate("App", "录制 GIF"), this, [this]() {
             this->onGifRecordingRequested(currentRect_);
         });
 
         if (windowManager_->setting()->paddleOcrConfig().enabled) {
-            menu_->addAction(QStringLiteral("OCR 识别"),
+            menu_->addAction(QCoreApplication::translate("App", "OCR 识别"),
                              this, &ScreenshotWidget::recognizeSelection);
         }
         
         {
             auto *s = windowManager_->setting();
             if (!s->gitHubImageBedConfig().token.isEmpty()) {
-                menu_->addAction(QStringLiteral("上传图床"), this, [this]() {
+                menu_->addAction(QCoreApplication::translate("App", "上传图床"), this, [this]() {
                     QPixmap pixmap = originScreen_->copy(currentRect_);
                     if (drawPanel_) {
                         drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
@@ -562,7 +563,7 @@ void ScreenshotWidget::initDrawPanel(void)
         }
 
         menu_->addSeparator();
-        menu_->addAction(QStringLiteral("退出"), this, &ScreenshotWidget::sigClose);
+        menu_->addAction(QCoreApplication::translate("App", "退出"), this, &ScreenshotWidget::sigClose);
     }
 }
 
@@ -572,30 +573,30 @@ void ScreenshotWidget::recognizeSelection()
 
     const PaddleOcrConfig config = windowManager_->setting()->paddleOcrConfig();
     if (!config.enabled) {
-        drawPanel_->showToolMessage(QStringLiteral("请先在设置 / 图片中启用 OCR"), true);
+        drawPanel_->showToolMessage(QCoreApplication::translate("App", "请先在设置 / 图片中启用 OCR"), true);
         return;
     }
 
     QPixmap pixmap = originScreen_->copy(currentRect_);
     drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
     if (pixmap.isNull()) {
-        drawPanel_->showToolMessage(QStringLiteral("OCR 失败：截图数据为空"), true);
+        drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 失败：截图数据为空"), true);
         return;
     }
 
-    drawPanel_->showToolMessage(QStringLiteral("OCR 识别中…"), false);
+    drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 识别中…"), false);
     auto* client = new PaddleOcrClient(this);
     connect(client, &PaddleOcrClient::succeeded, this, [this, client](const QString& text) {
         QApplication::clipboard()->setText(text);
         if (drawPanel_) {
             drawPanel_->showToolMessage(
-                QStringLiteral("OCR 识别成功，文本已复制到剪切板"), false);
+                QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板"), false);
         }
         client->deleteLater();
     });
     connect(client, &PaddleOcrClient::failed, this, [this, client](const QString& error) {
         if (drawPanel_) {
-            drawPanel_->showToolMessage(QStringLiteral("OCR 失败：%1").arg(error), true);
+            drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 失败：%1").arg(error), true);
         }
         client->deleteLater();
     });

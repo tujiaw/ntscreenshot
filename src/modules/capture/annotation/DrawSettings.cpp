@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "DrawSettings.h"
 #include <QComboBox>
 #include <QFrame>
@@ -30,7 +31,7 @@ public:
         setCheckable(true);
         setCursor(Qt::PointingHandCursor);
         setProperty("value", value);
-        setToolTip(QStringLiteral("线宽 %1").arg(value));
+        setToolTip(QCoreApplication::translate("App", "线宽 %1").arg(value));
     }
 
 protected:
@@ -161,13 +162,13 @@ DrawSettings::DrawSettings(QWidget *parent)
     sizeList_->addItems(QStringList()
                         << "8" << "9" << "10" << "11" << "12" << "14" << "16" << "18" << "20" << "22");
     sizeList_->setCurrentText(QString::number(s_fontSize));
-    sizeList_->setToolTip(QStringLiteral("字号"));
+    sizeList_->setToolTip(QCoreApplication::translate("App", "字号"));
     connect(sizeList_, &QComboBox::currentTextChanged, this, &DrawSettings::onFontSizeChanged);
 
     // 当前颜色（点击打开自定义颜色对话框）
     pbCurrentColor_ = new QPushButton(this);
     pbCurrentColor_->setCursor(Qt::PointingHandCursor);
-    pbCurrentColor_->setToolTip(QStringLiteral("自定义颜色"));
+    pbCurrentColor_->setToolTip(QCoreApplication::translate("App", "自定义颜色"));
     connect(pbCurrentColor_, &QPushButton::clicked, this, &DrawSettings::onCurrentColor);
 
     // 预设颜色（两排 8 色）
@@ -181,8 +182,8 @@ DrawSettings::DrawSettings(QWidget *parent)
         colorBtns_.push_back(btn);
     }
 
-    penWidthLabel_ = makeLabel(QStringLiteral("线宽"));
-    colorLabel_ = makeLabel(QStringLiteral("颜色"));
+    penWidthLabel_ = makeLabel(QCoreApplication::translate("App", "线宽"));
+    colorLabel_ = makeLabel(QCoreApplication::translate("App", "颜色"));
 
     // 线宽分段控件背景容器
     auto *penWidthContainer = new QWidget(this);

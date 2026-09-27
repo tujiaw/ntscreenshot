@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "modules/local_search/ui/LocalSearchWidget.h"
 
 #include "core/platform/Util.h"
@@ -342,8 +343,8 @@ QString bookmarkGroupLabel(const QString& parentPath)
                               .split(QStringLiteral(" / "), Qt::SkipEmptyParts);
     if (!folders.isEmpty()) {
         const QString root = folders.first().trimmed();
-        if (root.compare(QStringLiteral("书签栏"), Qt::CaseInsensitive) == 0
-            || root.compare(QStringLiteral("收藏夹栏"), Qt::CaseInsensitive) == 0
+        if (root.compare(QCoreApplication::translate("App", "书签栏"), Qt::CaseInsensitive) == 0
+            || root.compare(QCoreApplication::translate("App", "收藏夹栏"), Qt::CaseInsensitive) == 0
             || root.compare(QStringLiteral("Bookmarks bar"), Qt::CaseInsensitive) == 0
             || root.compare(QStringLiteral("Favorites bar"), Qt::CaseInsensitive) == 0) {
             folders.removeFirst();
@@ -395,7 +396,7 @@ QIcon searchEngineFallbackIcon(const QString& engineId, int size)
         letter = QStringLiteral("B");
     } else if (engineId == QStringLiteral("baidu")) {
         bg = QColor(0x29, 0x3A, 0xED);
-        letter = QStringLiteral("百");
+        letter = QCoreApplication::translate("App", "百");
     } else if (engineId == QStringLiteral("duckduckgo")) {
         bg = QColor(0xDE, 0x58, 0x33);
         letter = QStringLiteral("D");
@@ -404,10 +405,10 @@ QIcon searchEngineFallbackIcon(const QString& engineId, int size)
         letter = QStringLiteral("P");
     } else if (engineId == QStringLiteral("metaso")) {
         bg = QColor(0x10, 0xB9, 0x81);
-        letter = QStringLiteral("秘");
+        letter = QCoreApplication::translate("App", "秘");
     } else if (engineId == QStringLiteral("tiangong")) {
         bg = QColor(0x25, 0x63, 0xEB);
-        letter = QStringLiteral("天");
+        letter = QCoreApplication::translate("App", "天");
     } else {
         bg = QApplication::palette().color(QPalette::Mid);
         letter = QStringLiteral("?");
@@ -527,7 +528,7 @@ LocalSearchWidget::LocalSearchWidget(std::shared_ptr<SearchAggregator> aggregato
     setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
     setObjectName(QStringLiteral("LocalSearchLauncher"));
-    setWindowTitle(QStringLiteral("本地搜索"));
+    setWindowTitle(QCoreApplication::translate("App", "本地搜索"));
     rootLayout_ = new QVBoxLayout(this);
     rootLayout_->setContentsMargins(scaled(kShadowPad + kInnerPad),
                                     scaled(kShadowPad + kInnerPad),
@@ -540,7 +541,7 @@ LocalSearchWidget::LocalSearchWidget(std::shared_ptr<SearchAggregator> aggregato
     setMinimumHeight(compactHeight());
 
     query_ = new QLineEdit(this);
-    query_->setPlaceholderText(QStringLiteral("搜索文件、目录、应用或书签…"));
+    query_->setPlaceholderText(QCoreApplication::translate("App", "搜索文件、目录、应用或书签…"));
     query_->setClearButtonEnabled(false);
     query_->setFixedHeight(scaled(kQueryHeight));
     query_->setFrame(false);
@@ -610,7 +611,7 @@ LocalSearchWidget::LocalSearchWidget(std::shared_ptr<SearchAggregator> aggregato
     footerDivider->setFixedHeight(qMax(1, scaled(1)));
     resultsLayout_->addWidget(footerDivider);
     footerHint_ = new QLabel(
-        QStringLiteral("↑↓ 选择    Enter 打开    Shift+Enter 更多    < 网络搜索"),
+        QCoreApplication::translate("App", "↑↓ 选择    Enter 打开    Shift+Enter 更多    < 网络搜索"),
         resultsPanel_);
     footerHint_->setObjectName(QStringLiteral("localSearchFooter"));
     footerHint_->setFixedHeight(scaled(28));
@@ -929,10 +930,10 @@ void LocalSearchWidget::showResults(const QVector<SearchResult>& results)
     }
     for (const SearchResult& result : currentResults_) {
         QString type;
-        if (result.type == SearchItemType::Application) type = QStringLiteral("应用");
-        else if (result.type == SearchItemType::Bookmark) type = QStringLiteral("书签");
-        else if (result.type == SearchItemType::Directory) type = QStringLiteral("目录");
-        else type = QStringLiteral("文件");
+        if (result.type == SearchItemType::Application) type = QCoreApplication::translate("App", "应用");
+        else if (result.type == SearchItemType::Bookmark) type = QCoreApplication::translate("App", "书签");
+        else if (result.type == SearchItemType::Directory) type = QCoreApplication::translate("App", "目录");
+        else type = QCoreApplication::translate("App", "文件");
         const QString bookmarkGroup = result.type == SearchItemType::Bookmark
             ? bookmarkGroupLabel(result.parentPath) : QString();
         const QString metadata = bookmarkGroup.isEmpty()
@@ -969,7 +970,7 @@ void LocalSearchWidget::showResults(const QVector<SearchResult>& results)
     setResultsVisible(!currentResults_.isEmpty());
     resultCount_->setText(currentResults_.isEmpty()
                               ? QString()
-                              : QStringLiteral("找到 %1 项").arg(currentResults_.size()));
+                              : QCoreApplication::translate("App", "找到 %1 项").arg(currentResults_.size()));
     results_->setUpdatesEnabled(true);
     results_->viewport()->update();
 }
@@ -1205,7 +1206,7 @@ void LocalSearchWidget::showSearchEngines(const QString& query)
             item->setData(Qt::UserRole, idx);
             item->setData(NameRole, engine.name);
             item->setData(PathRole, engine.slogan);
-            item->setData(MetadataRole, QStringLiteral("搜索引擎"));
+            item->setData(MetadataRole, QCoreApplication::translate("App", "搜索引擎"));
             item->setSizeHint(QSize(0, scaled(46)));
         }
 
@@ -1224,8 +1225,8 @@ void LocalSearchWidget::showSearchEngines(const QString& query)
     showingEngines_ = true;
     setResultsVisible(results_->count() > 0);
     resultCount_->setText(terms.isEmpty()
-        ? QStringLiteral("选择引擎并输入关键词")
-        : QStringLiteral("回车搜索"));
+        ? QCoreApplication::translate("App", "选择引擎并输入关键词")
+        : QCoreApplication::translate("App", "回车搜索"));
 }
 
 int LocalSearchWidget::compactHeight() const
@@ -1298,7 +1299,7 @@ void LocalSearchWidget::openCurrent()
     const QString target = result->launchTarget.isEmpty() ? result->path : result->launchTarget;
     if (result->type == SearchItemType::Bookmark) {
         if (!QDesktopServices::openUrl(QUrl(target))) {
-            resultCount_->setText(QStringLiteral("无法使用默认浏览器打开书签"));
+            resultCount_->setText(QCoreApplication::translate("App", "无法使用默认浏览器打开书签"));
             return;
         }
         store_->recordLaunch(result->id);
@@ -1310,7 +1311,7 @@ void LocalSearchWidget::openCurrent()
         (target.startsWith(QStringLiteral("shell:"), Qt::CaseInsensitive) ||
          !QFileInfo::exists(target))) {
         if (!QProcess::startDetached(QStringLiteral("explorer.exe"), {target})) {
-            resultCount_->setText(QStringLiteral("无法启动应用"));
+            resultCount_->setText(QCoreApplication::translate("App", "无法启动应用"));
             return;
         }
         store_->recordLaunch(result->id);
@@ -1319,7 +1320,7 @@ void LocalSearchWidget::openCurrent()
     }
 #endif
     if (!QDesktopServices::openUrl(QUrl::fromLocalFile(target))) {
-        resultCount_->setText(QStringLiteral("无法打开，索引已标记为需要刷新"));
+        resultCount_->setText(QCoreApplication::translate("App", "无法打开，索引已标记为需要刷新"));
         return;
     }
     store_->recordLaunch(result->id);
@@ -1354,7 +1355,7 @@ bool LocalSearchWidget::runCurrentAsAdmin()
     if (!result || !canRunAsAdmin(*result)) return false;
     const QString target = result->launchTarget.isEmpty() ? result->path : result->launchTarget;
     if (!Util::shellExecute(target, QStringLiteral("runas"))) {
-        resultCount_->setText(QStringLiteral("无法以管理员身份运行"));
+        resultCount_->setText(QCoreApplication::translate("App", "无法以管理员身份运行"));
         return false;
     }
     store_->recordLaunch(result->id);
@@ -1367,7 +1368,7 @@ bool LocalSearchWidget::openCurrentInTerminal()
     if (!result || result->type == SearchItemType::Bookmark) return false;
     const QString directory = terminalDirectoryFor(*result);
     if (directory.isEmpty() || !QDir(directory).exists()) {
-        resultCount_->setText(QStringLiteral("无法打开终端：目录不存在"));
+        resultCount_->setText(QCoreApplication::translate("App", "无法打开终端：目录不存在"));
         return false;
     }
 #ifdef Q_OS_WIN
@@ -1381,7 +1382,7 @@ bool LocalSearchWidget::openCurrentInTerminal()
                                 {QStringLiteral("/k"), command})) {
         return true;
     }
-    resultCount_->setText(QStringLiteral("无法打开终端"));
+    resultCount_->setText(QCoreApplication::translate("App", "无法打开终端"));
     return false;
 #else
     if (QProcess::startDetached(QStringLiteral("x-terminal-emulator"),
@@ -1390,7 +1391,7 @@ bool LocalSearchWidget::openCurrentInTerminal()
                                    {QStringLiteral("--working-directory"), directory})) {
         return true;
     }
-    resultCount_->setText(QStringLiteral("无法打开终端"));
+    resultCount_->setText(QCoreApplication::translate("App", "无法打开终端"));
     return false;
 #endif
 }
@@ -1439,7 +1440,7 @@ void LocalSearchWidget::setCurrentEngineDefault()
     const auto& engine = engines[engineIdx];
     setWebSearchEngine(engine.baseUrl, engine.queryParam);
     emit requestSetWebSearchEngine(engine.id);
-    resultCount_->setText(QStringLiteral("已设为默认：%1").arg(engine.name));
+    resultCount_->setText(QCoreApplication::translate("App", "已设为默认：%1").arg(engine.name));
 }
 
 void LocalSearchWidget::addContextAction(const QString& text, const QIcon& icon, int actionId)
@@ -1464,16 +1465,16 @@ void LocalSearchWidget::showContextMenu()
 
         const auto& engine = engines[engineIdx];
         const QString terms = webSearchTerms(query_->text());
-        addContextAction(QStringLiteral("打开主页"),
+        addContextAction(QCoreApplication::translate("App", "打开主页"),
                          contextActionIcon(QStringLiteral("ctx_open.png")),
                          ActionOpenEngineHome);
         addContextAction(terms.isEmpty()
-                             ? QStringLiteral("复制主页链接")
-                             : QStringLiteral("复制搜索链接"),
+                             ? QCoreApplication::translate("App", "复制主页链接")
+                             : QCoreApplication::translate("App", "复制搜索链接"),
                          contextActionIcon(QStringLiteral("ctx_copy.png")),
                          ActionCopyEngineUrl);
         if (engine.baseUrl != webSearchUrl_) {
-            addContextAction(QStringLiteral("设为默认搜索引擎"),
+            addContextAction(QCoreApplication::translate("App", "设为默认搜索引擎"),
                              contextActionIcon(QStringLiteral("ok.png")),
                              ActionSetDefaultEngine);
         }
@@ -1481,26 +1482,26 @@ void LocalSearchWidget::showContextMenu()
         const SearchResult* result = currentResult();
         if (!result) return;
 
-        addContextAction(QStringLiteral("打开"),
+        addContextAction(QCoreApplication::translate("App", "打开"),
                          contextActionIcon(QStringLiteral("ctx_open.png")),
                          ActionOpen);
         addContextAction(result->type == SearchItemType::Bookmark
-                             ? QStringLiteral("复制链接")
-                             : QStringLiteral("复制完整路径"),
+                             ? QCoreApplication::translate("App", "复制链接")
+                             : QCoreApplication::translate("App", "复制完整路径"),
                          contextActionIcon(QStringLiteral("ctx_copy.png")),
                          ActionCopyPath);
 
         if (result->type != SearchItemType::Bookmark) {
-            addContextAction(QStringLiteral("在资源管理器中定位"),
+            addContextAction(QCoreApplication::translate("App", "在资源管理器中定位"),
                              contextActionIcon(QStringLiteral("ctx_folder.png")),
                              ActionLocate);
             addContextAction(result->type == SearchItemType::Directory
-                                 ? QStringLiteral("在终端中打开")
-                                 : QStringLiteral("在终端中打开所在目录"),
+                                 ? QCoreApplication::translate("App", "在终端中打开")
+                                 : QCoreApplication::translate("App", "在终端中打开所在目录"),
                              contextActionIcon(QStringLiteral("ctx_terminal.png")),
                              ActionOpenTerminal);
             if (canRunAsAdmin(*result)) {
-                addContextAction(QStringLiteral("以管理员身份运行"),
+                addContextAction(QCoreApplication::translate("App", "以管理员身份运行"),
                                  contextActionIcon(QStringLiteral("shield.png")),
                                  ActionRunAsAdmin);
             }

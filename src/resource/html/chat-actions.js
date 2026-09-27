@@ -3,12 +3,13 @@
   const state = ChatApp.state;
   const icons = ChatApp.icons;
   const helpers = ChatApp.helpers;
+  const i18n = global.ntI18n || {};
 
   function makeCopyButton(getText) {
     const btn = document.createElement('button');
     btn.className = 'msg-action-btn msg-copy-btn';
     btn.innerHTML = icons.copy;
-    btn.title = '复制';
+    btn.title = i18n.copy || '复制';
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       helpers.copyTextToClipboard(getText(), function () {
@@ -28,7 +29,7 @@
     btn.className = 'msg-action-btn code-copy-btn';
     btn.type = 'button';
     btn.innerHTML = icons.copy;
-    btn.title = '复制代码';
+    btn.title = i18n.copyCode || '复制代码';
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       const pre = btn.parentElement;
@@ -50,7 +51,7 @@
     const btn = document.createElement('button');
     btn.className = 'msg-action-btn msg-retry-btn';
     btn.innerHTML = icons.retry;
-    btn.title = '重新生成';
+    btn.title = i18n.retry || '重新生成';
     if (state.isPending) {
       btn.disabled = true;
     }
@@ -73,7 +74,7 @@
 
   function syncToggleButton(button, expanded) {
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    button.title = expanded ? '收起' : '展开';
+    button.title = expanded ? (i18n.collapse || '收起') : (i18n.expand || '展开');
     button.innerHTML = expanded ? icons.chevronUp : icons.chevronDown;
   }
 

@@ -63,6 +63,9 @@ public:
 
     void revertDefault();
 
+    QString uiLanguage() const;
+    void setUiLanguage(const QString& language);
+
     void setAutoStart(bool isAutoStart);
     bool autoStart() const;
 

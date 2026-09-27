@@ -16,6 +16,7 @@ static const QString REG_RUN = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\
 
 // [General] 节 —— 通用设置
 static const QString KEY_SCREENSHOT     = "SCREENSHOT_GLOBAL_KEY";
+static const QString KEY_UI_LANGUAGE    = "UI_LANGUAGE";
 static const QString KEY_PIN            = "PIN_GLOBAL_KEY";
 static const QString KEY_TEXT_SELECTION = "TEXT_SELECTION_GLOBAL_KEY";
 static const QString KEY_CHAT           = "CHAT_GLOBAL_KEY";
@@ -101,9 +102,9 @@ static QString textSelectionActionKey(int index, const char *field)
 static QList<TextSelectionActionConfig> defaultTextSelectionActions()
 {
     return {
-        { QStringLiteral("ask_ai"),    QStringLiteral("AI 搜索"), QStringLiteral("请基于以上文本进行搜索和解释。") },
-        { QStringLiteral("explain"),   QStringLiteral("解释"),     QStringLiteral("请解释以上文本。") },
-        { QStringLiteral("translate"), QStringLiteral("翻译"),     QStringLiteral("请翻译以上文本，并给出简短说明。") }
+        { QStringLiteral("ask_ai"),    QCoreApplication::translate("App", "AI 搜索"), QCoreApplication::translate("App", "请基于以上文本进行搜索和解释。") },
+        { QStringLiteral("explain"),   QCoreApplication::translate("App", "解释"),     QCoreApplication::translate("App", "请解释以上文本。") },
+        { QStringLiteral("translate"), QCoreApplication::translate("App", "翻译"),     QCoreApplication::translate("App", "请翻译以上文本，并给出简短说明。") }
     };
 }
 
@@ -158,6 +159,7 @@ SettingModel::~SettingModel() {}
 void SettingModel::revertDefault()
 {
     setAutoStart(false);
+    setUiLanguage(QStringLiteral("en"));
     setScreenshotGlobalKey("F5");
     setPinGlobalKey("F6");
     setTextSelectionGlobalKey(QString());
@@ -244,6 +246,18 @@ bool SettingModel::autoStart() const
 #else
     return false;
 #endif
+}
+
+QString SettingModel::uiLanguage() const
+{
+    const QString language = settings_.value(KEY_UI_LANGUAGE, QStringLiteral("en")).toString();
+    return language == QStringLiteral("zh") ? language : QStringLiteral("en");
+}
+
+void SettingModel::setUiLanguage(const QString& language)
+{
+    settings_.setValue(KEY_UI_LANGUAGE,
+                       language == QStringLiteral("zh") ? QStringLiteral("zh") : QStringLiteral("en"));
 }
 
 void SettingModel::setScreenshotGlobalKey(const QString &key)
@@ -447,25 +461,25 @@ void SettingModel::setLocalSearchPinyinEnabled(bool enabled)
 QVector<WebSearchEngine> SettingModel::localSearchWebEngines()
 {
     return {
-        {QStringLiteral("bing"), QStringLiteral("Bing"), QStringLiteral("微软必应搜索"),
+        {QStringLiteral("bing"), QStringLiteral("Bing"), QCoreApplication::translate("App", "微软必应搜索"),
          QStringLiteral("https://www.bing.com/search"), QStringLiteral("q"),
          QStringLiteral(":/icons/bing.ico")},
-        {QStringLiteral("google"), QStringLiteral("Google"), QStringLiteral("全球最大的搜索引擎"),
+        {QStringLiteral("google"), QStringLiteral("Google"), QCoreApplication::translate("App", "全球最大的搜索引擎"),
          QStringLiteral("https://www.google.com/search"), QStringLiteral("q"),
          QStringLiteral(":/icons/google.ico")},
-        {QStringLiteral("baidu"), QStringLiteral("百度"), QStringLiteral("百度一下，你就知道"),
+        {QStringLiteral("baidu"), QCoreApplication::translate("App", "百度"), QCoreApplication::translate("App", "百度一下，你就知道"),
          QStringLiteral("https://www.baidu.com/s"), QStringLiteral("wd"),
          QStringLiteral(":/icons/baidu.ico")},
-        {QStringLiteral("duckduckgo"), QStringLiteral("DuckDuckGo"), QStringLiteral("保护隐私的搜索引擎"),
+        {QStringLiteral("duckduckgo"), QStringLiteral("DuckDuckGo"), QCoreApplication::translate("App", "保护隐私的搜索引擎"),
          QStringLiteral("https://duckduckgo.com/"), QStringLiteral("q"),
          QStringLiteral(":/icons/duck.ico")},
-        {QStringLiteral("perplexity"), QStringLiteral("Perplexity"), QStringLiteral("AI 驱动的答案引擎"),
+        {QStringLiteral("perplexity"), QStringLiteral("Perplexity"), QCoreApplication::translate("App", "AI 驱动的答案引擎"),
          QStringLiteral("https://www.perplexity.ai/search"), QStringLiteral("q"),
          QStringLiteral(":/icons/perplexity.ico")},
-        {QStringLiteral("metaso"), QStringLiteral("秘塔AI搜索"), QStringLiteral("没有广告，直达结果"),
+        {QStringLiteral("metaso"), QCoreApplication::translate("App", "秘塔AI搜索"), QCoreApplication::translate("App", "没有广告，直达结果"),
          QStringLiteral("https://metaso.cn/"), QStringLiteral("q"),
          QStringLiteral(":/icons/metaso.ico")},
-        {QStringLiteral("tiangong"), QStringLiteral("天工AI搜索"), QStringLiteral("新一代 AI 搜索"),
+        {QStringLiteral("tiangong"), QCoreApplication::translate("App", "天工AI搜索"), QCoreApplication::translate("App", "新一代 AI 搜索"),
          QStringLiteral("https://www.tiangong.cn/"), QStringLiteral("q"),
          QStringLiteral(":/icons/tiangong.ico")},
     };
@@ -482,7 +496,7 @@ QStringList SettingModel::localSearchExcludePatterns() const
 QStringList SettingModel::defaultLocalSearchExcludePatterns()
 {
     return {
-        QStringLiteral("# 版本控制与开发缓存"),
+        QCoreApplication::translate("App", "# 版本控制与开发缓存"),
         QStringLiteral(".git/"),
         QStringLiteral(".svn/"),
         QStringLiteral(".hg/"),
@@ -494,11 +508,11 @@ QStringList SettingModel::defaultLocalSearchExcludePatterns()
         QStringLiteral("cmake-build-*/"),
         QStringLiteral(".vs/"),
         QStringLiteral(""),
-        QStringLiteral("# Windows 系统目录"),
+        QCoreApplication::translate("App", "# Windows 系统目录"),
         QStringLiteral("$Recycle.Bin/"),
         QStringLiteral("System Volume Information/"),
         QStringLiteral(""),
-        QStringLiteral("# 临时文件与未完成下载"),
+        QCoreApplication::translate("App", "# 临时文件与未完成下载"),
         QStringLiteral("*~"),
         QStringLiteral("*.tmp"),
         QStringLiteral("*.temp"),

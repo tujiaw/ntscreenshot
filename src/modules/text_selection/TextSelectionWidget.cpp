@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "TextSelectionWidget.h"
 
 #include <QApplication>
@@ -133,7 +134,7 @@ void TextSelectionWidget::paintEvent(QPaintEvent *event)
     }
 
     if (state_ == SelectionState::Idle) {
-        const QString hint = QStringLiteral("拖拽选择文本区域，释放后弹出工具条");
+        const QString hint = QCoreApplication::translate("App", "拖拽选择文本区域，释放后弹出工具条");
         QFont font = painter.font();
         font.setPixelSize(Util::scaleSize(16));
         painter.setFont(font);

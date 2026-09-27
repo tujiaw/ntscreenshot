@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "PinWidget.h"
 #include <QLabel>
 #include <QVBoxLayout>
@@ -41,37 +42,37 @@ PinWidget::PinWidget(WindowManager* windowManager, const QPixmap& pixmap, QWidge
 {
     menu_ = new QMenu(this);
 
-    menu_->addAction(QStringLiteral("标注"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
-    menu_->addAction(QStringLiteral("撤销"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
-	menu_->addAction(QStringLiteral("复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
-    menu_->addAction(QStringLiteral("保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
+    menu_->addAction(QCoreApplication::translate("App", "标注"), this, SLOT(onDraw()), QKeySequence("Ctrl+D"));
+    menu_->addAction(QCoreApplication::translate("App", "撤销"), this, SLOT(onUndo()), QKeySequence("Ctrl+Z"));
+	menu_->addAction(QCoreApplication::translate("App", "复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
+    menu_->addAction(QCoreApplication::translate("App", "保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
     if (windowManager_->setting()->paddleOcrConfig().enabled) {
-        menu_->addAction(QStringLiteral("OCR 识别"), this, SLOT(onOcr()));
+        menu_->addAction(QCoreApplication::translate("App", "OCR 识别"), this, SLOT(onOcr()));
     }
     {
         auto *s = windowManager_->setting();
         if (!s->gitHubImageBedConfig().token.isEmpty()) {
-            menu_->addAction(QStringLiteral("上传图床"), this, SLOT(onUploadImg()));
+            menu_->addAction(QCoreApplication::translate("App", "上传图床"), this, SLOT(onUploadImg()));
         }
     }
     menu_->addSeparator();
-    QMenu* imageToolsMenu = menu_->addMenu(ThemeIcon::icon("mosaic.png"), QStringLiteral("马赛克 / 图像工具"));
-    imageToolsMenu->addAction(QStringLiteral("识别二维码/条码"), this, SLOT(onScanCode()));
-    QMenu* enhanceMenu = imageToolsMenu->addMenu(QStringLiteral("图像增强"));
-    enhanceMenu->addAction(QStringLiteral("自动增强"), this, [this]() { onEnhance(0); });
-    enhanceMenu->addAction(QStringLiteral("提亮"), this, [this]() { onEnhance(1); });
-    enhanceMenu->addAction(QStringLiteral("对比度"), this, [this]() { onEnhance(2); });
-    enhanceMenu->addAction(QStringLiteral("锐化"), this, [this]() { onEnhance(3); });
-    enhanceMenu->addAction(QStringLiteral("降噪"), this, [this]() { onEnhance(4); });
-    imageToolsMenu->addAction(QStringLiteral("智能打码"), this, SLOT(onSmartMask()));
-    imageToolsMenu->addAction(QStringLiteral("自动裁边"), this, SLOT(onAutoCrop()));
-    imageToolsMenu->addAction(QStringLiteral("提取主色"), this, SLOT(onExtractColors()));
+    QMenu* imageToolsMenu = menu_->addMenu(ThemeIcon::icon("mosaic.png"), QCoreApplication::translate("App", "马赛克 / 图像工具"));
+    imageToolsMenu->addAction(QCoreApplication::translate("App", "识别二维码/条码"), this, SLOT(onScanCode()));
+    QMenu* enhanceMenu = imageToolsMenu->addMenu(QCoreApplication::translate("App", "图像增强"));
+    enhanceMenu->addAction(QCoreApplication::translate("App", "自动增强"), this, [this]() { onEnhance(0); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "提亮"), this, [this]() { onEnhance(1); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "对比度"), this, [this]() { onEnhance(2); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "锐化"), this, [this]() { onEnhance(3); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "降噪"), this, [this]() { onEnhance(4); });
+    imageToolsMenu->addAction(QCoreApplication::translate("App", "智能打码"), this, SLOT(onSmartMask()));
+    imageToolsMenu->addAction(QCoreApplication::translate("App", "自动裁边"), this, SLOT(onAutoCrop()));
+    imageToolsMenu->addAction(QCoreApplication::translate("App", "提取主色"), this, SLOT(onExtractColors()));
     menu_->addSeparator();
-    menu_->addAction(QStringLiteral("隐藏"), this, SLOT(onHide()), QKeySequence("Ctrl+H"));
-    menu_->addAction(QStringLiteral("隐藏所有"), this, SLOT(onHideAll()));
+    menu_->addAction(QCoreApplication::translate("App", "隐藏"), this, SLOT(onHide()), QKeySequence("Ctrl+H"));
+    menu_->addAction(QCoreApplication::translate("App", "隐藏所有"), this, SLOT(onHideAll()));
     menu_->addSeparator();
-    menu_->addAction(QStringLiteral("销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
-    menu_->addAction(QStringLiteral("销毁所有"), this, SLOT(onCloseAll()));
+    menu_->addAction(QCoreApplication::translate("App", "销毁"), this, SLOT(onClose()), QKeySequence("Esc"));
+    menu_->addAction(QCoreApplication::translate("App", "销毁所有"), this, SLOT(onCloseAll()));
 
     this->setFocusPolicy(Qt::StrongFocus);
     emit windowManager_->sigStickerCountChanged();
@@ -415,7 +416,7 @@ void PinWidget::onScanCode()
 {
     const QVector<CodeScanResult> results = CodeScanner::scan(currentImage());
     if (results.isEmpty()) {
-        notifyToolMessage(QStringLiteral("未识别到二维码/条码"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "未识别到二维码/条码"), true);
         return;
     }
 
@@ -430,8 +431,8 @@ void PinWidget::onScanCode()
     const QString text = parts.join(QLatin1Char('\n'));
     QApplication::clipboard()->setText(text);
     const QString title = results.size() > 1
-        ? QStringLiteral("识别成功（%1 条，已复制）").arg(results.size())
-        : QStringLiteral("识别成功（已复制）");
+        ? QCoreApplication::translate("App", "识别成功（%1 条，已复制）").arg(results.size())
+        : QCoreApplication::translate("App", "识别成功（已复制）");
     notifyToolMessage(title + QLatin1Char('\n') + text, false);
 }
 
@@ -439,25 +440,25 @@ void PinWidget::onOcr()
 {
     const PaddleOcrConfig config = windowManager_->setting()->paddleOcrConfig();
     if (!config.enabled) {
-        notifyToolMessage(QStringLiteral("请先在设置 / 图片中启用 OCR"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "请先在设置 / 图片中启用 OCR"), true);
         return;
     }
 
     const QImage image = currentImage();
     if (image.isNull()) {
-        notifyToolMessage(QStringLiteral("OCR 失败：贴图数据为空"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "OCR 失败：贴图数据为空"), true);
         return;
     }
 
-    notifyToolMessage(QStringLiteral("OCR 识别中…"), false);
+    notifyToolMessage(QCoreApplication::translate("App", "OCR 识别中…"), false);
     auto* client = new PaddleOcrClient(this);
     connect(client, &PaddleOcrClient::succeeded, this, [this, client](const QString& text) {
         QApplication::clipboard()->setText(text);
-        notifyToolMessage(QStringLiteral("OCR 识别成功，文本已复制到剪切板"), false);
+        notifyToolMessage(QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板"), false);
         client->deleteLater();
     });
     connect(client, &PaddleOcrClient::failed, this, [this, client](const QString& error) {
-        notifyToolMessage(QStringLiteral("OCR 失败：%1").arg(error), true);
+        notifyToolMessage(QCoreApplication::translate("App", "OCR 失败：%1").arg(error), true);
         client->deleteLater();
     });
     client->recognize(Util::pixmap2ByteArray(QPixmap::fromImage(image)), config);
@@ -467,16 +468,16 @@ void PinWidget::onSmartMask()
 {
     QImage src = currentImage();
     if (SmartMask::detectRegions(src).isEmpty()) {
-        notifyToolMessage(QStringLiteral("未检测到可打码区域"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "未检测到可打码区域"), true);
         return;
     }
     QImage out = SmartMask::autoMask(src);
     if (out.isNull() || out.size() != src.size()) {
-        notifyToolMessage(QStringLiteral("未检测到可打码区域"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "未检测到可打码区域"), true);
         return;
     }
     replacePixmap(QPixmap::fromImage(out));
-    notifyToolMessage(QStringLiteral("已智能打码"), false);
+    notifyToolMessage(QCoreApplication::translate("App", "已智能打码"), false);
 }
 
 void PinWidget::onAutoCrop()
@@ -484,18 +485,18 @@ void PinWidget::onAutoCrop()
     QImage src = currentImage();
     QImage cropped = ImageUtil::AutoCropAdaptive(src);
     if (cropped.isNull() || cropped.size() == src.size()) {
-        notifyToolMessage(QStringLiteral("无需裁边"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "无需裁边"), true);
         return;
     }
     replacePixmap(QPixmap::fromImage(cropped));
-    notifyToolMessage(QStringLiteral("已自动裁边"), false);
+    notifyToolMessage(QCoreApplication::translate("App", "已自动裁边"), false);
 }
 
 void PinWidget::onExtractColors()
 {
     const QVector<QColor> colors = ImageUtil::DominantColors(currentImage(), 5);
     if (colors.isEmpty()) {
-        notifyToolMessage(QStringLiteral("未能提取主色"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "未能提取主色"), true);
         return;
     }
     QStringList hexes;
@@ -504,18 +505,18 @@ void PinWidget::onExtractColors()
     }
     const QString text = hexes.join(QLatin1Char(' '));
     QApplication::clipboard()->setText(text);
-    notifyToolMessage(QStringLiteral("主色已复制") + QLatin1Char('\n') + text, false);
+    notifyToolMessage(QCoreApplication::translate("App", "主色已复制") + QLatin1Char('\n') + text, false);
 }
 
 void PinWidget::onEnhance(int preset)
 {
     QImage out = ImageEnhance::apply(currentImage(), static_cast<ImageEnhance::Preset>(preset));
     if (out.isNull()) {
-        notifyToolMessage(QStringLiteral("图像增强失败"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "图像增强失败"), true);
         return;
     }
     replacePixmap(QPixmap::fromImage(out));
-    notifyToolMessage(QStringLiteral("已应用图像增强"), false);
+    notifyToolMessage(QCoreApplication::translate("App", "已应用图像增强"), false);
 }
 
 void PinWidget::onDraw()
@@ -560,7 +561,7 @@ void PinWidget::onSave()
     this->onClose();
     
     QTimer::singleShot(0, [p, savePath]() {
-        QString fileName = QFileDialog::getSaveFileName(nullptr, QStringLiteral("保存图片"), savePath, "PNG (*.png)");
+        QString fileName = QFileDialog::getSaveFileName(nullptr, QCoreApplication::translate("App", "保存图片"), savePath, "PNG (*.png)");
         if (fileName.length() > 0) {
             PinWidget::setSaveDir(QFileInfo(fileName).absoluteDir());
             p.save(fileName, "png");
@@ -588,7 +589,7 @@ void PinWidget::onUploadImg()
             if (result.success) {
                 QApplication::clipboard()->setText(result.fullUrl);
             } else {
-                QMessageBox::warning(nullptr, QStringLiteral("上传图床失败"), result.message);
+                QMessageBox::warning(nullptr, QCoreApplication::translate("App", "上传图床失败"), result.message);
             }
         }, Qt::QueuedConnection);
     }).detach();

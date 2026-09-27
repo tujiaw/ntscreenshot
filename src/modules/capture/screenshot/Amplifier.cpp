@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "Amplifier.h"
 #include <QPixmap>
 #include <QPainter>
@@ -182,5 +183,5 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     y += metrics.lineSpacing();
     painter.drawText(QPoint(x, y), getCursorPointColor());
     y += metrics.lineSpacing();
-    painter.drawText(QPoint(x, y), useOpenCVMode_ ? QStringLiteral("模式: 智能吸附 [ALT]") : QStringLiteral("模式: 窗口检测 [ALT]"));
+    painter.drawText(QPoint(x, y), useOpenCVMode_ ? QCoreApplication::translate("App", "模式: 智能吸附 [ALT]") : QCoreApplication::translate("App", "模式: 窗口检测 [ALT]"));
 }

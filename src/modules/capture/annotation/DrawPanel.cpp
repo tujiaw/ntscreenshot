@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "DrawPanel.h"
 
 #include <QPen>
@@ -130,7 +131,7 @@ void DrawPanel::setupPanels()
     pbFont_ = new QPushButton(ThemeIcon::icon("color.png", IconTone::Default, iconSize), "", this);
     pbFont_->setFixedSize(btnSize, btnSize);
     pbFont_->setIconSize(QSize(iconSize, iconSize));
-    pbFont_->setToolTip(QStringLiteral("颜色与线条"));
+    pbFont_->setToolTip(QCoreApplication::translate("App", "颜色与线条"));
     UiStyler::setRole(pbFont_, UiRole::IconButton);
     connect(pbFont_, &QPushButton::clicked, this, &DrawPanel::onColorBtnClicked);
 
@@ -187,59 +188,59 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
         return pb;
     };
 
-    QPushButton* pbPolyLine = createShapeBtn("polyline.png", QStringLiteral("折线"));
-    QPushButton* pbLine = createShapeBtn("line.png", QStringLiteral("直线"));
-    QPushButton* pbArrow = createShapeBtn("arrow.png", QStringLiteral("箭头"));
-    QPushButton* pbRectangle = createShapeBtn("rectangle.png", QStringLiteral("矩形"));
-    QPushButton* pbEllipse = createShapeBtn("ellipse.png", QStringLiteral("椭圆"));
-    QPushButton* pbText = createShapeBtn("text.png", QStringLiteral("文本（Ctrl+Enter 完成，Esc 取消）"));
+    QPushButton* pbPolyLine = createShapeBtn("polyline.png", QCoreApplication::translate("App", "折线"));
+    QPushButton* pbLine = createShapeBtn("line.png", QCoreApplication::translate("App", "直线"));
+    QPushButton* pbArrow = createShapeBtn("arrow.png", QCoreApplication::translate("App", "箭头"));
+    QPushButton* pbRectangle = createShapeBtn("rectangle.png", QCoreApplication::translate("App", "矩形"));
+    QPushButton* pbEllipse = createShapeBtn("ellipse.png", QCoreApplication::translate("App", "椭圆"));
+    QPushButton* pbText = createShapeBtn("text.png", QCoreApplication::translate("App", "文本（Ctrl+Enter 完成，Esc 取消）"));
 
-    QPushButton* pbMosaic = createShapeBtn("mosaic.png", QStringLiteral("马赛克"));
+    QPushButton* pbMosaic = createShapeBtn("mosaic.png", QCoreApplication::translate("App", "马赛克"));
     const int imageToolsIconSize = Util::scaleSize(16);
     QPushButton* pbImageTools = new ImageToolsButton(
         ThemeIcon::icon("tools-solid.png", IconTone::Default, imageToolsIconSize), this);
-    pbImageTools->setToolTip(QStringLiteral("更多图像工具"));
+    pbImageTools->setToolTip(QCoreApplication::translate("App", "更多图像工具"));
     pbImageTools->setFixedSize(btnSize, btnSize);
     pbImageTools->setIconSize(QSize(imageToolsIconSize, imageToolsIconSize));
     pbImageTools->setProperty("iconBaseSize", 16);
     UiStyler::setRole(pbImageTools, UiRole::IconButton);
     QMenu* mosaicMenu = new QMenu(pbImageTools);
-    mosaicMenu->addAction(QStringLiteral("识别二维码/条码"), this, &DrawPanel::sigScanCode);
-    QMenu* enhanceMenu = mosaicMenu->addMenu(QStringLiteral("图像增强"));
-    enhanceMenu->addAction(QStringLiteral("自动增强"), this, [this]() { emit sigEnhance(0); });
-    enhanceMenu->addAction(QStringLiteral("提亮"), this, [this]() { emit sigEnhance(1); });
-    enhanceMenu->addAction(QStringLiteral("对比度"), this, [this]() { emit sigEnhance(2); });
-    enhanceMenu->addAction(QStringLiteral("锐化"), this, [this]() { emit sigEnhance(3); });
-    enhanceMenu->addAction(QStringLiteral("降噪"), this, [this]() { emit sigEnhance(4); });
-    mosaicMenu->addAction(QStringLiteral("智能打码"), this, &DrawPanel::sigSmartMask);
-    mosaicMenu->addAction(QStringLiteral("自动裁边"), this, &DrawPanel::sigAutoCrop);
-    mosaicMenu->addAction(QStringLiteral("提取主色"), this, &DrawPanel::sigExtractColors);
+    mosaicMenu->addAction(QCoreApplication::translate("App", "识别二维码/条码"), this, &DrawPanel::sigScanCode);
+    QMenu* enhanceMenu = mosaicMenu->addMenu(QCoreApplication::translate("App", "图像增强"));
+    enhanceMenu->addAction(QCoreApplication::translate("App", "自动增强"), this, [this]() { emit sigEnhance(0); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "提亮"), this, [this]() { emit sigEnhance(1); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "对比度"), this, [this]() { emit sigEnhance(2); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "锐化"), this, [this]() { emit sigEnhance(3); });
+    enhanceMenu->addAction(QCoreApplication::translate("App", "降噪"), this, [this]() { emit sigEnhance(4); });
+    mosaicMenu->addAction(QCoreApplication::translate("App", "智能打码"), this, &DrawPanel::sigSmartMask);
+    mosaicMenu->addAction(QCoreApplication::translate("App", "自动裁边"), this, &DrawPanel::sigAutoCrop);
+    mosaicMenu->addAction(QCoreApplication::translate("App", "提取主色"), this, &DrawPanel::sigExtractColors);
 
     connect(pbImageTools, &QPushButton::clicked, this, [pbImageTools, mosaicMenu]() {
         mosaicMenu->exec(pbImageTools->mapToGlobal(QPoint(0, pbImageTools->height())));
     });
 
-    QPushButton* pbAskAi = createActionBtn("llm.png", QStringLiteral("问 AI"));
-    QPushButton* pbUndo = createActionBtn("undo.png", QStringLiteral("撤销"));
-    QPushButton* pbSticker = createActionBtn("pin.png", QStringLiteral("贴图"));
-    QPushButton* pbLongScreenshot = createActionBtn("long_screenshot.png", QStringLiteral("长截图"));
+    QPushButton* pbAskAi = createActionBtn("llm.png", QCoreApplication::translate("App", "问 AI"));
+    QPushButton* pbUndo = createActionBtn("undo.png", QCoreApplication::translate("App", "撤销"));
+    QPushButton* pbSticker = createActionBtn("pin.png", QCoreApplication::translate("App", "贴图"));
+    QPushButton* pbLongScreenshot = createActionBtn("long_screenshot.png", QCoreApplication::translate("App", "长截图"));
     QPushButton* pbGifRecording = new QPushButton(QStringLiteral("GIF"), this);
-    pbGifRecording->setToolTip(QStringLiteral("录制 GIF"));
+    pbGifRecording->setToolTip(QCoreApplication::translate("App", "录制 GIF"));
     pbGifRecording->setFixedSize(btnSize, btnSize);
     QFont gifFont = pbGifRecording->font();
     gifFont.setPixelSize(qMax(7, Util::scaleSize(8)));
     gifFont.setBold(true);
     pbGifRecording->setFont(gifFont);
     QPushButton* pbOcr = new QPushButton(QStringLiteral("OCR"), this);
-    pbOcr->setToolTip(QStringLiteral("识别文字并复制到剪切板"));
+    pbOcr->setToolTip(QCoreApplication::translate("App", "识别文字并复制到剪切板"));
     pbOcr->setFixedSize(btnSize, btnSize);
     QFont ocrFont = pbOcr->font();
     ocrFont.setPixelSize(qMax(7, Util::scaleSize(8)));
     ocrFont.setBold(true);
     pbOcr->setFont(ocrFont);
     pbOcr->setVisible(settings_ && settings_->paddleOcrConfig().enabled);
-    QPushButton* pbSave = createActionBtn("save.png", QStringLiteral("保存"));
-    QPushButton* pbFinished = createActionBtn("clipboard.png", QStringLiteral("剪切板"));
+    QPushButton* pbSave = createActionBtn("save.png", QCoreApplication::translate("App", "保存"));
+    QPushButton* pbFinished = createActionBtn("clipboard.png", QCoreApplication::translate("App", "剪切板"));
     pbFinished->setIcon(ThemeIcon::icon("clipboard.png", IconTone::OnAccent, iconSize));
     UiStyler::setRole(pbFinished, UiRole::PrimaryButton);
 
@@ -372,7 +373,7 @@ void DrawPanel::showToolMessage(const QString& message, bool isError)
             .arg(Util::scaleSize(12)));
     toolMessageLabel_->setText(message);
     toolMessageLabel_->setVisible(true);
-    toolMessageLabel_->setToolTip(isError ? QString() : QStringLiteral("内容已复制，可选中文本再次复制"));
+    toolMessageLabel_->setToolTip(isError ? QString() : QCoreApplication::translate("App", "内容已复制，可选中文本再次复制"));
     refreshPanelHeight();
     adjustPos();
 
