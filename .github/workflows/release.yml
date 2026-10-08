@@ -70,7 +70,9 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build/release-windows --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
           ctest --test-dir build/release-windows --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Release tests failed.' }
 
       - name: Package and checksum
         shell: pwsh

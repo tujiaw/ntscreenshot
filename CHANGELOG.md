@@ -4,11 +4,19 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-08
+
 ### Changed
 
 - Moved AI chat, browser tools, chat assets and text selection into the independent [auto-browser](https://github.com/tujiaw/auto-browser) project. Removed their screenshot toolbar, tray, hotkey and Settings entries. Existing user settings and history remain available for import.
 - Removed Qt WebEngine and WebChannel from screenshot builds and CI. Clipboard AI form filling continues to use its separate integration.
 - Added `scripts/build-win.ps1 -Package` to build the portable ZIP and SHA256 checksum in one command. OpenCV packaging includes only runtime libraries imported by the executable.
+- Removed obsolete migration assets and generated files. Installed minimal OpenCV dependencies can be retained separately from disposable build caches.
+
+### Fixed
+
+- Prevented auto-browser text selection from completing screenshot capture prematurely after releasing a dragged selection. Capture overlays expose a native exclusion marker; update auto-browser to receive the matching exclusion logic.
+- Added regression coverage for selection release, continued resizing and drawing, and explicit clipboard completion.
 
 
 ## [0.1.3] - 2026-09-27
