@@ -1,3 +1,8 @@
+# Tests load Qt/OpenCV through the PATH configured below. vcpkg's parallel
+# app-local copy hooks otherwise race over the same DLLs in this shared output
+# directory. Keep this directory-scoped so application deployment is unchanged.
+set(VCPKG_APPLOCAL_DEPS OFF)
+
 function(nt_add_qt_test test_name target_name)
     if(WIN32)
         add_test(NAME ${test_name}

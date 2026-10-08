@@ -15,6 +15,7 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Fixed
 
+- Prevented parallel Windows test links from racing while vcpkg copied shared OpenCV runtime DLLs.
 - Prevented auto-browser text selection from completing screenshot capture prematurely after releasing a dragged selection. Capture overlays expose a native exclusion marker; update auto-browser to receive the matching exclusion logic.
 - Added regression coverage for selection release, continued resizing and drawing, and explicit clipboard completion.
 
