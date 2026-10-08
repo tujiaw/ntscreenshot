@@ -9,7 +9,7 @@ CMake 是唯一维护中的构建系统。当前只支持和发布 Windows 10/11
 需要：
 
 - Visual Studio 2022，包含「使用 C++ 的桌面开发」和 Windows SDK
-- Qt 6.8.x MSVC 2022 64-bit，并勾选 WebEngine
+- Qt 6.8.x MSVC 2022 64-bit
 - Git、CMake、Ninja（可来自 Qt 维护工具或 Visual Studio）
 - [OpenCV 4.14.0 Windows 预编译包](https://github.com/opencv/opencv/releases/download/4.14.0/opencv-4.14.0-windows.exe)
 
@@ -59,6 +59,23 @@ ctest --preset windows-opencv-release
 
 可分发目录和压缩包输出到 `dist/`。
 
+### 缩小 Windows 压缩包
+
+打包脚本使用 MSVC 的 `dumpbin.exe` 递归查找实际导入的第三方 DLL，避免把整个 OpenCV/vcpkg 的运行库目录带进包里。它保留 Qt 部署工具提供的插件，但不包含未使用的 OpenCV 视频插件。普通 PowerShell 中会自动定位 MSVC；也可以传入 `-DumpbinExe`。没有传入 `-OpenCvDir` 时，脚本会先从应用构建目录的 CMake 缓存读取 OpenCV 路径。
+
+进一步缩小 OpenCV 时，可以使用预编译包附带的 `sources` 目录。在 x64 VS 开发者 PowerShell 中执行（修改源码路径以匹配本机）：
+
+```powershell
+cmake -S C:/deps/opencv/sources -B build/opencv-minimal -G Ninja `
+  -C cmake/OpenCvMinimal.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build/opencv-minimal --parallel
+$env:OpenCV_DIR = (Resolve-Path build/opencv-minimal).Path
+.\scripts\build-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Reconfigure
+.\scripts\package-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Zip
+```
+
+该配置只构建图像处理、图像编码、特征匹配、目标检测和修复所需的模块及其依赖，并保留二维码解码和默认 CPU 优化。没有显式指定 OpenCV 路径或设置 `OpenCV_DIR` 时，构建辅助脚本会优先使用 `build/opencv-minimal` 中已编译的依赖。首次配置可能需要联网下载 OpenCV 的第三方构建依赖。重新使用不同的 OpenCV 配置时，应使用新的依赖构建目录。AI 对话和划词已迁至独立的 auto-browser 项目，截图程序无需安装或打包 Qt WebEngine。
+
 ### 常见问题
 
 - **找不到 Qt6Config.cmake：** `QTDIR` 应指向套件根目录（含 `lib/cmake/Qt6`），不是 Qt Creator 的安装根。
@@ -77,3 +94,11 @@ ctest --preset windows-opencv-release
 .\scripts\check-architecture.ps1
 .\scripts\check-repository.ps1
 ```
+
+### 一步构建并打包
+
+```powershell
+./scripts/build-win.ps1 -Package
+```
+
+输出 ZIP 与 SHA256 校验文件；`-Deploy` 保留用于本地运行库部署。

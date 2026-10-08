@@ -8,20 +8,6 @@
 #include "core/foundation/Constants.h"
 #include "core/theme/AppTheme.h"
 
-struct LlmProviderConfig {
-    QString name;
-    QString apiBaseUrl;
-    QString apiKey;
-    QString model;
-    double  temperature = 0.7;
-};
-
-struct TextSelectionActionConfig {
-    QString id;
-    QString label;
-    QString prompt;
-};
-
 struct PaddleOcrConfig {
     bool enabled = false;
     QString jobUrl;
@@ -35,13 +21,6 @@ struct HttpServerConfig {
     QString bind = QStringLiteral("0.0.0.0");
     QString protocol = QStringLiteral("HTTP/1.1");
     bool cgi = false;
-};
-
-enum class TrayNotificationPosition {
-    TopLeft = 0,
-    TopRight,
-    BottomLeft,
-    BottomRight
 };
 
 struct WebSearchEngine {
@@ -74,22 +53,6 @@ public:
 
     void setPinGlobalKey(const QString &key);
     QString pinGlobalKey() const;
-
-    void setTextSelectionGlobalKey(const QString &key);
-    QString textSelectionGlobalKey() const;
-
-    void setChatGlobalKey(const QString &key);
-    QString chatGlobalKey() const;
-
-    // 对话窗口的界面状态：记住“联网 / 浏览器”开关，以及左右两栏的宽度。
-    bool chatUseBrowser() const;
-    void setChatUseBrowser(bool useBrowser);
-    int chatPaneWidth() const;
-    void setChatPaneWidth(int width);
-    int chatBrowserPaneWidth() const;
-    void setChatBrowserPaneWidth(int width);
-    int chatToolCallLimit() const;
-    void setChatToolCallLimit(int limit);
 
     void setLocalSearchGlobalKey(const QString& key);
     QString localSearchGlobalKey() const;
@@ -129,21 +92,6 @@ public:
     void setThemeMode(AppTheme themeMode);
     AppTheme themeMode() const;
 
-    QList<LlmProviderConfig> llmProviders() const;
-    void setLlmProviders(const QList<LlmProviderConfig> &providers);
-    int llmActiveProviderIndex() const;
-    void setLlmActiveProviderIndex(int index);
-    LlmProviderConfig llmActiveProvider() const;
-
-    bool textSelectionEnabled() const;
-    void setTextSelectionEnabled(bool enabled);
-
-    QList<TextSelectionActionConfig> textSelectionActions() const;
-    void setTextSelectionActions(const QList<TextSelectionActionConfig> &actions);
-    void resetTextSelectionActions();
-    bool llmImageTokenSavingEnabled() const;
-    void setLlmImageTokenSavingEnabled(bool enabled);
-
     GitHubImageBedConfig gitHubImageBedConfig() const;
     void setGitHubImageBedConfig(const GitHubImageBedConfig &config);
 
@@ -152,11 +100,6 @@ public:
 
     HttpServerConfig httpServerConfig() const;
     void setHttpServerConfig(const HttpServerConfig &config);
-
-    QSize notificationWindowSize() const;
-    void setNotificationWindowSize(const QSize &size);
-    TrayNotificationPosition trayNotificationPosition() const;
-    void setTrayNotificationPosition(TrayNotificationPosition position);
 
 private:
     Q_DISABLE_COPY(SettingModel)

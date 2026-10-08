@@ -220,7 +220,6 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
         mosaicMenu->exec(pbImageTools->mapToGlobal(QPoint(0, pbImageTools->height())));
     });
 
-    QPushButton* pbAskAi = createActionBtn("llm.png", QCoreApplication::translate("App", "问 AI"));
     QPushButton* pbUndo = createActionBtn("undo.png", QCoreApplication::translate("App", "撤销"));
     QPushButton* pbSticker = createActionBtn("pin.png", QCoreApplication::translate("App", "贴图"));
     QPushButton* pbLongScreenshot = createActionBtn("long_screenshot.png", QCoreApplication::translate("App", "长截图"));
@@ -244,7 +243,6 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     pbFinished->setIcon(ThemeIcon::icon("clipboard.png", IconTone::OnAccent, iconSize));
     UiStyler::setRole(pbFinished, UiRole::PrimaryButton);
 
-    connect(pbAskAi, &QPushButton::clicked, this, &DrawPanel::sigAskAi);
     connect(pbUndo, &QPushButton::clicked, &drawer_, &Drawer::undo);
     connect(pbSticker, &QPushButton::clicked, this, &DrawPanel::sigSticker);
     connect(pbLongScreenshot, &QPushButton::clicked, this, &DrawPanel::sigLongScreenshot);
@@ -282,7 +280,6 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbImageTools);
-    hLayout->addWidget(pbAskAi);
     hLayout->addWidget(pbOcr);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbLongScreenshot);

@@ -47,7 +47,6 @@ jobs:
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
-          modules: 'qtpositioning qtwebchannel qtwebengine'
           cache: true
 
       - name: Set up vcpkg
@@ -81,9 +80,6 @@ jobs:
             -ExePath ./build/release-windows/ntscreenshot.exe `
             -VcpkgInstalledDir ./build/release-windows/vcpkg_installed `
             -VcpkgTriplet x64-windows -Zip
-          $archive = Resolve-Path ./dist/ntscreenshot-x64-Release.zip
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
-          "$hash  $([IO.Path]::GetFileName($archive))" | Set-Content -Encoding ascii "$archive.sha256"
 
       - name: Upload Windows release artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

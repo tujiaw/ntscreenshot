@@ -20,6 +20,8 @@ param(
 
   [switch]$Deploy,
 
+  [switch]$Package,
+
   [switch]$Clean,
 
   [switch]$Reconfigure
@@ -149,6 +151,7 @@ function Get-DefaultOpenCvDirs {
   # Locate locally-built OpenCV trees from their common default install locations.
   $found = [System.Collections.Generic.List[string]]::new()
   foreach ($candidate in @(
+      (Join-Path (Resolve-RepoRoot) 'build\opencv-minimal'),
       'C:\opencv\build',
       'C:\tools\opencv\build',
       'C:\deps\opencv\build',
@@ -378,14 +381,15 @@ if ($LASTEXITCODE -ne 0) {
 $exePath = Join-Path $buildDir 'ntscreenshot.exe'
 Write-Host '==> Build finished'
 Write-Host "    Output   : $exePath"
-if ($Deploy) {
+if ($Deploy -or $Package) {
   Write-Host '==> Deploying runtime dependencies'
   $deployParams = @{
     Config = $Config
     Platform = $Platform
     QtDir = $qtRoot
     ExePath = $exePath
-    InPlace = $true
+    InPlace = (-not $Package)
+    Zip = [bool]$Package
   }
   if ($openCvRoot) {
     $deployParams.OpenCvDir = $openCvRoot

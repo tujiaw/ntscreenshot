@@ -4,7 +4,7 @@
 
 ![ntscreenshot — open-source screenshot tool for Windows](docs/assets/social-preview.jpg)
 
-**An open-source, privacy-first screenshot and pinning tool for Windows.** Capture, annotate, pin, scroll, and record GIFs in one workflow. Clipboard history and local search stay on your machine; AI and OCR are opt-in and off by default.
+**An open-source, privacy-first screenshot and pinning tool for Windows.** Capture, annotate, pin, scroll, and record GIFs in one workflow. Clipboard history and local search stay on your machine; OCR and clipboard AI form filling are opt-in.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?logo=windows)](docs/faq.en.md)
@@ -24,7 +24,7 @@ Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier,
 
 - Pen, line, arrow, rectangle, ellipse, text, mosaic, undo
 - Copy, save, or pin; scrolling capture and GIF recording
-- QR / barcode recognition; optional OCR and AI
+- QR / barcode recognition; optional OCR
 
 ![Region capture and annotation](screenshot.png)
 
@@ -38,30 +38,23 @@ One box for local apps, files, folders, and browser bookmarks. Arrow keys select
 
 - `F6` pins a clipboard image on the desktop, with multi-pin and border options
 - Local clipboard history
-- A text-selection toolbar for quick actions on highlighted text
 
 ### Settings
 
-Open Settings from the tray. Startup, light / dark theme, capture / pin / chat hotkeys, overlay opacity, and color format live here. The interface defaults to English; choose English or Chinese under General Settings → Display language, then restart the app.
+Open Settings from the tray. Startup, light / dark theme, capture / pin hotkeys, overlay opacity, and color format live here. The interface defaults to English; choose English or Chinese under General Settings → Display language, then restart the app.
 
 ![Settings](settings.png)
 
-### AI assistant (optional)
+### AI 对话与划词 / AI chat and text selection
 
-Off by default. Add your own endpoint in Settings, then open chat with the hotkey. No key means no network calls.
-
-Enable **Web** beside the model selector to allow search, page reading, and `browser_use` actions. The **浏览器** button in the title bar shows a browser panel to the right of chat, with an address bar, back / forward / reload, a Home button that returns to the built-in start page, AI clicks, ordinary form filling, and scrolling. Its temporary login session lasts for the conversation and is cleared when the conversation closes.
-
-Password, verification-code, and QR login challenges pause automation and explain why in the conversation. Finish them in the panel and AI picks the task back up on its own; you can also pause AI by interacting with the page directly, and it resumes once the page leaves the challenge. Use the stop button in the chat input to cancel the current AI request. Authentication detection cannot cover every site. Some services prohibit embedded-browser login; external-browser sessions do not automatically transfer back. Background search and the browser panel use separate sessions.
-
-![AI chat](ai-chat.png)
+这两项功能已迁移至独立项目 [auto-browser](https://github.com/tujiaw/auto-browser)。截图包不再包含浏览器内核；配置与聊天记录的导入方式见 [迁移说明](docs/ai-migration.md)。
 
 ## 30-second start
 
 1. Launch the app, find it in the tray, and confirm hotkeys in Settings.
 2. `F5` to capture: drag a region, annotate from the toolbar, then copy, save, or pin.
 3. `F6` to pin.
-4. Enable OCR or AI in Settings only if you need them, using your own keys.
+4. Enable OCR only if needed, using your own service credentials.
 
 | Hotkey | Action |
 | --- | --- |

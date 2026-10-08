@@ -363,13 +363,6 @@ void ScreenshotWidget::initDrawPanel(void)
             emit actionController_->onStickerRequested(pixmap, currentRect_.topLeft());
         });
 
-        connect(drawPanel_.get(), &DrawPanel::sigAskAi, this, [this]() {
-            QPixmap pixmap = originScreen_->copy(currentRect_);
-            if (drawPanel_) {
-                drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
-            }
-            emit actionController_->onLLMChatRequested(QString(), pixmap);
-        });
         
         connect(drawPanel_.get(), &DrawPanel::sigLongScreenshot, this, [this]() {
             this->onLongScreenshotRequested(currentRect_);

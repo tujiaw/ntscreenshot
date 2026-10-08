@@ -54,11 +54,6 @@ bool ShellModule::setPinGlobalKey(const QString& key)
     return mainWidget_ && mainWidget_->setPinGlobalKey(key);
 }
 
-bool ShellModule::setChatGlobalKey(const QString& key)
-{
-    return mainWidget_ && mainWidget_->setChatGlobalKey(key);
-}
-
 bool ShellModule::setLocalSearchGlobalKey(const QString& key)
 {
     return mainWidget_ && mainWidget_->setLocalSearchGlobalKey(key);

@@ -2,11 +2,11 @@
 #include "app/ModuleRegistry.h"
 #include "app/WindowManager.h"
 #include "app/shell/ShellModule.h"
-#include "modules/assistant/AssistantModule.h"
+
 #include "modules/capture/CaptureModule.h"
 #include "modules/clipboard/ClipboardLiteManager.h"
 #include "modules/settings/SettingsModule.h"
-#include "modules/text_selection/TextSelectionModule.h"
+
 #include "modules/local_search/LocalSearchModule.h"
 #include "core/theme/DarkStyle.h"
 #include "core/runtime/RunGuard.h"
@@ -18,6 +18,10 @@
 #include <QTimer>
 #include <QTranslator>
 #include <QSettings>
+#include <QStandardPaths>
+#ifdef NT_BUILD_SELECTION_TEST
+int runScreenshotSelectionTest(QApplication& app);
+#endif
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -40,7 +44,8 @@ int main(int argc, char *argv[])
 
     // 单实例：避免重复启动（托盘/全局快捷键类应用尤其需要）
     qInfo() << "main: checking single instance guard...";
-    RunGuard guard("ntscreenshot_run_guard");
+    const bool selectionTest = qEnvironmentVariableIsSet("NTSCREENSHOT_SELECTION_TEST");
+    RunGuard guard(selectionTest ? "ntscreenshot_selection_test_guard" : "ntscreenshot_run_guard");
     if (!guard.tryToRun()) {
         qInfo() << "main: another instance is already running, exiting";
         return 0;
@@ -49,6 +54,12 @@ int main(int argc, char *argv[])
 
     qInfo() << "main: constructing QApplication...";
 	MyApplication a(argc, argv);
+#ifdef NT_BUILD_SELECTION_TEST
+    if (selectionTest) {
+        QStandardPaths::setTestModeEnabled(true);
+        return runScreenshotSelectionTest(a);
+    }
+#endif
 	a.setWindowIcon(QIcon(":/images/ntscreenshot.ico"));
     qInfo() << "main: QApplication constructed, appName =" << a.applicationName();
     qDebug() << "=================ntscreenshot start===============";
@@ -76,12 +87,10 @@ int main(int argc, char *argv[])
     qInfo() << "main: registered ClipboardLiteManager";
 	modules.emplaceModule<CaptureModule>(&windowManager);
     qInfo() << "main: registered CaptureModule";
-	modules.emplaceModule<AssistantModule>(windowManager.setting());
-    qInfo() << "main: registered AssistantModule";
+
 	modules.emplaceModule<SettingsModule>(&windowManager);
     qInfo() << "main: registered SettingsModule";
-	modules.emplaceModule<TextSelectionModule>(windowManager.setting());
-    qInfo() << "main: registered TextSelectionModule";
+
 	auto* localSearch = modules.emplaceModule<LocalSearchModule>(windowManager.setting());
     qInfo() << "main: registered LocalSearchModule";
 	modules.emplaceModule<ShellModule>(&windowManager, clipboard);
@@ -90,7 +99,6 @@ int main(int argc, char *argv[])
 	QObject::connect(&windowManager, &WindowManager::sigSettingChanged,
 	                 localSearch, &LocalSearchModule::applySettings);
 	CDarkStyle::assign(windowManager.setting()->themeMode());
-
 
 	QApplication::setQuitOnLastWindowClosed(false);
 	QObject::connect(&a, &QApplication::aboutToQuit, &windowManager, [&windowManager] {

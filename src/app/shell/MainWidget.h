@@ -19,7 +19,7 @@ public:
 
     bool setScreenshotGlobalKey(const QString &key);
     bool setPinGlobalKey(const QString &key);
-    bool setChatGlobalKey(const QString &key);
+
     bool setLocalSearchGlobalKey(const QString& key);
     QString lastHotkeyError() const;
     SystemTray* systemTray() const { return tray_; }
@@ -28,7 +28,7 @@ private slots:
 	void slotTrayActivated(QSystemTrayIcon::ActivationReason reason);
     void slotMainShortcut();
     void slotPinShortcut();
-    void slotChatShortcut();
+
     void slotLocalSearchShortcut();
     void slotExit();
 

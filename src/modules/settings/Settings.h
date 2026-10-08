@@ -28,8 +28,7 @@ private:
     void initThemeSelector();
     void updateScreenshotGlobalKey();
     void updatePinKey();
-    void updateChatKey();
-    void clearChatGlobalKey();
+
     void onAutoStartClicked(bool checked);
     void onAutoPin(bool checked);
     void onPinNoBorder(bool checked);
@@ -46,23 +45,7 @@ private:
     void onLanguageChanged(int index);
     void onGitHubFieldChanged();
     void onPaddleOcrChanged();
-    void onChatWindowSettingChanged();
-    void onLlmProviderSelected(int index);
-    void onLlmProviderFieldChanged();
-    void onAddLlmProvider();
-    void onDelLlmProvider();
-    void onTextSelectionEnabledToggled(bool checked);
-    void onImageTokenSavingToggled(bool checked);
-    void onTextSelectionActionSelected(int row);
-    void onTextSelectionActionFieldChanged();
-    void onAddTextSelectionAction();
-    void onDelTextSelectionAction();
-    void onSaveTextSelectionAction();
-    void onCancelTextSelectionAction();
-    void onResetTextSelectionActions();
 
-private:
-    void initLlmTab();
     void initLocalSearchTab();
     void initHttpServerTab();
     void refreshHttpServerState();
@@ -70,25 +53,13 @@ private:
     void showHttpServerError(const QString& title, const QString& detail);
     void applyModernLayout();
     void loadLocalSearchSettings();
-    void loadLlmProviders();
-    void loadTextSelectionActions(int preferredRow = -1);
 
 private:
     Q_DISABLE_COPY(Settings)
     Ui::Settings ui;
     WindowManager* windowManager_ = nullptr;
     class QComboBox*   cbTheme_;
-    class QComboBox*   cbLlmProviders_;
-    class QSpinBox*    sbChatToolCallLimit_ = nullptr;
-    class QLineEdit*   leLlmProviderName_;
-    class QCheckBox*   cbTextSelectionEnabled_;
-    class QCheckBox*   cbImageTokenSaving_;
-    class QListWidget* listTextSelectionActions_;
-    class QLineEdit*   leTextSelectionActionLabel_;
-    class QPlainTextEdit* teTextSelectionActionPrompt_;
-    class QPushButton* btnDelTextSelectionAction_;
-    class QPushButton* btnSaveTextSelectionAction_ = nullptr;
-    class QPushButton* btnCancelTextSelectionAction_ = nullptr;
+
     class QListWidget* listLocalSearchRoots_ = nullptr;
     class QPlainTextEdit* teLocalSearchExcludes_ = nullptr;
     class QKeySequenceEdit* kseLocalSearch_ = nullptr;
@@ -116,9 +87,6 @@ private:
     // performed on a worker. Start stays disabled until the result arrives.
     bool httpPythonProbed_ = false;
     bool httpPythonReady_ = false;
-    bool updatingProviderFields_ = false;
-    bool updatingTextSelectionActionFields_ = false;
-    bool textSelectionDraftNew_ = false;
-    bool textSelectionDraftDirty_ = false;
+
     QTimer* statusTipTimer_ = nullptr;
 };

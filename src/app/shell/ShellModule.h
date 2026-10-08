@@ -20,7 +20,7 @@ public:
     void open();
     bool setScreenshotGlobalKey(const QString& key);
     bool setPinGlobalKey(const QString& key);
-    bool setChatGlobalKey(const QString& key);
+
     bool setLocalSearchGlobalKey(const QString& key);
     QString lastHotkeyError() const;
 

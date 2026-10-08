@@ -27,37 +27,12 @@
         <file>images/setting.png</file>
         <file>images/mosaic.png</file>
         <file>images/tools-solid.png</file>
-        <file>images/llm.png</file>
         <file>images/long_screenshot.png</file>
-        <file>images/send.png</file>
-        <file>images/stop.png</file>
         <file>images/ctx_open.png</file>
         <file>images/ctx_copy.png</file>
         <file>images/ctx_folder.png</file>
         <file>images/ctx_terminal.png</file>
         <file>images/chrome.png</file>
-        <file>images/web.png</file>
-        <file>images/open_external.png</file>
-        <file>images/home.png</file>
-        <file>images/back.png</file>
-        <file>images/forward.png</file>
-        <file>images/refresh.png</file>
-        <file>images/collapse.png</file>
-        <file>html/browser-home.html</file>
-        <file>html/chat.html</file>
-        <file>html/chat.css</file>
-        <file>html/chat-message.css</file>
-        <file>html/chat-markdown.css</file>
-        <file>html/chat-media.css</file>
-        <file>html/chat-interactions.css</file>
-        <file>html/chat-tool.css</file>
-        <file>html/chat-core.js</file>
-        <file>html/marked.umd.js</file>
-        <file>html/chat-markdown.js</file>
-        <file>html/chat-actions.js</file>
-        <file>html/chat-renderer.js</file>
-        <file>html/chat-bridge.js</file>
-        <file>html/chat.js</file>
         <file>icons/bing.ico</file>
         <file>icons/google.ico</file>
         <file>icons/baidu.ico</file>

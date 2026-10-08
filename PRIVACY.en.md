@@ -2,7 +2,7 @@
 
 [简体中文](PRIVACY.md)
 
-Last updated: 2026-09-12
+Last updated: 2026-10-07
 
 ntscreenshot is a local desktop application. The project does not operate a central account or telemetry service.
 
@@ -29,13 +29,7 @@ Capture, pinning, annotation, clipboard, and local search do not require an ntsc
 - URL fetching
 - GitHub image uploads
 
-When Web is enabled, the assistant can send search terms to Google (falling back to Bing) and load selected websites and their subresources through background WebEngine pages. Extracted content is returned to your configured model provider. No search API key is required. Each background visit uses a temporary, off-the-record profile. Pages and profiles are released on completion, cancellation, timeout, or conversation closure. Tool results may remain in conversation history.
-
-`browser_use` operates the visible browser on the right. It retains an off-the-record login session for the conversation, destroys it on conversation closure, and shares no cookies with background readers or other conversations. With Web enabled, AI can read pages, click controls, and fill ordinary forms. Authenticated page content may be sent to your model provider and retained in conversation history. Detected password or verification challenges pause automation and request human takeover. You can also pause AI by interacting directly with the page. While paused, AI performs no page reading and no automated actions, and resumes once the page leaves the challenge. Detection does not cover every website. Enter credentials directly into the website or local authentication dialog, not the AI conversation. Some websites prohibit embedded-browser authentication; external-browser sessions are not automatically transferred back.
-
-Those requests follow the selected provider's terms. Review the destination and avoid sending confidential content.
-
-Assistant tools can access websites. Local file operations, Python, shell, and PowerShell tools are not currently provided. Use trusted model providers and review website actions involving submission, sending, or account changes.
+AI chat, the embedded browser and text selection moved to [auto-browser](https://github.com/tujiaw/auto-browser). Optional clipboard AI form filling remains and uses separate configuration.
 
 ## Credentials
 

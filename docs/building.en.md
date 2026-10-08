@@ -9,7 +9,7 @@ CMake is the only maintained build system. Windows 10/11 x64 is the only support
 Install:
 
 - Visual Studio 2022 with Desktop development with C++ and a Windows SDK
-- Qt 6.8.x MSVC 2022 64-bit with WebEngine
+- Qt 6.8.x MSVC 2022 64-bit
 - Git, CMake, and Ninja (from the Qt Maintenance Tool or Visual Studio)
 - [OpenCV 4.14.0 prebuilt package for Windows](https://github.com/opencv/opencv/releases/download/4.14.0/opencv-4.14.0-windows.exe)
 
@@ -59,6 +59,23 @@ The script builds only by default. Pass `-Deploy` to deploy Qt and OpenCV runtim
 
 The distributable directory and archive are written to `dist/`.
 
+### Smaller Windows packages
+
+The packaging script uses MSVC's `dumpbin.exe` to follow third-party DLL imports recursively instead of shipping the entire OpenCV/vcpkg runtime directory. Qt plugins remain managed by windeployqt; unused OpenCV video plugins are omitted. MSVC is located automatically from a regular PowerShell prompt, or you can pass `-DumpbinExe`. Without `-OpenCvDir`, the script first reads the OpenCV path from the application's CMake build cache.
+
+To further reduce OpenCV, use the `sources` directory included in the prebuilt package. Run in an x64 VS developer PowerShell, adjusting the source path:
+
+```powershell
+cmake -S C:/deps/opencv/sources -B build/opencv-minimal -G Ninja `
+  -C cmake/OpenCvMinimal.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build/opencv-minimal --parallel
+$env:OpenCV_DIR = (Resolve-Path build/opencv-minimal).Path
+.\scripts\build-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Reconfigure
+.\scripts\package-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Zip
+```
+
+This configuration builds only the modules and dependencies needed for image processing, image codecs, feature matching, object detection, and inpainting. QR decoding and default CPU optimizations remain enabled. Without an explicit OpenCV path or `OpenCV_DIR` environment variable, the build helper prefers the compiled dependency in `build/opencv-minimal`. Initial configuration may download OpenCV third-party build dependencies. Use a fresh dependency build directory when changing OpenCV configurations. AI chat and text selection now live in auto-browser. The screenshot app requires no Qt WebEngine.
+
 ### Common Windows problems
 
 - **Qt6Config.cmake not found:** point `QTDIR` at the kit root (`lib/cmake/Qt6`), not Qt Creator.
@@ -77,3 +94,11 @@ ctest --preset windows-opencv-release
 .\scripts\check-architecture.ps1
 .\scripts\check-repository.ps1
 ```
+
+### Build and package in one command
+
+```powershell
+./scripts/build-win.ps1 -Package
+```
+
+Produces the portable ZIP and SHA256 checksum. `-Deploy` remains available for local runtime deployment.

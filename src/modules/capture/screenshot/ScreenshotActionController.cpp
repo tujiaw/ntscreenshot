@@ -51,12 +51,6 @@ void ScreenshotActionController::onUploadRequested(const QPixmap &pixmap) {
     }).detach();
 }
 
-void ScreenshotActionController::onLLMChatRequested(const QString &prompt, const QPixmap &pixmap) {
-    if (pixmap.isNull()) return;
-    emit sigClose();
-    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"), prompt, pixmap);
-}
-
 void ScreenshotActionController::onSaveRequested(const QPixmap &pixmap) {
     if (pixmap.isNull()) return;
 

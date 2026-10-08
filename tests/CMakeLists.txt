@@ -10,11 +10,30 @@ function(nt_add_qt_test test_name target_name)
     endif()
 endfunction()
 
+target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/capture/ScreenshotSelectionTest.cpp)
+target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_SELECTION_TEST=1)
+add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_SELECTION_TEST=1"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/bin;$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+
+# Imported targets expose the actual DLL directory for both prebuilt OpenCV
+# packages and locally built minimal runtimes.
+set(nt_opencv_runtime_dirs "")
+foreach(opencv_library IN LISTS OpenCV_LIBS)
+    if(TARGET "${opencv_library}")
+        list(APPEND nt_opencv_runtime_dirs "$<TARGET_FILE_DIR:${opencv_library}>")
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES nt_opencv_runtime_dirs)
+
 add_executable(translation_tests i18n/TranslationTest.cpp)
 target_link_libraries(translation_tests PRIVATE Qt6::Core)
 if(MSVC)
     target_compile_options(translation_tests PRIVATE /utf-8)
 endif()
+
 nt_add_qt_test(english_translation translation_tests
     "${CMAKE_CURRENT_BINARY_DIR}/../ntscreenshot_en.qm")
 
@@ -42,7 +61,7 @@ endif()
 if(WIN32)
     add_test(NAME image_util_auto_crop
         COMMAND ${CMAKE_COMMAND} -E env
-            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/x64/vc16/bin;$ENV{PATH}"
+            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
             $<TARGET_FILE:image_util_auto_crop_tests>)
 else()
     add_test(NAME image_util_auto_crop COMMAND image_util_auto_crop_tests)
@@ -59,34 +78,28 @@ endif()
 if(WIN32)
     add_test(NAME long_screenshot_matcher
         COMMAND ${CMAKE_COMMAND} -E env
-            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/x64/vc16/bin;$ENV{PATH}"
+            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
             $<TARGET_FILE:image_matcher_tests>)
 else()
     add_test(NAME long_screenshot_matcher COMMAND image_matcher_tests)
 endif()
 
-add_executable(background_browser_tests
-    assistant/BackgroundBrowserTest.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/BackgroundBrowser.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp)
-target_include_directories(background_browser_tests PRIVATE ${NT_SOURCE_DIR})
-target_link_libraries(background_browser_tests PRIVATE Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
+add_executable(code_scanner_tests
+    imaging/CodeScannerTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/CodeScanner.cpp)
+target_include_directories(code_scanner_tests PRIVATE ${NT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(code_scanner_tests PRIVATE Qt6::Core Qt6::Gui ${OpenCV_LIBS})
 if(MSVC)
-    target_compile_options(background_browser_tests PRIVATE /utf-8)
+    target_compile_options(code_scanner_tests PRIVATE /utf-8)
 endif()
-nt_add_qt_test(background_browser_contract background_browser_tests)
-
-add_executable(browser_panel_tests
-    assistant/BrowserPanelTest.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/ui/BrowserPanel.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp)
-target_include_directories(browser_panel_tests PRIVATE ${NT_SOURCE_DIR})
-target_link_libraries(browser_panel_tests PRIVATE Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
-if(MSVC)
-    target_compile_options(browser_panel_tests PRIVATE /utf-8)
+if(WIN32)
+    add_test(NAME qr_code_decode
+        COMMAND ${CMAKE_COMMAND} -E env
+            "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+            $<TARGET_FILE:code_scanner_tests>)
+else()
+    add_test(NAME qr_code_decode COMMAND code_scanner_tests)
 endif()
-nt_add_qt_test(browser_panel_contract browser_panel_tests)
-set_tests_properties(browser_panel_contract PROPERTIES TIMEOUT 100)
 
 add_executable(local_search_tests
     local_search/SearchIndexStoreTest.cpp
@@ -98,16 +111,6 @@ target_include_directories(local_search_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(local_search_tests PRIVATE Qt6::Core Qt6::Sql)
 if(MSVC)
     target_compile_options(local_search_tests PRIVATE /utf-8)
-endif()
-
-add_executable(assistant_history_tests
-    assistant/ConversationHistoryTest.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/agent/ConversationHistory.cpp
-)
-target_include_directories(assistant_history_tests PRIVATE ${NT_SOURCE_DIR})
-target_link_libraries(assistant_history_tests PRIVATE Qt6::Core)
-if(MSVC)
-    target_compile_options(assistant_history_tests PRIVATE /utf-8)
 endif()
 
 add_executable(ui_theme_tests
@@ -141,48 +144,18 @@ if(MSVC)
     target_compile_options(http_server_tests PRIVATE /utf-8)
 endif()
 
-nt_add_qt_test(conversation_history_contract assistant_history_tests)
-
-add_executable(assistant_tool_result_tests
-    assistant/ToolResultCacheTest.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/agent/AgentToolRegistry.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/LlmTool.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/LlmToolUtils.cpp
-    ${NT_SOURCE_DIR}/modules/assistant/runtime/tools/ToolAbort.cpp
-)
-target_include_directories(assistant_tool_result_tests PRIVATE ${NT_SOURCE_DIR})
-target_link_libraries(assistant_tool_result_tests PRIVATE Qt6::Core)
-if(MSVC)
-    target_compile_options(assistant_tool_result_tests PRIVATE /utf-8)
-endif()
-nt_add_qt_test(tool_result_full_text_contract assistant_tool_result_tests)
-
 nt_add_qt_test(ui_theme_contract ui_theme_tests)
 nt_add_qt_test(modern_style_contract modern_style_tests)
-set_tests_properties(modern_style_contract PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(modern_style_contract PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 nt_add_qt_test(local_search_store local_search_tests)
 nt_add_qt_test(http_server_arguments http_server_tests)
-
 if(WIN32)
-    add_test(
-        NAME repository_release_gate
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass
-            -File "${CMAKE_CURRENT_SOURCE_DIR}/RepositoryCheckTest.ps1"
-            -Checker "${CMAKE_SOURCE_DIR}/scripts/check-repository.ps1"
-    )
-    add_test(
-        NAME release_version_gate
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass
-            -File "${CMAKE_CURRENT_SOURCE_DIR}/ReleaseCheckTest.ps1"
-            -Checker "${CMAKE_SOURCE_DIR}/scripts/check-repository.ps1"
-            -Root "${CMAKE_SOURCE_DIR}"
-    )
+ add_test(NAME repository_release_gate COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/RepositoryCheckTest.ps1" -Checker "${CMAKE_SOURCE_DIR}/scripts/check-repository.ps1")
+ add_test(NAME release_version_gate COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/ReleaseCheckTest.ps1" -Checker "${CMAKE_SOURCE_DIR}/scripts/check-repository.ps1" -Root "${CMAKE_SOURCE_DIR}")
 endif()
 
 if(WIN32)
-    add_executable(clipboard_history_tests
-        clipboard/ClipboardHistoryTest.cpp
+    add_executable(clipboard_history_tests clipboard/ClipboardHistoryTest.cpp
         ${NT_SOURCE_DIR}/modules/clipboard/ClipboardStore.cpp)
     target_include_directories(clipboard_history_tests PRIVATE ${NT_SOURCE_DIR})
     target_link_libraries(clipboard_history_tests PRIVATE Qt6::Core Qt6::Sql)
@@ -191,6 +164,5 @@ if(WIN32)
     endif()
     nt_add_qt_test(clipboard_history_contract clipboard_history_tests)
 endif()
-
 nt_add_qt_test(http_server_startup http_server_tests --integration)
 set_tests_properties(http_server_startup PROPERTIES SKIP_RETURN_CODE 77)

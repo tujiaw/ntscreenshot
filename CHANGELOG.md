@@ -4,6 +4,13 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- Moved AI chat, browser tools, chat assets and text selection into the independent [auto-browser](https://github.com/tujiaw/auto-browser) project. Removed their screenshot toolbar, tray, hotkey and Settings entries. Existing user settings and history remain available for import.
+- Removed Qt WebEngine and WebChannel from screenshot builds and CI. Clipboard AI form filling continues to use its separate integration.
+- Added `scripts/build-win.ps1 -Package` to build the portable ZIP and SHA256 checksum in one command. OpenCV packaging includes only runtime libraries imported by the executable.
+
+
 ## [0.1.3] - 2026-09-27
 
 ### Added

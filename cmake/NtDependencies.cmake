@@ -6,8 +6,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Gui
     Widgets
     Network
-    WebEngineWidgets
-    WebChannel
+
     Sql
     LinguistTools
 )

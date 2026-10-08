@@ -6,10 +6,10 @@
 
 #include <QDebug>
 #include "core/foundation/Constants.h"
-#include "modules/assistant/AssistantModule.h"
+
 #include "modules/capture/CaptureModule.h"
 #include "modules/settings/SettingsModule.h"
-#include "modules/text_selection/TextSelectionModule.h"
+
 #include "modules/local_search/LocalSearchModule.h"
 
 WindowManager::WindowManager()
@@ -37,13 +37,6 @@ WindowManager::~WindowManager()
 void WindowManager::setModuleRegistry(ModuleRegistry* modules)
 {
     modules_ = modules;
-    if (modules_) {
-        if (auto* textSelection = modules_->module<TextSelectionModule>()) {
-            connect(textSelection, &TextSelectionModule::actionTriggered,
-                    this, &WindowManager::onTextSelectionActionTriggered,
-                    Qt::UniqueConnection);
-        }
-    }
 }
 
 void WindowManager::destroy()
@@ -122,16 +115,6 @@ bool WindowManager::setPinGlobalKey(const QString& key)
     return false;
 }
 
-bool WindowManager::setChatGlobalKey(const QString& key)
-{
-    if (modules_) {
-        if (auto* shell = modules_->module<ShellModule>()) {
-            return shell->setChatGlobalKey(key);
-        }
-    }
-    return false;
-}
-
 bool WindowManager::setLocalSearchGlobalKey(const QString& key)
 {
     if (modules_) {
@@ -184,52 +167,4 @@ int WindowManager::allStickerCount()
         }
     }
     return 0;
-}
-
-void WindowManager::showLlmChatWindow(const QString& title, const QString& text, const QPixmap& pixmap)
-{
-    if (modules_) {
-        if (auto* assistant = modules_->module<AssistantModule>()) {
-            assistant->showChat(title, text, pixmap);
-        }
-    }
-}
-
-void WindowManager::onTextSelectionActionTriggered(const QString& actionId,
-                                                   const QString& selectedText,
-                                                   const QString& inputText)
-{
-    if (!modules_) {
-        return;
-    }
-    auto* assistant = modules_->module<AssistantModule>();
-    if (!assistant) {
-        return;
-    }
-
-    if (actionId == QStringLiteral("chat")) {
-        const QString trimmedInput = inputText.trimmed();
-        if (!trimmedInput.isEmpty()) {
-            assistant->showChat(QCoreApplication::translate("App", "AI 对话"),
-                                QStringLiteral("%1\n\n%2").arg(selectedText, trimmedInput));
-        } else {
-            assistant->showChat(QCoreApplication::translate("App", "AI 对话"));
-            assistant->quoteText(selectedText);
-        }
-        return;
-    }
-
-    const QList<TextSelectionActionConfig> actions = settingModel_->textSelectionActions();
-    for (const TextSelectionActionConfig& action : actions) {
-        if (action.id != actionId) {
-            continue;
-        }
-        const QString label = action.label.trimmed().isEmpty() ? actionId : action.label.trimmed();
-        const QString promptText = action.prompt.trimmed();
-        const QString prompt = promptText.isEmpty()
-            ? selectedText
-            : QStringLiteral("%1\n\n%2").arg(selectedText, promptText);
-        assistant->showChat(label, prompt);
-        return;
-    }
 }

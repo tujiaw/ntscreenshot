@@ -2,7 +2,6 @@
 #include "SystemTray.h"
 #include <QtWidgets>
 #include "app/WindowManager.h"
-#include "core/theme/MenuCheckMark.h"
 #include "modules/clipboard/ClipboardLiteManager.h"
 
 SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipboard, QWidget *parent)
@@ -17,12 +16,6 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
 
     pinAction_ = menu_->addAction(QCoreApplication::translate("App", "贴图"));
     connect(pinAction_, &QAction::triggered, this, &SystemTray::onPin);
-
-    textSelectionAction_ = menu_->addAction(QCoreApplication::translate("App", "划词工具"));
-    connect(textSelectionAction_, &QAction::triggered, this, &SystemTray::onTextSelection);
-
-    chatAction_ = menu_->addAction(QCoreApplication::translate("App", "对话窗口"));
-    connect(chatAction_, &QAction::triggered, this, &SystemTray::onChatAction);
 
     localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "本地快速搜索"));
     connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
@@ -63,21 +56,9 @@ void SystemTray::onScreenshot()
     windowManager_->openWidget(WidgetID::SCREENSHOT);
 }
 
-void SystemTray::onTextSelection()
-{
-    const bool enabled = !windowManager_->setting()->textSelectionEnabled();
-    windowManager_->setting()->setTextSelectionEnabled(enabled);
-    emit windowManager_->sigSettingChanged();
-}
-
 void SystemTray::onPin()
 {
     windowManager_->showAllSticker();
-}
-
-void SystemTray::onChatAction()
-{
-    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"));
 }
 
 void SystemTray::onLocalSearch()
@@ -104,25 +85,20 @@ void SystemTray::onClipboardMenuAboutToShow()
 
 void SystemTray::onUpdate()
 {
-    const QString chatKey = windowManager_->setting()->chatGlobalKey();
+
     QStringList tips;
     tips << "ntscreenshot";
     tips << QCoreApplication::translate("App", "版本v1.0.0");
     tips << QCoreApplication::translate("App", "截图快捷键：%1").arg(windowManager_->setting()->screenhotGlobalKey());
     tips << QCoreApplication::translate("App", "贴图快捷键：%1").arg(windowManager_->setting()->pinGlobalKey());
     tips << QCoreApplication::translate("App", "贴图数目：%1").arg(windowManager_->allStickerCount());
-    if (!chatKey.isEmpty()) {
-        tips << QCoreApplication::translate("App", "对话窗口快捷键：%1").arg(chatKey);
-    }
+
     this->setToolTip(tips.join("\r\n"));
 
     screenshotAction_->setText(QCoreApplication::translate("App", "截屏 %1").arg(windowManager_->setting()->screenhotGlobalKey()));
-    textSelectionAction_->setText(QCoreApplication::translate("App", "划词工具"));
-    MenuCheckMark::apply(textSelectionAction_, windowManager_->setting()->textSelectionEnabled());
+
     pinAction_->setText(QCoreApplication::translate("App", "贴图 %1").arg(windowManager_->setting()->pinGlobalKey()));
-    chatAction_->setText(chatKey.isEmpty()
-                             ? QCoreApplication::translate("App", "对话窗口")
-                             : QCoreApplication::translate("App", "对话窗口 %1").arg(chatKey));
+
     const QString searchKey = windowManager_->setting()->localSearchGlobalKey();
     localSearchAction_->setText(searchKey.isEmpty()
                                     ? QCoreApplication::translate("App", "本地快速搜索")

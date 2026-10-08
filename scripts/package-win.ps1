@@ -18,6 +18,8 @@ param(
 
   [string]$OutDir = 'dist',
 
+  [string]$DumpbinExe = '',
+
   [switch]$InPlace,
 
   [switch]$Zip
@@ -109,6 +111,62 @@ function Get-PathSizeBytes([string]$Path) {
   return (Get-Item $Path).Length
 }
 
+function Resolve-Dumpbin([string]$Explicit) {
+  if ($Explicit) { return (Resolve-Path -LiteralPath $Explicit).Path }
+  $command = Get-Command dumpbin.exe -ErrorAction SilentlyContinue
+  if ($command) { return $command.Source }
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+  if (Test-Path -LiteralPath $vswhere) {
+    $candidates = @(& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe')
+    if ($candidates.Count -gt 0) { return $candidates[0] }
+  }
+  throw 'Cannot find dumpbin.exe. Install MSVC, run from a VS developer shell, or pass -DumpbinExe.'
+}
+
+function Get-RequiredRuntimeDlls([string]$Executable, [string]$RuntimeDir, [string]$Dumpbin, [string[]]$OtherRuntimeDirs) {
+  # Follow PE imports recursively instead of copying every DLL in a dependency
+  # installation. Qt and its dynamically loaded plugins are handled by windeployqt.
+  # OpenCV video plugins are not used by this application's image-only operations.
+  $available = @{}
+  foreach ($dll in (Get-ChildItem -LiteralPath $RuntimeDir -Filter '*.dll' -File)) {
+    $available[$dll.Name] = $dll.FullName
+  }
+  $required = @{}
+  $pending = [System.Collections.Generic.Queue[string]]::new()
+  $pending.Enqueue($Executable)
+  while ($pending.Count -gt 0) {
+    $binary = $pending.Dequeue()
+    $imports = @(& $Dumpbin /nologo /dependents $binary)
+    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect runtime dependencies of $binary." }
+    foreach ($line in $imports) {
+      if ($line -notmatch '^\s+([^\s]+\.dll)\s*$') { continue }
+      $name = $Matches[1]
+      if (-not $available.ContainsKey($name)) {
+        if ($name -match '^(api-ms-|ext-ms-)') { continue }
+        $foundElsewhere = $false
+        foreach ($directory in $OtherRuntimeDirs) {
+          if (Test-Path -LiteralPath (Join-Path $directory $name)) {
+            $foundElsewhere = $true
+            break
+          }
+        }
+        if ($name -like 'opencv_*.dll' -or -not $foundElsewhere) {
+          throw "Required DLL not found in ${RuntimeDir}: $name (imported by $binary)"
+        }
+        continue
+      }
+      if ($required.ContainsKey($name)) { continue }
+      $required[$name] = $available[$name]
+      $pending.Enqueue($available[$name])
+    }
+  }
+  if (-not ($required.Keys | Where-Object { $_ -like 'opencv_*.dll' })) {
+    throw "No imported OpenCV runtime DLL was found for $Executable in $RuntimeDir."
+  }
+  return @($required.Values | Sort-Object)
+}
+
 function Remove-IfExists([string]$Path) {
   if (-not (Test-Path $Path)) {
     return 0
@@ -125,8 +183,6 @@ function Remove-DeployRuntimeBloat([string]$TargetDir) {
   foreach ($relativePath in @(
       'qmltooling',
       'qml',
-      'resources\qtwebengine_devtools_resources.pak',
-      'position\qtposition_nmea.dll',
       'sqldrivers\qsqlmimer.dll',
       'sqldrivers\qsqlodbc.dll',
       'sqldrivers\qsqlpsql.dll'
@@ -167,7 +223,7 @@ function Remove-BuildArtifacts([string]$TargetDir) {
   }
 }
 
-function Copy-PackageDocuments([string]$RepoRoot, [string]$StageDir, [string]$QtDir, [string]$SourceExe, [string]$VcpkgInstalledDir, [string]$VcpkgTriplet) {
+function Copy-PackageDocuments([string]$RepoRoot, [string]$StageDir, [string]$QtDir, [string]$SourceExe, [string]$VcpkgInstalledDir, [string]$VcpkgTriplet, [string]$OpenCvRoot) {
   foreach ($document in @('LICENSE', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md')) {
     $sourceDocument = Join-Path $RepoRoot $document
     if (Test-Path $sourceDocument) {
@@ -182,6 +238,23 @@ function Copy-PackageDocuments([string]$RepoRoot, [string]$StageDir, [string]$Qt
   $qhotkeyLicense = Join-Path $RepoRoot 'src\libs\QHotkey\LICENSE'
   if (Test-Path $qhotkeyLicense) {
     Copy-Item -Force -Path $qhotkeyLicense -Destination (Join-Path $licenseDir 'QHotkey-BSD-3-Clause.txt')
+  }
+
+  if ($OpenCvRoot) {
+    $licenseCandidates = @((Join-Path $OpenCvRoot 'LICENSE'), (Join-Path $OpenCvRoot '..\LICENSE.txt'))
+    $cachePath = Join-Path $OpenCvRoot 'CMakeCache.txt'
+    if (Test-Path -LiteralPath $cachePath) {
+      foreach ($line in (Get-Content -LiteralPath $cachePath)) {
+        if ($line -match '^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$') {
+          $licenseCandidates += Join-Path $Matches[1] 'LICENSE'
+        }
+      }
+    }
+    foreach ($candidate in $licenseCandidates) {
+      if (-not (Test-Path -LiteralPath $candidate)) { continue }
+      Copy-Item -LiteralPath $candidate -Destination (Join-Path $licenseDir 'OpenCV.txt') -Force
+      break
+    }
   }
 
   foreach ($qtLicenseCandidate in @(
@@ -222,7 +295,6 @@ function Invoke-WinDeploy(
     '--force',
     '--compiler-runtime',
     '--no-translations',
-    '--webenginewidgets',
     '--dir', $TargetDir,
     $DeployExe
   )
@@ -242,6 +314,7 @@ $repoRoot = Resolve-RepoRoot
 $qtRoot = Resolve-QtDir -QtDir $QtDir
 $sourceExe = Resolve-ExePath -RepoRoot $repoRoot -Explicit $ExePath -Platform $Platform -Config $Config
 $sourceDir = Split-Path -Parent $sourceExe
+$dumpbin = Resolve-Dumpbin -Explicit $DumpbinExe
 $stageToDist = $Zip -or (-not $InPlace)
 
 if ($stageToDist) {
@@ -260,8 +333,32 @@ if ($stageToDist) {
 Invoke-WinDeploy -QtRoot $qtRoot -DeployExe $deployExe -TargetDir $targetDir -Config $Config
 
 Write-Host '==> Copying third-party runtime DLLs'
+$otherRuntimeDirs = @($targetDir, (Join-Path $qtRoot 'bin'),
+  (Join-Path $env:WINDIR 'System32'), (Join-Path $env:WINDIR 'SysWOW64'))
 $openCvRoot = $OpenCvDir
+$hasCachedOpenCvDir = $false
 if (-not $openCvRoot) {
+  # Match the runtime to the actual build rather than an unrelated installation.
+  $sourceCache = Join-Path $sourceDir 'CMakeCache.txt'
+  if (Test-Path -LiteralPath $sourceCache) {
+    foreach ($line in (Get-Content -LiteralPath $sourceCache)) {
+      if ($line -match '^OpenCV_DIR:[^=]+=(.+)$') {
+        $hasCachedOpenCvDir = $true
+        $cachedOpenCvRoot = $Matches[1]
+        foreach ($relativeBin in @('bin', 'x64\vc17\bin', 'x64\vc16\bin')) {
+          if (Test-Path -LiteralPath (Join-Path $cachedOpenCvRoot $relativeBin)) {
+            $openCvRoot = $cachedOpenCvRoot
+            break
+          }
+        }
+        # vcpkg caches point to share/opencv4, whose runtime is handled below
+        # using VcpkgInstalledDir and the selected configuration/triplet.
+        break
+      }
+    }
+  }
+}
+if (-not $openCvRoot -and -not $hasCachedOpenCvDir) {
   $openCvRoot = [Environment]::GetEnvironmentVariable('OpenCV_DIR')
 }
 if ($openCvRoot -and (Test-Path (Join-Path $openCvRoot 'OpenCVConfig.cmake'))) {
@@ -273,14 +370,8 @@ if ($openCvRoot -and (Test-Path (Join-Path $openCvRoot 'OpenCVConfig.cmake'))) {
   $copied = 0
   foreach ($binDir in $binCandidates) {
     if (-not (Test-Path $binDir)) { continue }
-    $dlls = @(Get-ChildItem -Path $binDir -Filter 'opencv_*.dll' -File | Where-Object {
-      if ($Config -eq 'Debug') {
-        $_.Name -match 'world\d+d\.dll$' -or $_.Name -notmatch 'world'
-      } else {
-        $_.Name -notmatch 'world\d+d\.dll$'
-      }
-    })
-    if ($dlls.Count -eq 0) { continue }
+    if (-not (Get-ChildItem -LiteralPath $binDir -Filter 'opencv_*.dll' -File)) { continue }
+    $dlls = @(Get-RequiredRuntimeDlls -Executable $sourceExe -RuntimeDir $binDir -Dumpbin $dumpbin -OtherRuntimeDirs $otherRuntimeDirs)
     $dlls | Copy-Item -Force -Destination $targetDir
     $copied = $dlls.Count
     Write-Host ("    OpenCV  : {0} ({1} DLLs)" -f $binDir, $copied)
@@ -292,10 +383,7 @@ if ($openCvRoot -and (Test-Path (Join-Path $openCvRoot 'OpenCVConfig.cmake'))) {
 } else {
   $vcpkgRuntimeDir = Resolve-VcpkgRuntimeDir -RepoRoot $repoRoot -SourceDir $sourceDir `
     -InstalledDir $VcpkgInstalledDir -Triplet $VcpkgTriplet -Config $Config
-  $runtimeDlls = @(Get-ChildItem -Path $vcpkgRuntimeDir -Filter '*.dll' -File)
-  if (-not ($runtimeDlls | Where-Object Name -Like 'opencv_*.dll')) {
-    throw "No OpenCV runtime DLL was found in $vcpkgRuntimeDir."
-  }
+  $runtimeDlls = @(Get-RequiredRuntimeDlls -Executable $sourceExe -RuntimeDir $vcpkgRuntimeDir -Dumpbin $dumpbin -OtherRuntimeDirs $otherRuntimeDirs)
   $runtimeDlls | Copy-Item -Force -Destination $targetDir
   Write-Host ("    vcpkg   : {0} ({1} DLLs)" -f $vcpkgRuntimeDir, $runtimeDlls.Count)
 }
@@ -305,7 +393,7 @@ Remove-DeployRuntimeBloat -TargetDir $targetDir
 if ($stageToDist) {
   Remove-BuildArtifacts -TargetDir $targetDir
   Copy-PackageDocuments -RepoRoot $repoRoot -StageDir $targetDir -QtDir $qtRoot `
-    -SourceExe $sourceExe -VcpkgInstalledDir $VcpkgInstalledDir -VcpkgTriplet $VcpkgTriplet
+    -SourceExe $sourceExe -VcpkgInstalledDir $VcpkgInstalledDir -VcpkgTriplet $VcpkgTriplet -OpenCvRoot $openCvRoot
 }
 
 if ($Zip) {
@@ -313,8 +401,11 @@ if ($Zip) {
   New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
   $zipPath = Join-Path $outputRoot ("ntscreenshot-{0}-{1}.zip" -f $Platform, $Config)
   if (Test-Path $zipPath) { Remove-Item -Force -LiteralPath $zipPath }
-  Compress-Archive -Path (Join-Path $targetDir '*') -DestinationPath $zipPath -Force
+  Compress-Archive -Path (Join-Path $targetDir '*') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+  $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash.ToLowerInvariant()
+  "$hash  $([IO.Path]::GetFileName($zipPath))" | Set-Content -Encoding ascii "$zipPath.sha256"
   Write-Host "==> Package archive: $zipPath"
+  Write-Host ("    ZIP size : {0:N2} MiB" -f ((Get-Item -LiteralPath $zipPath).Length / 1MB))
 }
 
 $totalBytes = (Get-ChildItem $targetDir -Recurse -File -ErrorAction SilentlyContinue |

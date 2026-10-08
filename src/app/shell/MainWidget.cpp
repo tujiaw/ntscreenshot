@@ -12,7 +12,7 @@
 namespace {
 const QString kScreenshotHotkey = QStringLiteral("screenshot");
 const QString kPinHotkey = QStringLiteral("pin");
-const QString kChatHotkey = QStringLiteral("chat");
+
 const QString kLocalSearchHotkey = QStringLiteral("local_search");
 const QString kExitHotkey = QStringLiteral("exit");
 const QString kDefaultLocalSearchHotkey = QStringLiteral("Alt+Space");
@@ -30,7 +30,7 @@ MainWidget::MainWidget(WindowManager* windowManager, ClipboardLiteManager* clipb
 
     setScreenshotGlobalKey(windowManager_->setting()->screenhotGlobalKey());
     setPinGlobalKey(windowManager_->setting()->pinGlobalKey());
-    setChatGlobalKey(windowManager_->setting()->chatGlobalKey());
+
     const QString localSearchKey = windowManager_->setting()->localSearchGlobalKey();
     qInfo() << "MainWidget: registering local search hotkey:" << localSearchKey;
     if (!setLocalSearchGlobalKey(localSearchKey)) {
@@ -73,11 +73,6 @@ bool MainWidget::setPinGlobalKey(const QString &key)
     return hotkeys_->setHotkey(kPinHotkey, key, [this]() { slotPinShortcut(); });
 }
 
-bool MainWidget::setChatGlobalKey(const QString &key)
-{
-    return hotkeys_->setHotkey(kChatHotkey, key, [this]() { slotChatShortcut(); });
-}
-
 bool MainWidget::setLocalSearchGlobalKey(const QString& key)
 {
     return hotkeys_->setHotkey(kLocalSearchHotkey, key,
@@ -104,11 +99,6 @@ void MainWidget::slotMainShortcut()
 void MainWidget::slotPinShortcut()
 {
     emit windowManager_->sigPin();
-}
-
-void MainWidget::slotChatShortcut()
-{
-    windowManager_->showLlmChatWindow(QCoreApplication::translate("App", "AI 对话"));
 }
 
 void MainWidget::slotLocalSearchShortcut()

@@ -11,7 +11,7 @@ function(nt_configure_target target_name)
     )
 
     target_compile_definitions(${target_name} PRIVATE
-        NT_SKILLS_SOURCE_DIR="${NT_SOURCE_DIR}/resource/skills"
+
         NT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
         NT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         NT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
@@ -24,8 +24,7 @@ function(nt_configure_target target_name)
         Qt6::Gui
         Qt6::Widgets
         Qt6::Network
-        Qt6::WebEngineWidgets
-        Qt6::WebChannel
+
         Qt6::Sql
     )
 

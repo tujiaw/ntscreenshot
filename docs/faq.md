@@ -34,7 +34,7 @@ ntscreenshot 默认驻留托盘。关闭主窗口不会退出。在托盘图标�
 
 ## 安装包为什么这么大？
 
-发布包会带上 Qt 和 WebEngine 运行库，体积明显大于「纯截图」小工具。这是为了标注、主题和可选的助手界面。若不需要 AI 助手，功能上仍可把相关项保持关闭，但当前构建仍会带上这些运行库。
+发布包仅带截图和桌面工具所需的 Qt 与 OpenCV 运行库。AI 对话与划词已迁至 [auto-browser](https://github.com/tujiaw/auto-browser)，截图包不再包含 WebEngine。
 
 ## OCR 或二维码不能用？
 

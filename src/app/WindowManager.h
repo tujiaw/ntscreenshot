@@ -27,14 +27,13 @@ public:
     HttpServerController* httpServer() const { return httpServer_.get(); }
     bool setScreenshotGlobalKey(const QString& key);
     bool setPinGlobalKey(const QString& key);
-    bool setChatGlobalKey(const QString& key);
+
     bool setLocalSearchGlobalKey(const QString& key);
     QString lastHotkeyError() const;
     void rebuildLocalSearchIndex();
     QString localSearchStatus() const;
     void showAllSticker();
     int allStickerCount();
-    void showLlmChatWindow(const QString& title, const QString& text = {}, const QPixmap& pixmap = {});
 
 signals:
     void sigPin();
@@ -42,10 +41,6 @@ signals:
     void sigStickerCountChanged();
 
 private:
-    void onTextSelectionActionTriggered(const QString& actionId,
-                                        const QString& selectedText,
-                                        const QString& inputText);
-
     ModuleRegistry* modules_ = nullptr;
     std::unique_ptr<SettingModel> settingModel_;
     std::unique_ptr<HttpServerController> httpServer_;

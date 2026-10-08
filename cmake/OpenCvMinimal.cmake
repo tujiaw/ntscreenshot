@@ -1,0 +1,15 @@
+# Initial cache for a small OpenCV runtime; pass with cmake -C before configuring
+# an OpenCV source tree. BUILD_LIST also enables required module dependencies.
+set(BUILD_LIST "core,imgproc,imgcodecs,features2d,objdetect,photo" CACHE STRING "OpenCV modules used by ntscreenshot")
+set(BUILD_opencv_world OFF CACHE BOOL "Build only the required module DLLs")
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Shared OpenCV runtime")
+set(BUILD_TESTS OFF CACHE BOOL "No OpenCV tests in the runtime build")
+set(BUILD_PERF_TESTS OFF CACHE BOOL "No OpenCV benchmarks")
+set(BUILD_EXAMPLES OFF CACHE BOOL "No OpenCV examples")
+set(BUILD_opencv_apps OFF CACHE BOOL "No OpenCV command-line applications")
+set(BUILD_opencv_python2 OFF CACHE BOOL "No Python bindings")
+set(BUILD_opencv_python3 OFF CACHE BOOL "No Python bindings")
+set(BUILD_opencv_java OFF CACHE BOOL "No Java bindings")
+set(WITH_FFMPEG OFF CACHE BOOL "ntscreenshot does not use OpenCV video I/O")
+set(WITH_ADE OFF CACHE BOOL "No Graph API dependency download")
+set(WITH_QUIRC ON CACHE BOOL "Preserve QR decoding")

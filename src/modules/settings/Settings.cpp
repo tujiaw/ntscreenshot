@@ -9,7 +9,6 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QStandardPaths>
-#include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QComboBox>
 #include <QKeySequenceEdit>
@@ -32,7 +31,6 @@
 #include <QIcon>
 #include <QSizePolicy>
 #include <QStyle>
-#include <QUuid>
 #include <QMessageBox>
 #include <QTimer>
 #include <QKeyEvent>
@@ -98,14 +96,7 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     : QDialog(parent)
     , windowManager_(windowManager)
     , cbTheme_(nullptr)
-    , cbLlmProviders_(nullptr)
-    , leLlmProviderName_(nullptr)
-    , cbTextSelectionEnabled_(nullptr)
-    , cbImageTokenSaving_(nullptr)
-    , listTextSelectionActions_(nullptr)
-    , leTextSelectionActionLabel_(nullptr)
-    , teTextSelectionActionPrompt_(nullptr)
-    , btnDelTextSelectionAction_(nullptr)
+
 {
 	qInfo() << "Settings: constructor start";
 	// Prevent background SQLite operations from interfering with widget
@@ -133,7 +124,6 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
 	};
 	setupStatusBtn(ui.pbScreenshotStatus, ":/images/ok.png", QCoreApplication::translate("App", "快捷键注册状态"));
 	setupStatusBtn(ui.pbPinStatus, ":/images/ok.png", QCoreApplication::translate("App", "快捷键注册状态"));
-	setupStatusBtn(ui.pbChatStatus, ":/images/remove.png", QCoreApplication::translate("App", "清除对话窗口快捷键"));
 
     // 适配路径相关按钮
     int pathBtnWidth = Util::scaleSize(75);
@@ -151,8 +141,7 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     qInfo() << "Settings: initTablePath done";
     initThemeSelector();
     qInfo() << "Settings: initThemeSelector done";
-    initLlmTab();
-    qInfo() << "Settings: initLlmTab done";
+
     initLocalSearchTab();
     qInfo() << "Settings: initLocalSearchTab done";
     initHttpServerTab();
@@ -187,18 +176,10 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     connect(ui.lePaddleOcrUrl, &QLineEdit::textChanged, this, &Settings::onPaddleOcrChanged);
     connect(ui.lePaddleOcrToken, &QLineEdit::textChanged, this, &Settings::onPaddleOcrChanged);
     connect(ui.lePaddleOcrModel, &QLineEdit::textChanged, this, &Settings::onPaddleOcrChanged);
-    connect(ui.sbNotifyWidth, QOverload<int>::of(&QSpinBox::valueChanged), this, &Settings::onChatWindowSettingChanged);
-    connect(ui.sbNotifyHeight, QOverload<int>::of(&QSpinBox::valueChanged), this, &Settings::onChatWindowSettingChanged);
-    connect(ui.cbNotifyPosition, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Settings::onChatWindowSettingChanged);
-    connect(sbChatToolCallLimit_, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int limit) {
-        windowManager_->setting()->setChatToolCallLimit(limit);
-        emit windowManager_->sigSettingChanged();
-        showStatusTip(QCoreApplication::translate("App", "工具调用次数上限已更新"));
-    });
+
     connect(ui.kseScreenshot, &QKeySequenceEdit::editingFinished, this, &Settings::updateScreenshotGlobalKey);
     connect(ui.ksePin, &QKeySequenceEdit::editingFinished, this, &Settings::updatePinKey);
-    connect(ui.kseChat, &QKeySequenceEdit::editingFinished, this, &Settings::updateChatKey);
-    connect(ui.pbChatStatus, &QPushButton::clicked, this, &Settings::clearChatGlobalKey);
+
     qInfo() << "Settings: reading data...";
     readData();
     qInfo() << "Settings: readData done";
@@ -255,14 +236,11 @@ void Settings::applyModernLayout()
     QWidget* generalPage = pageByTitle(QCoreApplication::translate("App", "常规设置"));
     QWidget* imagePage = pageByTitle(QCoreApplication::translate("App", "图片"));
     QWidget* pathPage = pageByTitle(QCoreApplication::translate("App", "路径"));
-    QWidget* llmHostPage = pageByTitle(QCoreApplication::translate("App", "大模型对话"));
+
     QWidget* githubPage = pageByTitle(QCoreApplication::translate("App", "GitHub图床"));
     QWidget* localSearchPage = pageByTitle(QCoreApplication::translate("App", "本地搜索"));
     QWidget* httpServerPage = pageByTitle(QCoreApplication::translate("App", "HTTP 服务"));
     QWidget* aboutPage = pageByTitle(QCoreApplication::translate("App", "关于"));
-    QTabWidget* llmTabs = llmHostPage
-        ? llmHostPage->findChild<QTabWidget*>(QString(), Qt::FindDirectChildrenOnly)
-        : nullptr;
 
     // Keep Designer-owned pages inside their original QTabWidgets. Reparenting
     // them at runtime leaves Qt with stale explicit show/hide state and can
@@ -285,8 +263,7 @@ void Settings::applyModernLayout()
     navigation->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     navigation->setFocusPolicy(Qt::NoFocus);
     navigation->addItems({QCoreApplication::translate("App", "常规"), QCoreApplication::translate("App", "截图与输出"),
-                          QCoreApplication::translate("App", "本地搜索"), QCoreApplication::translate("App", "AI 助手"),
-                          QCoreApplication::translate("App", "划词"), QCoreApplication::translate("App", "HTTP 服务"),
+                          QCoreApplication::translate("App", "本地搜索"), QCoreApplication::translate("App", "HTTP 服务"),
                           QCoreApplication::translate("App", "路径记录"),
                           QCoreApplication::translate("App", "关于")});
 
@@ -358,27 +335,11 @@ void Settings::applyModernLayout()
             legacyTabs->setCurrentWidget(localSearchPage);
             break;
         case 3:
-            titleLabel->setText(QCoreApplication::translate("App", "AI 助手"));
-            subtitleLabel->setText(QCoreApplication::translate("App", "配置模型与对话窗口"));
-            legacyTabs->setCurrentWidget(llmHostPage);
-            if (llmTabs) {
-                llmTabs->setCurrentIndex(0);
-            }
-            break;
-        case 4:
-            titleLabel->setText(QCoreApplication::translate("App", "划词"));
-            subtitleLabel->setText(QCoreApplication::translate("App", "配置划词操作"));
-            legacyTabs->setCurrentWidget(llmHostPage);
-            if (llmTabs) {
-                llmTabs->setCurrentIndex(1);
-            }
-            break;
-        case 5:
             titleLabel->setText(QCoreApplication::translate("App", "HTTP 服务"));
             subtitleLabel->setText(QCoreApplication::translate("App", "共享本地目录并管理后台服务"));
             legacyTabs->setCurrentWidget(httpServerPage);
             break;
-        case 6:
+        case 4:
             titleLabel->setText(QCoreApplication::translate("App", "路径记录"));
             subtitleLabel->setText(QCoreApplication::translate("App", "查看并复制常用保存路径"));
             legacyTabs->setCurrentWidget(pathPage);
@@ -420,10 +381,10 @@ void Settings::readData()
     ui.cbPinNoBorder->setCheckState(setting->pinNoBorder() ? Qt::Checked : Qt::Unchecked);
     ui.kseScreenshot->setKeySequence(QKeySequence::fromString(setting->screenhotGlobalKey(), QKeySequence::NativeText));
     ui.ksePin->setKeySequence(QKeySequence::fromString(setting->pinGlobalKey(), QKeySequence::NativeText));
-    ui.kseChat->setKeySequence(QKeySequence::fromString(setting->chatGlobalKey(), QKeySequence::NativeText));
+
     setStatusIcon(ui.pbScreenshotStatus, !setting->screenhotGlobalKey().isEmpty());
     setStatusIcon(ui.pbPinStatus, !setting->pinGlobalKey().isEmpty());
-    setStatusIcon(ui.pbChatStatus, !setting->chatGlobalKey().isEmpty());
+
     ui.rbRGB->setChecked(setting->rgbColor());
     ui.rbHexadecimal->setChecked(!setting->rgbColor());
 
@@ -466,31 +427,6 @@ void Settings::readData()
     ui.leGitHubToken->setText(ghConfig.token);
     ui.leGitHubPathPrefix->setText(ghConfig.pathPrefix);
     ui.leGitHubCdnUrl->setText(ghConfig.cdnUrl);
-    {
-        const QSignalBlocker widthBlocker(ui.sbNotifyWidth);
-        const QSignalBlocker heightBlocker(ui.sbNotifyHeight);
-        const QSignalBlocker positionBlocker(ui.cbNotifyPosition);
-        const QSize notifySize = setting->notificationWindowSize();
-        ui.sbNotifyWidth->setValue(notifySize.width());
-        ui.sbNotifyHeight->setValue(notifySize.height());
-        ui.cbNotifyPosition->setCurrentIndex(static_cast<int>(setting->trayNotificationPosition()));
-    }
-    if (sbChatToolCallLimit_) {
-        const QSignalBlocker blocker(sbChatToolCallLimit_);
-        sbChatToolCallLimit_->setValue(setting->chatToolCallLimit());
-    }
-    if (cbImageTokenSaving_) {
-        const QSignalBlocker imageTokenSavingBlocker(cbImageTokenSaving_);
-        cbImageTokenSaving_->setChecked(setting->llmImageTokenSavingEnabled());
-    }
-
-    qInfo() << "Settings::readData: loading providers and actions...";
-    loadLlmProviders();
-    if (cbTextSelectionEnabled_) {
-        const QSignalBlocker blocker(cbTextSelectionEnabled_);
-        cbTextSelectionEnabled_->setChecked(setting->textSelectionEnabled());
-    }
-    loadTextSelectionActions();
     loadLocalSearchSettings();
     qInfo() << "Settings::readData: done";
 }
@@ -913,36 +849,6 @@ void Settings::updatePinKey()
     }
 }
 
-void Settings::updateChatKey()
-{
-    const QString key = keySequenceText(ui.kseChat->keySequence());
-    if (!key.isEmpty() && windowManager_->setChatGlobalKey(key)) {
-        windowManager_->setting()->setChatGlobalKey(key);
-        setStatusIcon(ui.pbChatStatus, true);
-        emit windowManager_->sigSettingChanged();
-        showStatusTip(QCoreApplication::translate("App", "对话快捷键已更新"));
-    } else if (key.isEmpty()) {
-        clearChatGlobalKey();
-    } else {
-        setStatusIcon(ui.pbChatStatus, false);
-        const QString reason = windowManager_->lastHotkeyError();
-        showStatusTip(reason.isEmpty()
-                          ? QCoreApplication::translate("App", "快捷键注册失败，可能被占用")
-                          : QCoreApplication::translate("App", "快捷键注册失败：%1").arg(reason),
-                      false);
-    }
-}
-
-void Settings::clearChatGlobalKey()
-{
-    windowManager_->setChatGlobalKey(QString());
-    windowManager_->setting()->setChatGlobalKey(QString());
-    ui.kseChat->setKeySequence(QKeySequence());
-    setStatusIcon(ui.pbChatStatus, false);
-    emit windowManager_->sigSettingChanged();
-    showStatusTip(QCoreApplication::translate("App", "对话快捷键已清除"));
-}
-
 void Settings::onAutoStartClicked(bool checked)
 {
     windowManager_->setting()->setAutoStart(checked);
@@ -1059,511 +965,6 @@ void Settings::onThemeChanged(int index)
     showStatusTip(themeMode == AppTheme::Dark ? QCoreApplication::translate("App", "已切换为黑色主题") : QCoreApplication::translate("App", "已切换为白色主题"));
 }
 
-void Settings::initLlmTab()
-{
-    qInfo() << "Settings::initLlmTab: start";
-    QTabWidget* tabWidget = new QTabWidget(ui.tab_llm);
-
-    // Keep Designer-owned widgets in their original hierarchy. Moving them
-    // between layouts and then dismantling the old form caused dangling
-    // QLayoutItems. The old form is hidden; the active page owns fresh fields.
-    const QList<QWidget*> designerLlmWidgets{
-        ui.label_llm_base_url, ui.leLlmApiBaseUrl,
-        ui.label_llm_api_key, ui.leLlmApiKey,
-        ui.label_llm_model, ui.leLlmModel,
-        ui.label_llm_temperature, ui.dsbLlmTemperature
-    };
-    for (QWidget* widget : designerLlmWidgets) {
-        if (widget) widget->hide();
-    }
-    ui.verticalSpacer_llm->changeSize(0, 0, QSizePolicy::Minimum, QSizePolicy::Minimum);
-    ui.verticalLayout_llm->invalidate();
-
-    // --- Tab 1: Provider Settings ---
-    QWidget* generalPage = new QWidget();
-    QVBoxLayout* generalVLayout = new QVBoxLayout(generalPage);
-    generalVLayout->setContentsMargins(10, 10, 10, 10);
-    generalVLayout->setSpacing(8);
-
-    // Provider selector row
-    QHBoxLayout* selectorRow = new QHBoxLayout();
-    selectorRow->setSpacing(5);
-    cbLlmProviders_ = new QComboBox(generalPage);
-    int smallBtnW = Util::scaleSize(50);
-    int smallBtnH = Util::scaleSize(25);
-    QPushButton* btnAddProvider = new QPushButton(QCoreApplication::translate("App", "新增"), generalPage);
-    btnAddProvider->setFixedSize(smallBtnW, smallBtnH);
-    QPushButton* btnDelProvider = new QPushButton(QCoreApplication::translate("App", "删除"), generalPage);
-    btnDelProvider->setFixedSize(smallBtnW, smallBtnH);
-    selectorRow->addWidget(cbLlmProviders_, 1);
-    selectorRow->addWidget(btnAddProvider);
-    selectorRow->addWidget(btnDelProvider);
-
-    QFormLayout* generalLayout = new QFormLayout();
-    generalLayout->setSpacing(8);
-    leLlmProviderName_ = new QLineEdit(generalPage);
-    ui.leLlmApiBaseUrl = new QLineEdit(generalPage);
-    ui.leLlmApiBaseUrl->setPlaceholderText(QStringLiteral("https://api.xxx.com/v1"));
-    ui.leLlmApiKey = new QLineEdit(generalPage);
-    ui.leLlmApiKey->setEchoMode(QLineEdit::Password);
-    ui.leLlmApiKey->setPlaceholderText(QCoreApplication::translate("App", "请输入 API Key"));
-    ui.leLlmModel = new QLineEdit(generalPage);
-    ui.leLlmModel->setPlaceholderText(QCoreApplication::translate("App", "例如：gpt-4o-mini"));
-    ui.dsbLlmTemperature = new QDoubleSpinBox(generalPage);
-    ui.dsbLlmTemperature->setRange(0.0, 2.0);
-    ui.dsbLlmTemperature->setSingleStep(0.1);
-    ui.dsbLlmTemperature->setDecimals(2);
-    generalLayout->addRow(QCoreApplication::translate("App", "大模型厂商:"),    selectorRow);
-    generalLayout->addRow(QCoreApplication::translate("App", "名称:"),         leLlmProviderName_);
-    generalLayout->addRow(QStringLiteral("API Base URL:"), ui.leLlmApiBaseUrl);
-    generalLayout->addRow(QStringLiteral("API Key:"),      ui.leLlmApiKey);
-    generalLayout->addRow(QStringLiteral("Model:"),        ui.leLlmModel);
-    generalLayout->addRow(QStringLiteral("Temperature:"),  ui.dsbLlmTemperature);
-    generalVLayout->addLayout(generalLayout);
-    cbImageTokenSaving_ = new QCheckBox(QCoreApplication::translate("App", "图片省token"), generalPage);
-    cbImageTokenSaving_->setChecked(true);
-    generalVLayout->addWidget(cbImageTokenSaving_);
-    connect(cbImageTokenSaving_, &QCheckBox::toggled, this, &Settings::onImageTokenSavingToggled);
-    generalVLayout->addStretch();
-    qInfo() << "Settings::initLlmTab: provider page built";
-
-    connect(cbLlmProviders_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &Settings::onLlmProviderSelected);
-    connect(btnAddProvider, &QPushButton::clicked, this, &Settings::onAddLlmProvider);
-    connect(btnDelProvider, &QPushButton::clicked, this, &Settings::onDelLlmProvider);
-    connect(leLlmProviderName_, &QLineEdit::textChanged,   this, &Settings::onLlmProviderFieldChanged);
-    connect(ui.leLlmApiBaseUrl, &QLineEdit::textChanged,   this, &Settings::onLlmProviderFieldChanged);
-    connect(ui.leLlmApiKey,     &QLineEdit::textChanged,   this, &Settings::onLlmProviderFieldChanged);
-    connect(ui.leLlmModel,      &QLineEdit::textChanged,   this, &Settings::onLlmProviderFieldChanged);
-    connect(ui.dsbLlmTemperature, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &Settings::onLlmProviderFieldChanged);
-
-    // --- Tab 2: Text Selection Actions ---
-    QWidget* textSelectionPage = new QWidget();
-    QVBoxLayout* textSelectionLayout = new QVBoxLayout(textSelectionPage);
-    textSelectionLayout->setContentsMargins(10, 10, 10, 10);
-    textSelectionLayout->setSpacing(8);
-
-    cbTextSelectionEnabled_ = new QCheckBox(QCoreApplication::translate("App", "启用划词功能"), textSelectionPage);
-    textSelectionLayout->addWidget(cbTextSelectionEnabled_);
-
-    textSelectionLayout->addWidget(new QLabel(QCoreApplication::translate("App", "配置划词工具栏按钮及对应 Prompt："), textSelectionPage));
-    auto *textSelectionHint = new QLabel(QCoreApplication::translate("App", "新增或修改后，下次划词弹出工具栏时立即生效。"), textSelectionPage);
-    textSelectionHint->setStyleSheet(
-        QStringLiteral("color:%1; font-size:12px;").arg(ThemeManager::tokens().textSecondary.name()));
-    textSelectionLayout->addWidget(textSelectionHint);
-
-    QHBoxLayout* textSelectionContentRow = new QHBoxLayout();
-    textSelectionContentRow->setSpacing(10);
-    textSelectionContentRow->setAlignment(Qt::AlignTop);
-
-    QVBoxLayout* textSelectionLeftLayout = new QVBoxLayout();
-    textSelectionLeftLayout->setContentsMargins(0, 0, 0, 0);
-    textSelectionLeftLayout->setSpacing(6);
-    listTextSelectionActions_ = new QListWidget(textSelectionPage);
-    listTextSelectionActions_->setAlternatingRowColors(true);
-    listTextSelectionActions_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    listTextSelectionActions_->setTextElideMode(Qt::ElideRight);
-    listTextSelectionActions_->setWordWrap(false);
-    listTextSelectionActions_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    const int actionTextWidth = listTextSelectionActions_->fontMetrics().horizontalAdvance(
-        QCoreApplication::translate("App", "按钮文字字"));
-    const int actionListWidth = actionTextWidth
-        + Util::scaleSize(28)
-        + listTextSelectionActions_->frameWidth() * 2
-        + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-    listTextSelectionActions_->setFixedWidth(actionListWidth);
-    textSelectionLeftLayout->addWidget(listTextSelectionActions_, 1);
-
-    QVBoxLayout* textSelectionButtonLayout = new QVBoxLayout();
-    textSelectionButtonLayout->setContentsMargins(0, 0, 0, 0);
-    textSelectionButtonLayout->setSpacing(6);
-    QPushButton* btnAddTextSelectionAction = new QPushButton(QCoreApplication::translate("App", "新增"), textSelectionPage);
-    btnAddTextSelectionAction->setFixedSize(smallBtnW, smallBtnH);
-    btnDelTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "删除"), textSelectionPage);
-    btnDelTextSelectionAction_->setFixedSize(smallBtnW, smallBtnH);
-    textSelectionButtonLayout->addWidget(btnAddTextSelectionAction);
-    textSelectionButtonLayout->addWidget(btnDelTextSelectionAction_);
-    textSelectionButtonLayout->addStretch();
-
-    QWidget* textSelectionEditor = new QWidget(textSelectionPage);
-    QVBoxLayout* textSelectionForm = new QVBoxLayout(textSelectionEditor);
-    textSelectionForm->setContentsMargins(0, 0, 0, 2);
-    textSelectionForm->setSpacing(8);
-    leTextSelectionActionLabel_ = new QLineEdit(textSelectionEditor);
-    leTextSelectionActionLabel_->setPlaceholderText(QCoreApplication::translate("App", "按钮文字"));
-    teTextSelectionActionPrompt_ = new QPlainTextEdit(textSelectionEditor);
-    teTextSelectionActionPrompt_->setPlaceholderText(QStringLiteral("Prompt"));
-    teTextSelectionActionPrompt_->setMinimumHeight(Util::scaleSize(120));
-    teTextSelectionActionPrompt_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    teTextSelectionActionPrompt_->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
-    textSelectionForm->addWidget(leTextSelectionActionLabel_);
-    textSelectionForm->addWidget(teTextSelectionActionPrompt_, 1);
-    auto *textSelectionEditorButtons = new QHBoxLayout();
-    btnSaveTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "保存"), textSelectionEditor);
-    btnCancelTextSelectionAction_ = new QPushButton(QCoreApplication::translate("App", "取消"), textSelectionEditor);
-    auto *btnResetTextSelectionActions = new QPushButton(QCoreApplication::translate("App", "恢复默认动作"), textSelectionEditor);
-    textSelectionEditorButtons->addWidget(btnSaveTextSelectionAction_);
-    textSelectionEditorButtons->addWidget(btnCancelTextSelectionAction_);
-    textSelectionEditorButtons->addStretch();
-    textSelectionEditorButtons->addWidget(btnResetTextSelectionActions);
-    textSelectionForm->addLayout(textSelectionEditorButtons);
-    textSelectionEditor->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    textSelectionContentRow->addLayout(textSelectionLeftLayout, 0);
-    textSelectionContentRow->addLayout(textSelectionButtonLayout, 0);
-    textSelectionContentRow->addWidget(textSelectionEditor, 1);
-    textSelectionLayout->addLayout(textSelectionContentRow, 1);
-
-    connect(listTextSelectionActions_, &QListWidget::currentRowChanged,
-            this, &Settings::onTextSelectionActionSelected);
-    connect(btnAddTextSelectionAction, &QPushButton::clicked,
-            this, &Settings::onAddTextSelectionAction);
-    connect(btnDelTextSelectionAction_, &QPushButton::clicked,
-            this, &Settings::onDelTextSelectionAction);
-    connect(leTextSelectionActionLabel_, &QLineEdit::textChanged,
-            this, &Settings::onTextSelectionActionFieldChanged);
-    connect(teTextSelectionActionPrompt_, &QPlainTextEdit::textChanged,
-            this, &Settings::onTextSelectionActionFieldChanged);
-    connect(cbTextSelectionEnabled_, &QCheckBox::toggled,
-            this, &Settings::onTextSelectionEnabledToggled);
-    connect(btnSaveTextSelectionAction_, &QPushButton::clicked, this, &Settings::onSaveTextSelectionAction);
-    connect(btnCancelTextSelectionAction_, &QPushButton::clicked, this, &Settings::onCancelTextSelectionAction);
-    connect(btnResetTextSelectionActions, &QPushButton::clicked, this, &Settings::onResetTextSelectionActions);
-    qInfo() << "Settings::initLlmTab: selection page built";
-
-    QWidget* notificationPage = new QWidget();
-    QVBoxLayout* notificationPageLayout = new QVBoxLayout(notificationPage);
-    notificationPageLayout->setContentsMargins(10, 10, 10, 10);
-    notificationPageLayout->setSpacing(8);
-    auto* notificationForm = new QFormLayout();
-    auto* notificationSizeRow = new QHBoxLayout();
-    ui.sbNotifyWidth = new QSpinBox(notificationPage);
-    ui.sbNotifyWidth->setMinimum(420);
-    ui.sbNotifyWidth->setMaximum(1200);
-    ui.sbNotifyHeight = new QSpinBox(notificationPage);
-    ui.sbNotifyHeight->setMinimum(300);
-    ui.sbNotifyHeight->setMaximum(900);
-    notificationSizeRow->addWidget(ui.sbNotifyWidth);
-    notificationSizeRow->addWidget(new QLabel(QStringLiteral("×"), notificationPage));
-    notificationSizeRow->addWidget(ui.sbNotifyHeight);
-    notificationSizeRow->addStretch();
-    notificationForm->addRow(QCoreApplication::translate("App", "窗口大小："), notificationSizeRow);
-    ui.cbNotifyPosition = new QComboBox(notificationPage);
-    ui.cbNotifyPosition->addItems({QCoreApplication::translate("App", "左上"), QCoreApplication::translate("App", "右上"),
-                                   QCoreApplication::translate("App", "左下"), QCoreApplication::translate("App", "右下")});
-    notificationForm->addRow(QCoreApplication::translate("App", "展示位置："), ui.cbNotifyPosition);
-    sbChatToolCallLimit_ = new QSpinBox(notificationPage);
-    sbChatToolCallLimit_->setRange(1, 100);
-    sbChatToolCallLimit_->setValue(10);
-    sbChatToolCallLimit_->setSuffix(QCoreApplication::translate("App", " 次"));
-    sbChatToolCallLimit_->setToolTip(
-        QCoreApplication::translate("App", "单次对话请求允许执行的工具调用总数；达到上限后，AI 将基于已有上下文直接作答。"));
-    notificationForm->addRow(QCoreApplication::translate("App", "工具调用次数上限："), sbChatToolCallLimit_);
-    notificationPageLayout->addLayout(notificationForm);
-    notificationPageLayout->addStretch();
-    qInfo() << "Settings::initLlmTab: notification page built";
-
-    tabWidget->addTab(generalPage, QCoreApplication::translate("App", "厂商配置"));
-    tabWidget->addTab(textSelectionPage, QCoreApplication::translate("App", "划词设置"));
-    tabWidget->addTab(notificationPage, QCoreApplication::translate("App", "对话窗口"));
-    qInfo() << "Settings::initLlmTab: first tabs added";
-
-    const int notificationTabIndex = ui.tabWidget->indexOf(ui.tab_notification);
-    if (notificationTabIndex >= 0) {
-        ui.tabWidget->removeTab(notificationTabIndex);
-    }
-
-    ui.verticalLayout_llm->addWidget(tabWidget, 1);
-    qInfo() << "Settings::initLlmTab: done";
-}
-
-void Settings::loadLlmProviders()
-{
-    updatingProviderFields_ = true;
-
-    auto *setting  = windowManager_->setting();
-    const auto providers   = setting->llmProviders();
-    const int  activeIndex = qBound(0, setting->llmActiveProviderIndex(), providers.size() - 1);
-
-    cbLlmProviders_->clear();
-    for (const auto &p : providers) {
-        cbLlmProviders_->addItem(p.name.isEmpty() ? QCoreApplication::translate("App", "未命名") : p.name);
-    }
-    cbLlmProviders_->setCurrentIndex(activeIndex);
-
-    if (!providers.isEmpty()) {
-        const LlmProviderConfig &p = providers.at(activeIndex);
-        leLlmProviderName_->setText(p.name);
-        ui.leLlmApiBaseUrl->setText(p.apiBaseUrl);
-        ui.leLlmApiKey->setText(p.apiKey);
-        ui.leLlmModel->setText(p.model);
-        ui.dsbLlmTemperature->setValue(p.temperature);
-    }
-
-    updatingProviderFields_ = false;
-}
-
-void Settings::onLlmProviderSelected(int index)
-{
-    if (updatingProviderFields_) return;
-
-    auto *setting    = windowManager_->setting();
-    const auto providers = setting->llmProviders();
-    if (index < 0 || index >= providers.size()) return;
-
-    setting->setLlmActiveProviderIndex(index);
-
-    updatingProviderFields_ = true;
-    const LlmProviderConfig &p = providers.at(index);
-    leLlmProviderName_->setText(p.name);
-    ui.leLlmApiBaseUrl->setText(p.apiBaseUrl);
-    ui.leLlmApiKey->setText(p.apiKey);
-    ui.leLlmModel->setText(p.model);
-    ui.dsbLlmTemperature->setValue(p.temperature);
-    updatingProviderFields_ = false;
-}
-
-void Settings::onLlmProviderFieldChanged()
-{
-    if (updatingProviderFields_) return;
-
-    auto *setting  = windowManager_->setting();
-    const int index    = cbLlmProviders_->currentIndex();
-    auto providers = setting->llmProviders();
-    if (index < 0 || index >= providers.size()) return;
-
-    LlmProviderConfig &p = providers[index];
-    p.name        = leLlmProviderName_->text().trimmed();
-    p.apiBaseUrl  = ui.leLlmApiBaseUrl->text().trimmed();
-    p.apiKey      = ui.leLlmApiKey->text().trimmed();
-    p.model       = ui.leLlmModel->text().trimmed();
-    p.temperature = ui.dsbLlmTemperature->value();
-    setting->setLlmProviders(providers);
-
-    // Keep combo box display name in sync
-    updatingProviderFields_ = true;
-    cbLlmProviders_->setItemText(index, p.name.isEmpty() ? QCoreApplication::translate("App", "未命名") : p.name);
-    updatingProviderFields_ = false;
-    showStatusTip(QCoreApplication::translate("App", "厂商配置已保存"));
-}
-
-void Settings::onAddLlmProvider()
-{
-    auto *setting  = windowManager_->setting();
-    auto providers = setting->llmProviders();
-
-    LlmProviderConfig newProvider;
-    newProvider.name        = QCoreApplication::translate("App", "新厂商");
-    newProvider.temperature = 0.7;
-    providers.append(newProvider);
-
-    setting->setLlmProviders(providers);
-    setting->setLlmActiveProviderIndex(providers.size() - 1);
-    loadLlmProviders();
-    showStatusTip(QCoreApplication::translate("App", "已添加新厂商"));
-}
-
-void Settings::onDelLlmProvider()
-{
-    auto *setting  = windowManager_->setting();
-    auto providers = setting->llmProviders();
-    if (providers.size() <= 1) {
-        showStatusTip(QCoreApplication::translate("App", "至少保留一个厂商"), false);
-        return;
-    }
-
-    const int index = cbLlmProviders_->currentIndex();
-    if (index < 0 || index >= providers.size()) return;
-
-    providers.removeAt(index);
-    setting->setLlmProviders(providers);
-    setting->setLlmActiveProviderIndex(qMin(index, providers.size() - 1));
-    loadLlmProviders();
-    showStatusTip(QCoreApplication::translate("App", "已删除厂商"));
-}
-
-void Settings::loadTextSelectionActions(int preferredRow)
-{
-    if (!listTextSelectionActions_) {
-        return;
-    }
-
-    const QList<TextSelectionActionConfig> actions =
-        windowManager_->setting()->textSelectionActions();
-    const int previousRow = listTextSelectionActions_->currentRow();
-
-    {
-        const QSignalBlocker blocker(listTextSelectionActions_);
-        listTextSelectionActions_->clear();
-        for (const TextSelectionActionConfig &action : actions) {
-            auto *item = new QListWidgetItem(
-                action.label.trimmed().isEmpty() ? QCoreApplication::translate("App", "未命名") : action.label.trimmed());
-            item->setData(Qt::UserRole, action.id);
-            listTextSelectionActions_->addItem(item);
-        }
-    }
-
-    if (actions.isEmpty()) {
-        onTextSelectionActionSelected(-1);
-        return;
-    }
-
-    int targetRow = preferredRow;
-    if (targetRow < 0) {
-        targetRow = qMin(previousRow, actions.size() - 1);
-    }
-    if (targetRow < 0) {
-        targetRow = 0;
-    }
-
-    listTextSelectionActions_->setCurrentRow(targetRow);
-    onTextSelectionActionSelected(targetRow);
-}
-
-void Settings::onImageTokenSavingToggled(bool checked)
-{
-    windowManager_->setting()->setLlmImageTokenSavingEnabled(checked);
-    showStatusTip(checked ? QCoreApplication::translate("App", "已开启图片省token") : QCoreApplication::translate("App", "已关闭图片省token"));
-}
-
-void Settings::onTextSelectionEnabledToggled(bool checked)
-{
-    windowManager_->setting()->setTextSelectionEnabled(checked);
-    emit windowManager_->sigSettingChanged();
-    showStatusTip(checked ? QCoreApplication::translate("App", "已启用划词功能") : QCoreApplication::translate("App", "已关闭划词功能"));
-}
-
-void Settings::onTextSelectionActionSelected(int row)
-{
-    if (textSelectionDraftNew_ || textSelectionDraftDirty_) return;
-    updatingTextSelectionActionFields_ = true;
-
-    const QList<TextSelectionActionConfig> actions =
-        windowManager_->setting()->textSelectionActions();
-    const bool valid = row >= 0 && row < actions.size();
-
-    if (leTextSelectionActionLabel_) {
-        leTextSelectionActionLabel_->setEnabled(valid);
-        leTextSelectionActionLabel_->setText(valid ? actions.at(row).label : QString());
-    }
-    if (teTextSelectionActionPrompt_) {
-        teTextSelectionActionPrompt_->setEnabled(valid);
-        teTextSelectionActionPrompt_->setPlainText(valid ? actions.at(row).prompt : QString());
-    }
-    if (btnDelTextSelectionAction_) {
-        btnDelTextSelectionAction_->setEnabled(valid && actions.size() > 1);
-    }
-    if (btnSaveTextSelectionAction_) btnSaveTextSelectionAction_->setEnabled(false);
-    if (btnCancelTextSelectionAction_) btnCancelTextSelectionAction_->setEnabled(false);
-
-    updatingTextSelectionActionFields_ = false;
-}
-
-void Settings::onTextSelectionActionFieldChanged()
-{
-    if (updatingTextSelectionActionFields_ || !listTextSelectionActions_) {
-        return;
-    }
-    textSelectionDraftDirty_ = true;
-    listTextSelectionActions_->setEnabled(false);
-    if (btnDelTextSelectionAction_) btnDelTextSelectionAction_->setEnabled(false);
-    if (btnSaveTextSelectionAction_) btnSaveTextSelectionAction_->setEnabled(true);
-    if (btnCancelTextSelectionAction_) btnCancelTextSelectionAction_->setEnabled(true);
-}
-
-void Settings::onAddTextSelectionAction()
-{
-    if (textSelectionDraftDirty_ || textSelectionDraftNew_) return;
-    textSelectionDraftNew_ = true;
-    textSelectionDraftDirty_ = true;
-    updatingTextSelectionActionFields_ = true;
-    leTextSelectionActionLabel_->clear();
-    teTextSelectionActionPrompt_->clear();
-    leTextSelectionActionLabel_->setEnabled(true);
-    teTextSelectionActionPrompt_->setEnabled(true);
-    updatingTextSelectionActionFields_ = false;
-    listTextSelectionActions_->setEnabled(false);
-    btnDelTextSelectionAction_->setEnabled(false);
-    btnSaveTextSelectionAction_->setEnabled(true);
-    btnCancelTextSelectionAction_->setEnabled(true);
-    leTextSelectionActionLabel_->setFocus();
-}
-
-void Settings::onDelTextSelectionAction()
-{
-    if (!listTextSelectionActions_ || textSelectionDraftDirty_) {
-        return;
-    }
-
-    QList<TextSelectionActionConfig> actions =
-        windowManager_->setting()->textSelectionActions();
-    if (actions.size() <= 1) {
-        showStatusTip(QCoreApplication::translate("App", "至少保留一个划词动作"), false);
-        return;
-    }
-
-    const int row = listTextSelectionActions_->currentRow();
-    if (row < 0 || row >= actions.size()) {
-        return;
-    }
-
-    if (QMessageBox::question(this, QCoreApplication::translate("App", "删除划词动作"),
-            QCoreApplication::translate("App", "确定删除这个划词动作吗？")) != QMessageBox::Yes) return;
-
-    actions.removeAt(row);
-    windowManager_->setting()->setTextSelectionActions(actions);
-    loadTextSelectionActions(qMin(row, actions.size() - 1));
-    showStatusTip(QCoreApplication::translate("App", "已删除划词动作"));
-}
-
-void Settings::onSaveTextSelectionAction()
-{
-    const QString label = leTextSelectionActionLabel_->text().trimmed();
-    if (label.isEmpty()) {
-        showStatusTip(QCoreApplication::translate("App", "按钮文字不能为空"), false);
-        leTextSelectionActionLabel_->setFocus();
-        return;
-    }
-    QList<TextSelectionActionConfig> actions = windowManager_->setting()->textSelectionActions();
-    const int row = listTextSelectionActions_->currentRow();
-    TextSelectionActionConfig action;
-    action.id = textSelectionDraftNew_ ? QUuid::createUuid().toString(QUuid::WithoutBraces)
-                                       : (row >= 0 && row < actions.size() ? actions[row].id : QString());
-    if (action.id.isEmpty()) return;
-    action.label = label;
-    action.prompt = teTextSelectionActionPrompt_->toPlainText().trimmed();
-    const bool wasNew = textSelectionDraftNew_;
-    if (wasNew) actions.append(action);
-    else actions[row] = action;
-    windowManager_->setting()->setTextSelectionActions(actions);
-    textSelectionDraftNew_ = false;
-    textSelectionDraftDirty_ = false;
-    listTextSelectionActions_->setEnabled(true);
-    loadTextSelectionActions(wasNew ? actions.size() - 1 : row);
-    showStatusTip(QCoreApplication::translate("App", "已保存划词动作"));
-}
-
-void Settings::onCancelTextSelectionAction()
-{
-    textSelectionDraftNew_ = false;
-    textSelectionDraftDirty_ = false;
-    listTextSelectionActions_->setEnabled(true);
-    onTextSelectionActionSelected(listTextSelectionActions_->currentRow());
-}
-
-void Settings::onResetTextSelectionActions()
-{
-    if (QMessageBox::question(this, QCoreApplication::translate("App", "恢复默认动作"),
-            QCoreApplication::translate("App", "确定用默认动作替换当前所有自定义动作吗？")) != QMessageBox::Yes) return;
-    textSelectionDraftNew_ = false;
-    textSelectionDraftDirty_ = false;
-    listTextSelectionActions_->setEnabled(true);
-    windowManager_->setting()->resetTextSelectionActions();
-    loadTextSelectionActions(0);
-    showStatusTip(QCoreApplication::translate("App", "已恢复默认动作"));
-}
-
 void Settings::onGitHubFieldChanged()
 {
     GitHubImageBedConfig config;
@@ -1587,14 +988,6 @@ void Settings::onPaddleOcrChanged()
     ui.lePaddleOcrUrl->setEnabled(config.enabled);
     ui.lePaddleOcrToken->setEnabled(config.enabled);
     ui.lePaddleOcrModel->setEnabled(config.enabled);
-}
-
-void Settings::onChatWindowSettingChanged()
-{
-    SettingModel *setting = windowManager_->setting();
-    setting->setNotificationWindowSize(QSize(ui.sbNotifyWidth->value(), ui.sbNotifyHeight->value()));
-    setting->setTrayNotificationPosition(static_cast<TrayNotificationPosition>(ui.cbNotifyPosition->currentIndex()));
-    showStatusTip(QCoreApplication::translate("App", "对话窗口设置已更新"));
 }
 
 void Settings::initHttpServerTab()

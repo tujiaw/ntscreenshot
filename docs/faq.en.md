@@ -26,7 +26,7 @@ ntscreenshot lives in the tray. Closing the main window does not quit. Right-cli
 
 ## Why is the package large?
 
-The release bundles Qt and WebEngine. That is heavier than a snipping-only utility, and it is expected with the current feature set. You can leave AI disabled; the runtime is still included in this build.
+The release contains Qt and OpenCV for capture and desktop tools. AI chat and text selection moved to [auto-browser](https://github.com/tujiaw/auto-browser); WebEngine is no longer bundled here.
 
 ## OCR or QR codes do not work
 

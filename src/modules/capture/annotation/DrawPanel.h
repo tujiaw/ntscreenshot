@@ -160,7 +160,6 @@ public:
     static QColor currentColor();
 
 signals:
-    void sigAskAi();
     void sigSticker();
     void sigLongScreenshot();
     void sigGifRecording();

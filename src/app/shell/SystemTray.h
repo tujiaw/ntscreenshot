@@ -16,9 +16,9 @@ public:
 
 private slots:
     void onScreenshot();
-    void onTextSelection();
+
     void onPin();
-    void onChatAction();
+
     void onLocalSearch();
     void onSetting();
     void onExit();
@@ -29,9 +29,9 @@ private:
     Q_DISABLE_COPY(SystemTray)
 	QWidget *parent_;
     QAction *screenshotAction_;
-    QAction *textSelectionAction_;
+
     QAction *pinAction_;
-    QAction *chatAction_;
+
 	QAction *localSearchAction_;
 	QAction *clipboardAction_;
 	QMenu *menu_;

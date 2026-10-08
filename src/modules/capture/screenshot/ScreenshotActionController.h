@@ -15,7 +15,6 @@ signals:
 
 public slots:
     void onUploadRequested(const QPixmap &pixmap);
-    void onLLMChatRequested(const QString &prompt, const QPixmap &pixmap);
     void onSaveRequested(const QPixmap &pixmap);
     void onSaveToClipboardRequested(const QPixmap &pixmap);
     void onStickerRequested(const QPixmap &pixmap, const QPoint &pos);

@@ -21,11 +21,11 @@ src/
 |-- shared/
 |   `-- ui/                      # 多个模块共用的无业务 Widget
 |-- modules/                     # 按业务能力纵向组织的个人工具
-|   |-- assistant/               # AI Agent、工具执行器与聊天 UI
+
 |   |-- capture/                 # 截图、标注、贴图、长截图、GIF
 |   |-- clipboard/               # 剪贴板历史与 AI Fill
 |   |-- settings/                # 设置界面
-|   |-- text_selection/          # 全局文本选择工具
+
 |   `-- local_search/            # 本地文件、目录与应用快速搜索
 |-- libs/                        # 暂时保留的第三方源码
 `-- resource/                    # Qt 资源与运行时素材
@@ -63,7 +63,7 @@ app  --> modules --> shared --> core
 - 按相反顺序关闭；
 - 在注册器析构时执行幂等清理。
 
-当前统一注册了 `clipboard`、`capture`、`assistant`、`settings`、`text_selection`、`local_search` 和应用 `shell`。`WindowManager` 只把调用路由到对应模块，不持有各工具的界面对象。
+当前统一注册了 `clipboard`、`capture`、`settings`、`local_search` 和应用 `shell`。`WindowManager` 只把调用路由到对应模块，不持有各工具的界面对象。
 
 ## 模块内部结构
 
@@ -85,3 +85,5 @@ modules/my_tool/
 ## 第三方代码
 
 `src/libs/` 仅用于现有 vendored 依赖，禁止加入第一方业务代码。新的第三方库优先通过 CMake package 管理；确需离线 vendoring 时，后续统一迁移至仓库根 `third_party/`。
+
+AI 对话、网页资源与划词模块已迁至独立仓库 auto-browser；本项目不再依赖 Qt WebEngine / WebChannel。
