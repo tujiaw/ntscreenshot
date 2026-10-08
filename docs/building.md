@@ -69,12 +69,13 @@ ctest --preset windows-opencv-release
 cmake -S C:/deps/opencv/sources -B build/opencv-minimal -G Ninja `
   -C cmake/OpenCvMinimal.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build/opencv-minimal --parallel
-$env:OpenCV_DIR = (Resolve-Path build/opencv-minimal).Path
+cmake --install build/opencv-minimal --config Release --prefix .deps/opencv-minimal
+$env:OpenCV_DIR = (Resolve-Path .deps/opencv-minimal).Path
 .\scripts\build-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Reconfigure
 .\scripts\package-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Zip
 ```
 
-该配置只构建图像处理、图像编码、特征匹配、目标检测和修复所需的模块及其依赖，并保留二维码解码和默认 CPU 优化。没有显式指定 OpenCV 路径或设置 `OpenCV_DIR` 时，构建辅助脚本会优先使用 `build/opencv-minimal` 中已编译的依赖。首次配置可能需要联网下载 OpenCV 的第三方构建依赖。重新使用不同的 OpenCV 配置时，应使用新的依赖构建目录。AI 对话和划词已迁至独立的 auto-browser 项目，截图程序无需安装或打包 Qt WebEngine。
+该配置只构建图像处理、图像编码、特征匹配、目标检测和修复所需的模块及其依赖，并保留二维码解码和默认 CPU 优化。安装后可以删除 `build/opencv-minimal` 的编译缓存；`.deps/opencv-minimal` 保留头文件、库及运行时，不提交到 Git。没有显式指定 OpenCV 路径或设置 `OpenCV_DIR` 时，构建辅助脚本优先使用 `.deps/opencv-minimal`，并兼容旧的 `build/opencv-minimal`。首次配置可能需要联网下载 OpenCV 的第三方构建依赖。重新使用不同的 OpenCV 配置时，应使用新的依赖构建目录。AI 对话和划词已迁至独立的 auto-browser 项目，截图程序无需安装或打包 Qt WebEngine。
 
 ### 常见问题
 

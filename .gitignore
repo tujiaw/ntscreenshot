@@ -5,6 +5,8 @@
 
 # Build outputs
 /build/
+/.deps/
+/Testing/
 /src/build/
 /.vs/
 /CMakeUserPresets.json

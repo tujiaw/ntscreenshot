@@ -14,4 +14,6 @@ AI 对话、浏览器工具、聊天历史和 Windows 划词功能已迁至独�
 
 在迁移快捷键前退出旧版 ntscreenshot，避免两者注册同一对话快捷键。新版 ntscreenshot 已不再注册该快捷键。
 
+两个程序同时运行时，auto-browser 会排除 ntscreenshot 的窗口，避免划词回退复制操作的 Ctrl+C 提前完成截图。截图覆盖层同时设置原生窗口属性 `AutoBrowser.IgnoreTextSelection`，供独立划词程序识别；旧版截图程序通过进程名兼容排除。更新后需退出并重新启动 auto-browser。
+
 构建截图便携包只需 `./scripts/build-win.ps1 -Package`，输出 `dist/ntscreenshot-x64-Release.zip` 和对应 SHA256 校验文件。auto-browser 的构建与测试方式见其 README。

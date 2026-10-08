@@ -151,6 +151,7 @@ function Get-DefaultOpenCvDirs {
   # Locate locally-built OpenCV trees from their common default install locations.
   $found = [System.Collections.Generic.List[string]]::new()
   foreach ($candidate in @(
+      (Join-Path (Resolve-RepoRoot) '.deps\opencv-minimal'),
       (Join-Path (Resolve-RepoRoot) 'build\opencv-minimal'),
       'C:\opencv\build',
       'C:\tools\opencv\build',

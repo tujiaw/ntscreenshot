@@ -32,7 +32,7 @@ foreach ($required in $requiredFiles) {
   if ($required -notin $trackedFiles) { Add-Failure "Required file is not tracked: $required" }
 }
 
-$forbiddenDirectoryPattern = '(^|/)(build|dist|vcpkg_installed|buildtrees|packages|\.vs|\.cache)(/|$)'
+$forbiddenDirectoryPattern = '(^|/)(build|dist|vcpkg_installed|buildtrees|packages|\.vs|\.cache|\.deps)(/|$)|(^|/)Testing/Temporary(/|$)'
 $forbiddenExtensionPattern = '\.(exe|dll|lib|pdb|ilk|obj|pch|zip|7z|rar|tar|gz|dmp)$'
 $sensitiveNamePattern = '(^|/)(\.env($|\.)|id_rsa($|\.)|credentials\.json$|secrets?\.(json|ya?ml|ini)$|base\.ini$|history\.db$|.*\.(pem|pfx|p12|key)$)'
 $maxBytes = $MaxTrackedFileMiB * 1MB

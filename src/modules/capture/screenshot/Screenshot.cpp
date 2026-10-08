@@ -116,6 +116,9 @@ ScreenshotWidget::ScreenshotWidget(WindowManager* windowManager, QWidget *parent
     
     // 对于 Windows API 强行占满物理全屏：
     HWND hwnd = (HWND)winId();
+    // Global text-selection tools must not inject Ctrl+C into this overlay:
+    // here that shortcut completes capture rather than copying selected text.
+    SetPropW(hwnd, L"AutoBrowser.IgnoreTextSelection", reinterpret_cast<HANDLE>(1));
     SetWindowPos(hwnd, HWND_TOPMOST, r.x(), r.y(), r.width(), r.height(), SWP_SHOWWINDOW);
 #else
     // Qt::X11BypassWindowManagerHint 完全绕过 WM，避免任务栏 strut 导致窗口被向下推移

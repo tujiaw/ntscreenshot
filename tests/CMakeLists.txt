@@ -12,11 +12,6 @@ endfunction()
 
 target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/capture/ScreenshotSelectionTest.cpp)
 target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_SELECTION_TEST=1)
-add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
-    "NTSCREENSHOT_SELECTION_TEST=1"
-    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${OpenCV_DIR}/bin;$ENV{PATH}"
-    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
-    $<TARGET_FILE:ntscreenshot>)
 
 # Imported targets expose the actual DLL directory for both prebuilt OpenCV
 # packages and locally built minimal runtimes.
@@ -27,6 +22,13 @@ foreach(opencv_library IN LISTS OpenCV_LIBS)
     endif()
 endforeach()
 list(REMOVE_DUPLICATES nt_opencv_runtime_dirs)
+add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_SELECTION_TEST=1"
+    "QT_FORCE_STDERR_LOGGING=1"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(screenshot_selection_release PROPERTIES TIMEOUT 30)
 
 add_executable(translation_tests i18n/TranslationTest.cpp)
 target_link_libraries(translation_tests PRIVATE Qt6::Core)

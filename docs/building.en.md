@@ -69,12 +69,13 @@ To further reduce OpenCV, use the `sources` directory included in the prebuilt p
 cmake -S C:/deps/opencv/sources -B build/opencv-minimal -G Ninja `
   -C cmake/OpenCvMinimal.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build/opencv-minimal --parallel
-$env:OpenCV_DIR = (Resolve-Path build/opencv-minimal).Path
+cmake --install build/opencv-minimal --config Release --prefix .deps/opencv-minimal
+$env:OpenCV_DIR = (Resolve-Path .deps/opencv-minimal).Path
 .\scripts\build-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Reconfigure
 .\scripts\package-win.ps1 -QtDir $env:QTDIR -OpenCvDir $env:OpenCV_DIR -Zip
 ```
 
-This configuration builds only the modules and dependencies needed for image processing, image codecs, feature matching, object detection, and inpainting. QR decoding and default CPU optimizations remain enabled. Without an explicit OpenCV path or `OpenCV_DIR` environment variable, the build helper prefers the compiled dependency in `build/opencv-minimal`. Initial configuration may download OpenCV third-party build dependencies. Use a fresh dependency build directory when changing OpenCV configurations. AI chat and text selection now live in auto-browser. The screenshot app requires no Qt WebEngine.
+This configuration builds only the modules and dependencies needed for image processing, image codecs, feature matching, object detection, and inpainting. QR decoding and default CPU optimizations remain enabled. After installation, the compilation cache in `build/opencv-minimal` can be deleted; `.deps/opencv-minimal` preserves headers, libraries and runtime files and is ignored by Git. Without an explicit OpenCV path or `OpenCV_DIR` environment variable, the build helper prefers `.deps/opencv-minimal` and supports the older `build/opencv-minimal` layout. Initial configuration may download OpenCV third-party build dependencies. Use a fresh dependency build directory when changing OpenCV configurations. AI chat and text selection now live in auto-browser. The screenshot app requires no Qt WebEngine.
 
 ### Common Windows problems
 

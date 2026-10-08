@@ -44,7 +44,12 @@ int main(int argc, char *argv[])
 
     // 单实例：避免重复启动（托盘/全局快捷键类应用尤其需要）
     qInfo() << "main: checking single instance guard...";
-    const bool selectionTest = qEnvironmentVariableIsSet("NTSCREENSHOT_SELECTION_TEST");
+    const bool selectionTest =
+#ifdef NT_BUILD_SELECTION_TEST
+        qEnvironmentVariableIsSet("NTSCREENSHOT_SELECTION_TEST");
+#else
+        false;
+#endif
     RunGuard guard(selectionTest ? "ntscreenshot_selection_test_guard" : "ntscreenshot_run_guard");
     if (!guard.tryToRun()) {
         qInfo() << "main: another instance is already running, exiting";
@@ -56,6 +61,7 @@ int main(int argc, char *argv[])
 	MyApplication a(argc, argv);
 #ifdef NT_BUILD_SELECTION_TEST
     if (selectionTest) {
+        qInstallMessageHandler(nullptr);
         QStandardPaths::setTestModeEnabled(true);
         return runScreenshotSelectionTest(a);
     }
