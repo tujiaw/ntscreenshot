@@ -9,6 +9,7 @@
 
 #include <QBuffer>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QDebug>
 #include <QIcon>
@@ -32,6 +33,7 @@ QByteArray ImageToPng(const QImage& image) {
 }
 
 constexpr int kMaxHistoryValues[] = {20, 50, 100, 200};
+constexpr int kBackgroundTransparencyValues[] = {0, 20, 40, 80};
 
 } // namespace
 
@@ -355,49 +357,61 @@ void ClipboardLiteManager::PopulateClipboardMenu(QMenu* menu) {
     }
     menu->clear();
 
-    QAction* captureAction = menu->addAction(QStringLiteral("Monitor clipboard"));
+    QAction* captureAction = menu->addAction(QCoreApplication::translate("App", "监控剪切板"));
     MenuCheckMark::apply(captureAction, captureEnabled_);
     connect(captureAction, &QAction::triggered, this,
             [this]() { SetCaptureEnabled(!captureEnabled_); });
     menu->addSeparator();
 
-    menu->addAction(QStringLiteral("Show history\t") + ActiveShowHotkeyLabel(),
+    menu->addAction(QCoreApplication::translate("App", "显示历史记录") + QLatin1Char('\t') + ActiveShowHotkeyLabel(),
                     this, [this]() { ShowHistory(true); });
-    menu->addAction(QStringLiteral("Clear history"), this, [this]() {
+    menu->addAction(QCoreApplication::translate("App", "清空历史记录"), this, [this]() {
         history_.Clear();
         MarkHistoryDirty();
         RefreshPopupIfVisible();
     });
     menu->addSeparator();
 
-    QMenu* hotkeyMenu = menu->addMenu(QStringLiteral("Wake hotkey"));
+    QMenu* hotkeyMenu = menu->addMenu(QCoreApplication::translate("App", "唤醒快捷键"));
     for (const HotkeyOption& option : ShowHotkeyOptions()) {
         AppendHotkeyItem(hotkeyMenu, option.commandId);
     }
 
-    QMenu* pasteMenu = menu->addMenu(QStringLiteral("Paste hotkey"));
+    QMenu* pasteMenu = menu->addMenu(QCoreApplication::translate("App", "粘贴快捷键"));
     for (const PasteHotkeyOption& option : PasteHotkeyOptions()) {
         AppendPasteHotkeyItem(pasteMenu, option.commandId);
     }
 
-    QMenu* scaleMenu = menu->addMenu(QStringLiteral("Image paste size"));
+    QMenu* scaleMenu = menu->addMenu(QCoreApplication::translate("App", "图片粘贴尺寸"));
     for (const ImageScaleOption& option : ImageScaleOptions()) {
         AppendImageScaleItem(scaleMenu, option.commandId);
     }
 
-    QMenu* maxMenu = menu->addMenu(QStringLiteral("Max retained"));
+    QMenu* maxMenu = menu->addMenu(QCoreApplication::translate("App", "最大保留条数"));
     for (int value : kMaxHistoryValues) {
         AppendMaxItem(maxMenu, 0, static_cast<size_t>(value));
     }
 
+    QMenu* transparencyMenu = menu->addMenu(QCoreApplication::translate("App", "背景透明度"));
+    for (int percent : kBackgroundTransparencyValues) {
+        auto* action = transparencyMenu->addAction(percent == 0
+            ? QCoreApplication::translate("App", "不透明") : QStringLiteral("%1%").arg(percent));
+        MenuCheckMark::apply(action, backgroundTransparency_ == percent);
+        connect(action, &QAction::triggered, this, [this, percent]() {
+            backgroundTransparency_ = percent;
+            store_.SaveSettingInt("BackgroundTransparency", percent);
+            if (popup_) popup_->SetBackgroundTransparency(percent);
+        });
+    }
+
     menu->addSeparator();
 
-    menu->addAction(QStringLiteral("AI Fill Settings..."), this,
+    menu->addAction(QCoreApplication::translate("App", "AI 填充设置..."), this,
                     [this]() { ShowAiFillSettingsDialog(); });
 }
 
 void ClipboardLiteManager::AppendMaxItem(QMenu* menu, int, size_t value) {
-    QAction* act = menu->addAction(QString::number(value) + QStringLiteral(" items"));
+    QAction* act = menu->addAction(QCoreApplication::translate("App", "%1 条").arg(value));
     MenuCheckMark::apply(act, history_.MaxItems() == value);
     connect(act, &QAction::triggered, this, [this, value]() { SetMax(value); });
 }
@@ -427,7 +441,7 @@ void ClipboardLiteManager::AppendImageScaleItem(QMenu* menu, int id) {
     if (!option) {
         return;
     }
-    QAction* act = menu->addAction(option->label);
+    QAction* act = menu->addAction(QCoreApplication::translate("App", option->label));
     MenuCheckMark::apply(act, imageScaleMaxEdge_ == option->maxEdge);
     connect(act, &QAction::triggered, this, [this, id]() { SetImageScaleMaxEdge(FindImageScale(id)->maxEdge); });
 }
@@ -466,6 +480,10 @@ QString ClipboardLiteManager::ActiveImageScaleLabel() const {
 
 void ClipboardLiteManager::LoadSettings() {
     captureEnabled_ = store_.LoadSettingInt("CaptureEnabled", 1) != 0;
+    const int transparency = store_.LoadSettingInt("BackgroundTransparency", 0);
+    for (int percent : kBackgroundTransparencyValues) {
+        if (transparency == percent) backgroundTransparency_ = percent;
+    }
 
     int commandId = store_.LoadSettingInt("WakeHotkey", cl::id::HotkeyCtrlBacktick);
     if (FindShowHotkey(commandId)) {
@@ -768,13 +786,17 @@ void ClipboardLiteManager::EnsurePopup() {
         popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
         popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
         popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
+        popup_->SetBackgroundTransparency(backgroundTransparency_);
         return;
     }
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
+    connect(popup_, &HistoryWindow::imagePreviewRequested,
+            this, &ClipboardLiteManager::imagePreviewRequested);
     popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
     popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
     popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
+    popup_->SetBackgroundTransparency(backgroundTransparency_);
 }
 
 // ── Timer handlers ───────────────────────────────────────────────

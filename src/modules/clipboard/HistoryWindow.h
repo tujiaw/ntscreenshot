@@ -38,6 +38,7 @@ public:
                    bool aiConfigured,
                    DeleteCallback togglePinned = {});
     void SetSavedPosition(const QPoint& position, bool available);
+    void SetBackgroundTransparency(int percent);
     void SetSavedSize(const QSize& size, bool available, qreal savedScaleFactor = 1.0);
 
     void ShowPopup(bool activate = false);
@@ -45,6 +46,9 @@ public:
     void Refresh();
     void ShowHint(const QString& text, int timeoutMs = 2400);
     bool IsPopupVisible() const;
+
+signals:
+    void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -109,6 +113,7 @@ private:
     QPoint dragStartPos_;
     QString lastQuery_;
     qreal scaleFactor_ = 1.0;
+    int backgroundAlpha_ = 255;
 
 public:
     static constexpr int kPopupWidth = 340;

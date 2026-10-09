@@ -3,6 +3,106 @@
   <context>
     <name>App</name>
     <message>
+      <source>快捷启动</source>
+      <translation>Quick Launch</translation>
+    </message>
+    <message>
+      <source>快捷启动 %1</source>
+      <translation>Quick Launch %1</translation>
+    </message>
+    <message>
+      <source>置顶</source>
+      <translation>Pin to top</translation>
+    </message>
+    <message>
+      <source>取消置顶</source>
+      <translation>Unpin</translation>
+    </message>
+    <message>
+      <source>删除</source>
+      <translation>Delete</translation>
+    </message>
+    <message>
+      <source>AI 填充</source>
+      <translation>AI Fill</translation>
+    </message>
+    <message>
+      <source>预览</source>
+      <translation>Preview</translation>
+    </message>
+    <message>
+      <source>无法预览此图片</source>
+      <translation>Unable to preview this image</translation>
+    </message>
+    <message>
+      <source>监控剪切板</source>
+      <translation>Monitor clipboard</translation>
+    </message>
+    <message>
+      <source>显示历史记录</source>
+      <translation>Show history</translation>
+    </message>
+    <message>
+      <source>清空历史记录</source>
+      <translation>Clear history</translation>
+    </message>
+    <message>
+      <source>唤醒快捷键</source>
+      <translation>Wake hotkey</translation>
+    </message>
+    <message>
+      <source>粘贴快捷键</source>
+      <translation>Paste hotkey</translation>
+    </message>
+    <message>
+      <source>图片粘贴尺寸</source>
+      <translation>Image paste size</translation>
+    </message>
+    <message>
+      <source>最大保留条数</source>
+      <translation>Max retained</translation>
+    </message>
+    <message>
+      <source>背景透明度</source>
+      <translation>Background transparency</translation>
+    </message>
+    <message>
+      <source>不透明</source>
+      <translation>Opaque</translation>
+    </message>
+    <message>
+      <source>AI 填充设置...</source>
+      <translation>AI Fill Settings...</translation>
+    </message>
+    <message>
+      <source>%1 条</source>
+      <translation>%1 items</translation>
+    </message>
+    <message>
+      <source>原始尺寸</source>
+      <translation>Original size</translation>
+    </message>
+    <message>
+      <source>限制在 640 像素内</source>
+      <translation>Fit within 640 px</translation>
+    </message>
+    <message>
+      <source>限制在 1024 像素内</source>
+      <translation>Fit within 1024 px</translation>
+    </message>
+    <message>
+      <source>限制在 1600 像素内</source>
+      <translation>Fit within 1600 px</translation>
+    </message>
+    <message>
+      <source>快捷键不可用</source>
+      <translation>Hotkey unavailable</translation>
+    </message>
+    <message>
+      <source>粘贴快捷键不可用</source>
+      <translation>Paste hotkey unavailable</translation>
+    </message>
+    <message>
       <location filename="../../modules/settings/Settings.cpp" line="113" />
       <source>编译时间：</source>
       <translation>Build time:</translation>

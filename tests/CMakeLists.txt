@@ -36,6 +36,7 @@ add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
 set_tests_properties(screenshot_selection_release PROPERTIES TIMEOUT 30)
 
 add_executable(translation_tests i18n/TranslationTest.cpp)
+target_include_directories(translation_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(translation_tests PRIVATE Qt6::Core)
 if(MSVC)
     target_compile_options(translation_tests PRIVATE /utf-8)

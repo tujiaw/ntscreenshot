@@ -4,6 +4,7 @@
 #include "app/shell/ShellModule.h"
 
 #include "modules/capture/CaptureModule.h"
+#include "modules/capture/pin/PinWidget.h"
 #include "modules/clipboard/ClipboardLiteManager.h"
 #include "modules/settings/SettingsModule.h"
 
@@ -90,6 +91,11 @@ int main(int argc, char *argv[])
     qInfo() << "main: WindowManager created, registering modules...";
 	ModuleRegistry modules;
 	auto* clipboard = modules.emplaceModule<ClipboardLiteManager>();
+    QObject::connect(clipboard, &ClipboardLiteManager::imagePreviewRequested,
+                     &windowManager, [&windowManager](const QPixmap& pixmap, const QPoint& screenCenter) {
+        const QPoint previewPosition = screenCenter - QPoint(pixmap.width() / 2, pixmap.height() / 2);
+        PinWidget::popup(&windowManager, pixmap, previewPosition);
+    });
     qInfo() << "main: registered ClipboardLiteManager";
 	modules.emplaceModule<CaptureModule>(&windowManager);
     qInfo() << "main: registered CaptureModule";

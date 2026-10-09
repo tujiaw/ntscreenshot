@@ -17,9 +17,6 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
     pinAction_ = menu_->addAction(QCoreApplication::translate("App", "贴图"));
     connect(pinAction_, &QAction::triggered, this, &SystemTray::onPin);
 
-    localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "本地快速搜索"));
-    connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
-
     clipboardMenu_ = menu_->addMenu(QCoreApplication::translate("App", "剪切板"));
     clipboardAction_ = clipboardMenu_->menuAction();
     connect(clipboardMenu_, &QMenu::aboutToShow, this, &SystemTray::onClipboardMenuAboutToShow);
@@ -31,6 +28,9 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
                                               : QCoreApplication::translate("App", "剪切板 %1").arg(hotkey));
                 });
     }
+
+    localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "快捷启动"));
+    connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
 
     QAction *settingAction = menu_->addAction(QCoreApplication::translate("App", "设置"));
     connect(settingAction, &QAction::triggered, this, &SystemTray::onSetting);
@@ -101,8 +101,8 @@ void SystemTray::onUpdate()
 
     const QString searchKey = windowManager_->setting()->localSearchGlobalKey();
     localSearchAction_->setText(searchKey.isEmpty()
-                                    ? QCoreApplication::translate("App", "本地快速搜索")
-                                    : QCoreApplication::translate("App", "本地快速搜索 %1").arg(searchKey));
+                                    ? QCoreApplication::translate("App", "快捷启动")
+                                    : QCoreApplication::translate("App", "快捷启动 %1").arg(searchKey));
     const QString clipboardKey = clipboard_ ? clipboard_->ActiveShowHotkeyLabel() : QString();
     clipboardAction_->setText(clipboardKey.isEmpty()
                                   ? QCoreApplication::translate("App", "剪切板")

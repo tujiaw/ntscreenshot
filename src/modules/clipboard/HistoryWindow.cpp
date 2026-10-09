@@ -25,13 +25,14 @@
 #include <QShowEvent>
 #include <QStyledItemDelegate>
 #include <QTextLayout>
+#include <QTextOption>
 #include <QVBoxLayout>
 
 namespace {
 
 constexpr int kHeaderHeight = 34;
 constexpr int kSearchHeight = 24;
-constexpr int kRowHeight = 58;
+constexpr int kMaxPreviewLines = 3;
 constexpr int kNumberWidth = 28;
 constexpr int kTimeWidth = 40;
 
@@ -74,8 +75,23 @@ public:
         thumbCache_.clear();
     }
 
-    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const override {
-        return QSize(s(HistoryWindow::kPopupWidth), s(kRowHeight));
+    void setBackgroundAlpha(int alpha) { backgroundAlpha_ = alpha; }
+
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+        const auto* view = qobject_cast<const QAbstractItemView*>(parent());
+        const int width = view ? view->viewport()->width() : s(HistoryWindow::kPopupWidth);
+        int lineCount = 1;
+        const int historyIndex = index.data(Qt::UserRole).toInt();
+        if (history_ && historyIndex >= 0 && historyIndex < static_cast<int>(history_->Items().size())) {
+            const ClipItem& item = history_->Items()[static_cast<size_t>(historyIndex)];
+            if (item.kind == ClipKind::Image) {
+                lineCount = kMaxPreviewLines;
+            } else {
+                QTextLayout layout(PreviewText(item.text), option.font);
+                lineCount = LayoutPreview(layout, ContentWidth(width, option.font, historyIndex)).lines;
+            }
+        }
+        return QSize(width, lineCount * QFontMetrics(option.font).height() + s(10));
     }
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
@@ -91,7 +107,7 @@ public:
         const ThemeTokens& tokens = ThemeManager::tokens();
         if (selected) {
             painter->fillRect(rowRect.adjusted(s(1), 0, -s(1), 0),
-                              tokens.accentSubtle);
+                              WithAlpha(tokens.accentSubtle, backgroundAlpha_));
         }
 
         const int historyIndex = index.data(Qt::UserRole).toInt();
@@ -107,14 +123,15 @@ public:
         const QColor secondary = selected ? tokens.textSecondary
                                           : palette.color(QPalette::PlaceholderText);
 
-        QFont numberFont = option.font;
-        numberFont.setPointSizeF(qMax(8.0, numberFont.pointSizeF() - 0.5));
+        const QFont numberFont = NumberFont(option.font);
         painter->setFont(numberFont);
         painter->setPen(secondary);
-        const QRect numberRect(rowRect.left() + s(3), rowRect.top() + s(6),
-                               s(kNumberWidth - 6), rowRect.height() - s(12));
-        painter->drawText(numberRect, Qt::AlignTop | Qt::AlignRight,
-                          QString::number(historyIndex + 1));
+        const QString numberText = QString::number(historyIndex + 1);
+        const int numberWidth = QFontMetrics(numberFont).horizontalAdvance(numberText);
+        const QRect numberRect(rowRect.left() + s(2), rowRect.top() + s(6),
+                               numberWidth, rowRect.height() - s(12));
+        painter->drawText(numberRect, Qt::AlignTop | Qt::AlignLeft,
+                          numberText);
 
         const QRect timeRect(rowRect.right() - s(kTimeWidth), rowRect.top() + s(5),
                              s(kTimeWidth - 6), rowRect.height() - s(10));
@@ -124,11 +141,19 @@ public:
 
         if (item.pinned) {
             painter->setPen(tokens.accent);
-            painter->drawText(timeRect, Qt::AlignTop | Qt::AlignRight, QStringLiteral("PIN"));
+            if (rowRect.height() <= QFontMetrics(option.font).height() + s(10)) {
+                // A compact marker leaves the timestamp readable on one-line rows.
+                painter->setBrush(tokens.accent);
+                painter->setPen(Qt::NoPen);
+                painter->drawEllipse(QRect(timeRect.left() - s(6), rowRect.center().y() - s(2), s(4), s(4)));
+            } else {
+                painter->drawText(timeRect, Qt::AlignTop | Qt::AlignRight, QStringLiteral("PIN"));
+            }
         }
 
-        const QRect contentRect(rowRect.left() + s(kNumberWidth + 2), rowRect.top() + s(5),
-                                rowRect.width() - s(kNumberWidth + kTimeWidth + 10),
+        const int contentOffset = ContentOffset(option.font, historyIndex);
+        const QRect contentRect(rowRect.left() + contentOffset, rowRect.top() + s(5),
+                                ContentWidth(rowRect.width(), option.font, historyIndex),
                                 rowRect.height() - s(10));
         if (item.kind == ClipKind::Image) {
             DrawImage(painter, contentRect, item, historyIndex);
@@ -146,6 +171,50 @@ public:
 
 private:
     int s(int value) const { return Scaled(value, scaleFactor_); }
+
+    static QFont NumberFont(QFont font) {
+        font.setPointSizeF(qMax(8.0, font.pointSizeF() - 0.5));
+        return font;
+    }
+
+    int ContentOffset(const QFont& font, int historyIndex) const {
+        const int numberWidth = QFontMetrics(NumberFont(font)).horizontalAdvance(QString::number(historyIndex + 1));
+        // Keep one quarter of the original gap, including for multi-digit labels.
+        const int gap = qMax(s(2), qRound((s(kNumberWidth) - numberWidth) / 4.0));
+        return s(2) + numberWidth + gap;
+    }
+
+    int ContentWidth(int rowWidth, const QFont& font, int historyIndex) const {
+        return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8));
+    }
+
+    static QString PreviewText(QString text) {
+        text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+        text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+        text.replace(QLatin1Char('\t'), QLatin1Char(' '));
+        text.replace(QLatin1Char('\n'), QChar::LineSeparator);
+        return text;
+    }
+
+    struct PreviewLines { int lines; bool truncated; };
+
+    static PreviewLines LayoutPreview(QTextLayout& layout, int width) {
+        QTextOption textOption;
+        textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        layout.setTextOption(textOption);
+        layout.beginLayout();
+        int count = 0;
+        const int lineHeight = QFontMetrics(layout.font()).height();
+        for (; count < kMaxPreviewLines; ++count) {
+            QTextLine line = layout.createLine();
+            if (!line.isValid()) break;
+            line.setLineWidth(qMax(1, width));
+            line.setPosition(QPointF(0, count * lineHeight));
+        }
+        const bool truncated = layout.createLine().isValid();
+        layout.endLayout();
+        return {qMax(1, count), truncated};
+    }
 
     void DrawImage(QPainter* painter, const QRect& rect, const ClipItem& item,
                    int historyIndex) const {
@@ -171,33 +240,23 @@ private:
         painter->drawPixmap(rect.topLeft(), pixmap);
     }
 
-    static void DrawText(QPainter* painter, const QRect& rect, QString text,
+    static void DrawText(QPainter* painter, const QRect& rect, const QString& text,
                          const QFont& font, const QColor& color) {
-        text.replace(QRegularExpression(QStringLiteral("[\\r\\n\\t]+")), QStringLiteral(" "));
+        painter->save();
+        painter->setClipRect(rect, Qt::IntersectClip);
         painter->setFont(font);
         painter->setPen(color);
 
-        QTextLayout layout(text, font);
-        layout.beginLayout();
-        QList<QTextLine> lines;
-        for (int i = 0; i < 3; ++i) {
-            QTextLine line = layout.createLine();
-            if (!line.isValid()) {
-                break;
-            }
-            line.setLineWidth(rect.width());
-            line.setPosition(QPointF(0, i * line.height()));
-            lines.append(line);
-        }
-        const bool truncated = layout.createLine().isValid();
-        layout.endLayout();
+        QTextLayout layout(PreviewText(text), font);
+        const PreviewLines preview = LayoutPreview(layout, rect.width());
 
-        for (int i = 0; i < lines.size(); ++i) {
-            const QTextLine& line = lines[i];
-            if (i == lines.size() - 1 && truncated) {
-                const QString remaining = text.mid(line.textStart());
+        for (int i = 0; i < qMin(preview.lines, layout.lineCount()); ++i) {
+            const QTextLine line = layout.lineAt(i);
+            if (i == preview.lines - 1 && preview.truncated) {
+                QString lastLine = layout.text().mid(line.textStart(), line.textLength());
+                lastLine.remove(QChar::LineSeparator);
                 const QString elided = QFontMetrics(font).elidedText(
-                    remaining, Qt::ElideRight, rect.width());
+                    lastLine.trimmed() + QChar(0x2026), Qt::ElideRight, rect.width());
                 painter->drawText(rect.left(),
                                   rect.top() + qRound(line.y()) + QFontMetrics(font).ascent(),
                                   elided);
@@ -205,6 +264,7 @@ private:
                 line.draw(painter, rect.topLeft());
             }
         }
+        painter->restore();
     }
 
     struct Thumbnail {
@@ -214,6 +274,7 @@ private:
 
     const ClipboardHistory* history_ = nullptr;
     qreal scaleFactor_ = 1.0;
+    int backgroundAlpha_ = 255;
     mutable QHash<int, Thumbnail> thumbCache_;
 };
 
@@ -294,13 +355,14 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
 
     list_ = new QListWidget(body_);
     list_->setObjectName(QStringLiteral("clipList"));
-    list_->setUniformItemSizes(true);
+    list_->setUniformItemSizes(false);
+    list_->setResizeMode(QListView::Adjust);
     list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     list_->setSelectionMode(QAbstractItemView::SingleSelection);
     list_->setMouseTracking(false);
     list_->setFrameShape(QFrame::NoFrame);
-    delegate_ = new HistoryDelegate(nullptr, scaleFactor_, this);
+    delegate_ = new HistoryDelegate(nullptr, scaleFactor_, list_);
     list_->setItemDelegate(delegate_);
 
     emptyState_ = new QWidget(body_);
@@ -574,13 +636,18 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     const ClipItem contextItem = history_->Items()[index];
     const bool isText = contextItem.kind == ClipKind::Text;
     QMenu menu(this);
-    QAction* pinAction = menu.addAction(history_->Items()[index].pinned
-        ? QStringLiteral("Unpin") : QStringLiteral("Pin to top"));
+    QAction* pinAction = menu.addAction(contextItem.pinned
+        ? QCoreApplication::translate("App", "取消置顶")
+        : QCoreApplication::translate("App", "置顶"));
     pinAction->setEnabled(static_cast<bool>(togglePinned_));
-    QAction* copyAction = menu.addAction(QStringLiteral("Copy"));
-    QAction* deleteAction = menu.addAction(QStringLiteral("Delete"));
+    QAction* copyAction = menu.addAction(QCoreApplication::translate("App", "复制"));
+    QAction* previewAction = nullptr;
+    if (contextItem.kind == ClipKind::Image) {
+        previewAction = menu.addAction(QCoreApplication::translate("App", "预览"));
+    }
+    QAction* deleteAction = menu.addAction(QCoreApplication::translate("App", "删除"));
     menu.addSeparator();
-    QAction* aiAction = menu.addAction(QStringLiteral("AI Fill"));
+    QAction* aiAction = menu.addAction(QCoreApplication::translate("App", "AI 填充"));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
     QAction* selected = menu.exec(globalPos);
     if (selected == pinAction && togglePinned_) {
@@ -589,6 +656,17 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
             return ClipboardHistory::SameContent(item, contextItem);
         });
         if (found != items.end()) togglePinned_(static_cast<size_t>(std::distance(items.begin(), found)));
+    } else if (previewAction && selected == previewAction) {
+        const QPixmap pixmap = QPixmap::fromImage(QImage::fromData(contextItem.data, "PNG"));
+        if (!pixmap.isNull()) {
+            const QScreen* historyScreen = screen();
+            const QRect previewArea = historyScreen ? historyScreen->availableGeometry() : frameGeometry();
+            const QPoint screenCenter = previewArea.topLeft()
+                + QPoint(previewArea.width() / 2, previewArea.height() / 2);
+            emit imagePreviewRequested(pixmap, screenCenter);
+        } else {
+            ShowHint(QCoreApplication::translate("App", "无法预览此图片"));
+        }
     } else if (selected == copyAction) {
         CopySelected();
     } else if (selected == deleteAction) {
@@ -605,13 +683,12 @@ void HistoryWindow::ApplyTheme() {
     const QColor text = palette.color(QPalette::Text);
     const QColor muted = palette.color(QPalette::PlaceholderText);
     const QColor border = WithAlpha(text, 28);
-    const QColor listBase = tokens.surface;
     const QColor listText = tokens.textPrimary;
     const QColor listMuted = tokens.textSecondary;
 
     QPalette listPalette = list_->palette();
-    listPalette.setColor(QPalette::Base, listBase);
-    listPalette.setColor(QPalette::AlternateBase, listBase);
+    listPalette.setColor(QPalette::Base, Qt::transparent);
+    listPalette.setColor(QPalette::AlternateBase, Qt::transparent);
     listPalette.setColor(QPalette::Text, listText);
     listPalette.setColor(QPalette::PlaceholderText, listMuted);
     list_->setPalette(listPalette);
@@ -639,7 +716,7 @@ void HistoryWindow::ApplyTheme() {
                        "QScrollBar::handle:vertical { background: %3; border-radius: %4px;"
                        " min-height: %5px; }"
                        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }")
-            .arg(CssColor(listBase)).arg(scaled(7))
+            .arg(QStringLiteral("transparent")).arg(scaled(7))
             .arg(CssColor(WithAlpha(listMuted, 120))).arg(scaled(4)).arg(scaled(24)));
     const QString buttonStyle =
         QStringLiteral("QToolButton { color: %1; background: transparent; border: none;"
@@ -672,16 +749,31 @@ void HistoryWindow::ShowToast(const QString& text, int timeoutMs) {
     toastTimer_->start(timeoutMs);
 }
 
+void HistoryWindow::SetBackgroundTransparency(int percent) {
+    backgroundAlpha_ = qRound(255 * (100 - qBound(0, percent, 100)) / 100.0);
+    static_cast<HistoryDelegate*>(delegate_)->setBackgroundAlpha(backgroundAlpha_);
+    update();
+    list_->viewport()->update();
+}
+
 void HistoryWindow::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     QPainterPath path;
     path.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                         scaled(kRadius), scaled(kRadius));
-    painter.fillPath(path, palette().color(QPalette::Window));
+    const QColor windowBackground = WithAlpha(palette().color(QPalette::Window), backgroundAlpha_);
+    painter.fillPath(path, windowBackground);
+    // Paint the list background once on the translucent top-level surface.
+    // Replacing the header fill avoids stacking two translucent backgrounds.
+    painter.save();
+    painter.setClipPath(path);
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+    painter.fillRect(body_->geometry(), WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
+    painter.restore();
     // Match the frame to the title area's effective background color. The
     // header is transparent and therefore uses QPalette::Window as well.
-    painter.setPen(QPen(palette().color(QPalette::Window), scaled(1)));
+    painter.setPen(QPen(windowBackground, scaled(1)));
     painter.drawPath(path);
 }
 

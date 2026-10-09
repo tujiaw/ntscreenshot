@@ -37,6 +37,7 @@ public:
 
 signals:
     void wakeHotkeyChanged(const QString& hotkey);
+    void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
 
 protected:
     bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
@@ -145,6 +146,7 @@ private:
     int preferredPasteHotkeyCommand_ = cl::id::PasteHotkeyCtrlAltNum;
     int registeredPasteHotkeyCommand_ = 0;
     int imageScaleMaxEdge_ = 0;
+    int backgroundTransparency_ = 0;
 
     bool historyDirty_ = false;
     bool captureEnabled_ = true;

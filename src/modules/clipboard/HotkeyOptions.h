@@ -6,6 +6,7 @@
 
 #include <array>
 #include <QString>
+#include <QCoreApplication>
 
 // Hotkey / option tables. Virtual-key codes and MOD_* flags are native Win32
 // values used with RegisterHotKey, mirroring wtl_clipboard's AppOptions.
@@ -26,7 +27,7 @@ struct PasteHotkeyOption {
 struct ImageScaleOption {
     int commandId;
     int maxEdge;
-    QString label;
+    const char* label;
 };
 
 inline const std::array<HotkeyOption, 6>& ShowHotkeyOptions() {
@@ -52,10 +53,10 @@ inline const std::array<PasteHotkeyOption, 3>& PasteHotkeyOptions() {
 
 inline const std::array<ImageScaleOption, 4>& ImageScaleOptions() {
     static const std::array<ImageScaleOption, 4> options{ {
-        { cl::id::ImageScaleOriginal, 0, QStringLiteral("Original size") },
-        { cl::id::ImageScale640, 640, QStringLiteral("Fit within 640 px") },
-        { cl::id::ImageScale1024, 1024, QStringLiteral("Fit within 1024 px") },
-        { cl::id::ImageScale1600, 1600, QStringLiteral("Fit within 1600 px") },
+        { cl::id::ImageScaleOriginal, 0, QT_TRANSLATE_NOOP("App", "原始尺寸") },
+        { cl::id::ImageScale640, 640, QT_TRANSLATE_NOOP("App", "限制在 640 像素内") },
+        { cl::id::ImageScale1024, 1024, QT_TRANSLATE_NOOP("App", "限制在 1024 像素内") },
+        { cl::id::ImageScale1600, 1600, QT_TRANSLATE_NOOP("App", "限制在 1600 像素内") },
     } };
     return options;
 }
@@ -102,7 +103,7 @@ inline QString ShowHotkeyLabel(int registeredCommandId, int preferredCommandId) 
         return option->label;
     }
     option = FindShowHotkey(preferredCommandId);
-    return option ? option->label : QStringLiteral("hotkey unavailable");
+    return option ? option->label : QCoreApplication::translate("App", "快捷键不可用");
 }
 
 inline QString PasteHotkeyLabel(int registeredCommandId, int preferredCommandId) {
@@ -111,10 +112,11 @@ inline QString PasteHotkeyLabel(int registeredCommandId, int preferredCommandId)
         return option->label;
     }
     option = FindPasteHotkey(preferredCommandId);
-    return option ? option->label : QStringLiteral("paste hotkey unavailable");
+    return option ? option->label : QCoreApplication::translate("App", "粘贴快捷键不可用");
 }
 
 inline QString ImageScaleLabel(int maxEdge) {
     const ImageScaleOption* option = FindImageScaleByMaxEdge(maxEdge);
-    return option ? option->label : QStringLiteral("original size");
+    return option ? QCoreApplication::translate("App", option->label)
+                  : QCoreApplication::translate("App", "原始尺寸");
 }
