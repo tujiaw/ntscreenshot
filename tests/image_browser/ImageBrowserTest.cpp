@@ -23,6 +23,7 @@
 #include <QFontDatabase>
 #include <QImageReader>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QListView>
 #include <QLineF>
 #include <QMessageBox>
@@ -35,6 +36,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QStatusBar>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
@@ -225,6 +227,9 @@ int runImageBrowserTest(QApplication& app) {
     ImageCanvas canvas;
     canvas.resize(640, 480); canvas.show(); canvas.setImage(source, true);
     check(canvas.zoom() == 1.0, "small images default to actual size");
+    canvas.fit();
+    check(canvas.zoom() > 1.0, "explicit fit can enlarge small images");
+    canvas.setImage(source, true);
     canvas.resize(240, 140);
     QCoreApplication::processEvents();
     check(canvas.zoom() < 1 && canvas.viewportPoint(QPointF(0, 0)).x() >= 16 &&
@@ -410,10 +415,18 @@ int runImageBrowserTest(QApplication& app) {
                     }), "QA thumbnails loaded");
                     const auto* bar = qa->findChild<QToolBar*>();
                     for (auto* button : bar->findChildren<QToolButton*>()) {
-                        if (button->isVisible()) check(bar->rect().contains(button->geometry()), "toolbar button fits at DPI");
+                        if (button->isVisible()) {
+                            if (!bar->rect().contains(button->geometry())) qWarning() << "Toolbar geometry:" << bar->rect() << button->objectName() << button->geometry();
+                            check(bar->rect().contains(button->geometry()), "toolbar button fits at DPI");
+                        }
                     }
                     auto* images = qa->findChild<QListView*>();
+                    check(images->width() <= qRound(148 * scale), "thumbnail sidebar remains compact");
                     check(images->sizeHintForRow(0) >= images->fontMetrics().height() + qRound(80 * scale), "thumbnail text fits at DPI");
+                    auto* directoryLabel = qa->findChild<QLabel*>(QStringLiteral("browserDirectoryPath"));
+                    check(directoryLabel && directoryLabel->parentWidget() == qa->statusBar() &&
+                          directoryLabel->text() == directoryLabel->fontMetrics().elidedText(directoryLabel->toolTip(), Qt::ElideMiddle,
+                              qMax(0, directoryLabel->contentsRect().width() - 8)), "bottom directory path uses middle elision");
                     qa->grab().save(QDir(screenshots).filePath(QStringLiteral("browser-%1-%2-%3.png")
                         .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
                 }

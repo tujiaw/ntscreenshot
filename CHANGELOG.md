@@ -6,7 +6,7 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ### Added
 
-- Added a tray image browser with asynchronous thumbnails, directory watching, drag and drop, GIF playback, and basic crop/rotate/flip/resize editing. Edits support undo/redo and atomic PNG/JPEG export, with source conflict checks before overwriting.
+- Added a tray image browser with asynchronous thumbnails, directory watching, drag and drop, GIF playback, and basic crop/rotate/flip/resize editing. Edits support undo/redo and atomic PNG/JPEG export, with source conflict checks before overwriting. All actions are available in the context menu. Images open at actual size or shrink to fit with margins; format conversion supports installed PNG/JPEG/BMP/WebP writers.
 
 ## [0.1.4] - 2026-10-08
 

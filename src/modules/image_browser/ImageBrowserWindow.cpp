@@ -218,6 +218,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
     pathLabel_ = new QLabel(this);
+    pathLabel_->setObjectName(QStringLiteral("browserDirectoryPath"));
     pathLabel_->setTextFormat(Qt::PlainText);
     pathLabel_->setMargin(4);
     pathLabel_->setMinimumWidth(0);
@@ -284,7 +285,7 @@ ImageBrowserWindow::~ImageBrowserWindow() { loadGeneration_->store(++imageVersio
 
 void ImageBrowserWindow::applyDpi(double scale) {
     if (scale <= 0) scale = Util::getScreenScaleFactor(frameGeometry().center());
-    toolbar_->setProperty("browserExtensionExtent", qRound(22 * scale));
+    toolbar_->setProperty("browserExtensionExtent", qRound(22 * scale) + 1);
     setStyleSheet(QStringLiteral("#ImageBrowserWindow, #ImageBrowserWindow QWidget { font-size: %1px; }").arg(qRound(13 * scale)));
     toolbar_->setStyleSheet(QStringLiteral("QToolBar { spacing: %1px; border: 0; } QToolButton { min-width: 0; min-height: 0; padding: %2px; }")
                            .arg(qRound(2 * scale)).arg(qRound(4 * scale)));
@@ -296,6 +297,7 @@ void ImageBrowserWindow::applyDpi(double scale) {
     if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button"))) {
         extension->setFixedSize(qRound(22 * scale), qRound(34 * scale));
         extension->setStyleSheet(QStringLiteral("padding: 1px; min-width: 0; min-height: 0;"));
+        extension->setIcon(ThemeIcon::icon("browser-more.png"));
     }
     static_cast<ThumbnailDelegate*>(list_->itemDelegate())->scale = scale;
     QFont scaledFont = font();
@@ -312,6 +314,9 @@ void ImageBrowserWindow::applyDpi(double scale) {
         splitter_->setSizes({qRound(144 * scale), qRound(956 * scale)});
     }
     setMinimumSize(qRound(540 * scale), qRound(380 * scale));
+    QTimer::singleShot(0, this, [this, scale] {
+        splitter_->setSizes({qRound(144 * scale), qMax(1, splitter_->width() - qRound(144 * scale))});
+    });
     thumbnailsTimer_.start();
 }
 
@@ -492,6 +497,8 @@ void ImageBrowserWindow::updateStatus() {
     setWindowTitle(name.isEmpty() ? tr("图片浏览") : name + (document_.dirty() ? " * - " : " - ") + tr("图片浏览"));
 }
 void ImageBrowserWindow::updateActions() {
+    if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button")))
+        extension->setIcon(ThemeIcon::icon("browser-more.png"));
     for (auto* a : toolbar_->actions()) {
         const QString icon = a->property("browserIcon").toString();
         if (!icon.isEmpty()) a->setIcon(ThemeIcon::icon(icon));
