@@ -30,7 +30,7 @@ Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier,
 
 ### Image browser and editor
 
-Open **Image Browser** from the tray to browse the configured screenshot directory. Small images open at actual size; larger images fit with margins. Long directory paths are middle-elided in the bottom status bar. Choose or drop a directory, drop an image to locate it, and browse with thumbnails, zoom, and pan. Crop, rotate, flip, resize, undo, and redo are available, with all actions also accessible from the context menu. `Ctrl+S` saves a new PNG/JPEG; overwriting the source requires explicit confirmation. Format conversion supports PNG, JPEG, BMP, and WebP when its Qt plugin is installed.
+Open **Image Browser** from the tray to browse the configured screenshot directory. Small images open at actual size; larger images fit with margins. The status bar shows pixel dimensions, file size, position, and zoom. Choose or drop a directory, drop an image to locate it, and browse with thumbnails, zoom, and pan. Crop, rotate, flip, resize, undo, and redo are available, with all actions also accessible from the context menu. F11 toggles full screen and Esc exits it. `Ctrl+S` saves a new PNG/JPEG; overwriting the source requires explicit confirmation. Format conversion supports PNG, JPEG, BMP, and WebP when its Qt plugin is installed.
 
 Play or pause GIFs and use **Edit current frame** to export a static image. Animated WebP depends on the installed Qt image plugin, with a message when unsupported. Browsing is nonrecursive; images above 40 megapixels use a restricted preview.
 

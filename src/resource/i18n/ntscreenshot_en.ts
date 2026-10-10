@@ -1978,6 +1978,7 @@ Copied to clipboard</translation>
     <message><source>下一张</source><translation>Next image</translation></message>
     <message><source>适应窗口</source><translation>Fit to window</translation></message>
     <message><source>实际尺寸</source><translation>Actual size</translation></message>
+    <message><source>全屏</source><translation>Full screen</translation></message>
     <message><source>裁剪</source><translation>Crop</translation></message>
     <message><source>应用裁剪</source><translation>Apply crop</translation></message>
     <message><source>取消裁剪</source><translation>Cancel crop</translation></message>

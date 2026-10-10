@@ -25,6 +25,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
+#include <QLocale>
 #include <QLineF>
 #include <QMessageBox>
 #include <QMimeData>
@@ -273,6 +274,24 @@ int runImageBrowserTest(QApplication& app) {
     drop(window, {QUrl::fromLocalFile(path), QUrl::fromLocalFile(jpeg)});
     check(waitUntil([&] { auto* a = action(window, QStringLiteral("向右旋转")); return a && a->isEnabled(); }), "drop selects image");
     check(window->windowTitle().startsWith(QFileInfo(path).fileName()), "dropped file selected");
+    auto* details = window->findChild<QLabel*>(QStringLiteral("browserImageDetails"));
+    check(details && !details->toolTip().contains(QFileInfo(path).fileName()) && !details->toolTip().contains(temp.path()) &&
+          details->toolTip().contains(QLocale().formattedDataSize(QFileInfo(path).size())), "status shows file size without filename or directory");
+    trigger(window, QStringLiteral("全屏"));
+    check(window->isFullScreen() && action(window, QStringLiteral("全屏"))->isChecked(), "enter fullscreen");
+    trigger(window, QStringLiteral("全屏"));
+    check(!window->isFullScreen(), "leave fullscreen");
+    window->showMaximized();
+    trigger(window, QStringLiteral("全屏"));
+    QAction* escapeFullscreen = nullptr;
+    for (auto* a : window->actions()) if (a->shortcut() == QKeySequence(Qt::Key_Escape)) escapeFullscreen = a;
+    check(escapeFullscreen && escapeFullscreen->isEnabled(), "Escape enabled in fullscreen");
+    trigger(window, QStringLiteral("裁剪"));
+    if (escapeFullscreen) escapeFullscreen->trigger();
+    check(window->isFullScreen() && !action(window, QStringLiteral("裁剪"))->isChecked(), "Escape cancels crop before exiting fullscreen");
+    if (escapeFullscreen) escapeFullscreen->trigger();
+    check(window->isMaximized(), "fullscreen restores maximized state");
+    window->showNormal();
     QTimer::singleShot(0, [&] {
         auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
         check(menu && menu->actions().contains(action(window, QStringLiteral("格式转换"))) &&
@@ -423,10 +442,8 @@ int runImageBrowserTest(QApplication& app) {
                     auto* images = qa->findChild<QListView*>();
                     check(images->width() <= qRound(148 * scale), "thumbnail sidebar remains compact");
                     check(images->sizeHintForRow(0) >= images->fontMetrics().height() + qRound(80 * scale), "thumbnail text fits at DPI");
-                    auto* directoryLabel = qa->findChild<QLabel*>(QStringLiteral("browserDirectoryPath"));
-                    check(directoryLabel && directoryLabel->parentWidget() == qa->statusBar() &&
-                          directoryLabel->text() == directoryLabel->fontMetrics().elidedText(directoryLabel->toolTip(), Qt::ElideMiddle,
-                              qMax(0, directoryLabel->contentsRect().width() - 8)), "bottom directory path uses middle elision");
+                    check(!qa->findChild<QLabel*>(QStringLiteral("browserDirectoryPath")), "directory removed from status bar");
+                    check(bar->styleSheet().contains("border: 0") && bar->styleSheet().contains("spacing: 0"), "borderless compact toolbar");
                     qa->grab().save(QDir(screenshots).filePath(QStringLiteral("browser-%1-%2-%3.png")
                         .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
                 }

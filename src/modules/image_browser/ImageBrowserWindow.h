@@ -56,6 +56,7 @@ private:
     void stopMovie();
     void screenshotDirectory();
     void updateStatus();
+    void toggleFullscreen();
 
 private slots:
     void applyDpi(double scale = 0);
@@ -69,7 +70,6 @@ private:
     QListView* list_;
     QSplitter* splitter_;
     QToolBar* toolbar_;
-    QLabel* pathLabel_;
     QLabel* details_ = nullptr;
     QMovie* movie_ = nullptr;
     QFileSystemWatcher directoryWatcher_;
@@ -86,6 +86,9 @@ private:
     bool scanning_ = false;
     bool animationSource_ = false;
     bool resumeMovie_ = false;
+    bool restoreMaximized_ = false;
+    QAction* fullscreenAction_ = nullptr;
+    QAction* exitFullscreenAction_ = nullptr;
     QAction* saveAction_;
     QAction* overwriteAction_;
     QAction* copyAction_;

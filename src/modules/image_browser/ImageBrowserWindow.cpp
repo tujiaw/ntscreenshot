@@ -23,6 +23,7 @@
 #include <QImageWriter>
 #include <QLabel>
 #include <QListView>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
@@ -148,6 +149,16 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         button->setToolButtonStyle(Qt::ToolButtonTextOnly);
         button->setText(QStringLiteral("1:1"));
     }
+    fullscreenAction_ = action(tr("全屏"), "browser-actual.png", QKeySequence("F11"), [this] { toggleFullscreen(); });
+    fullscreenAction_->setCheckable(true);
+    exitFullscreenAction_ = new QAction(this);
+    exitFullscreenAction_->setShortcut(QKeySequence(Qt::Key_Escape));
+    exitFullscreenAction_->setEnabled(false);
+    addAction(exitFullscreenAction_);
+    connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
+        if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
+        else if (isFullScreen()) toggleFullscreen();
+    });
     toolbar_->addSeparator();
     cropAction_ = action(tr("裁剪"), "browser-crop.png", {}, [this] {
         canvas_->setCropping(cropAction_->isChecked()); updateActions();
@@ -217,12 +228,6 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
-    pathLabel_ = new QLabel(this);
-    pathLabel_->setObjectName(QStringLiteral("browserDirectoryPath"));
-    pathLabel_->setTextFormat(Qt::PlainText);
-    pathLabel_->setMargin(4);
-    pathLabel_->setMinimumWidth(0);
-    pathLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     splitter_ = new QSplitter(central);
     list_ = new QListView(splitter_);
     list_->setModel(model_);
@@ -238,13 +243,12 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     layout->addWidget(splitter_, 1);
     setCentralWidget(central);
     details_ = new QLabel(this);
+    details_->setObjectName(QStringLiteral("browserImageDetails"));
     details_->setTextFormat(Qt::PlainText);
     details_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     details_->setMinimumWidth(0);
-    statusBar()->addWidget(details_, 3);
-    statusBar()->addPermanentWidget(pathLabel_, 2);
+    statusBar()->addWidget(details_, 1);
     details_->installEventFilter(this);
-    pathLabel_->installEventFilter(this);
     for (QWidget* surface : {static_cast<QWidget*>(canvas_), list_->viewport(), static_cast<QWidget*>(toolbar_)}) {
         surface->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(surface, &QWidget::customContextMenuRequested, this, [this, surface](const QPoint& point) {
@@ -287,16 +291,21 @@ void ImageBrowserWindow::applyDpi(double scale) {
     if (scale <= 0) scale = Util::getScreenScaleFactor(frameGeometry().center());
     toolbar_->setProperty("browserExtensionExtent", qRound(22 * scale) + 1);
     setStyleSheet(QStringLiteral("#ImageBrowserWindow, #ImageBrowserWindow QWidget { font-size: %1px; }").arg(qRound(13 * scale)));
-    toolbar_->setStyleSheet(QStringLiteral("QToolBar { spacing: %1px; border: 0; } QToolButton { min-width: 0; min-height: 0; padding: %2px; }")
-                           .arg(qRound(2 * scale)).arg(qRound(4 * scale)));
+    toolbar_->setStyleSheet(QStringLiteral(
+        "QToolBar { spacing: 0; border: 0; padding: 0; } "
+        "QToolBar QToolButton { min-width: 0; min-height: 0; padding: %1px; border: 0; border-radius: 0; background: transparent; } "
+        "QToolBar QToolButton:hover, QToolBar QToolButton:pressed { border: 0; background: rgba(128,128,128,28); } "
+        "QToolBar QToolButton:checked { border: 0; background: rgba(70,130,210,45); } "
+        "QToolBar QToolButton::menu-indicator { image: none; width: 0; }")
+        .arg(qRound(2 * scale)));
     toolbar_->setIconSize(QSize(qRound(20 * scale), qRound(20 * scale)));
     for (auto* a : toolbar_->actions()) {
         if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a)))
-            button->setFixedSize(qRound(34 * scale), qRound(34 * scale));
+            button->setFixedSize(qRound(28 * scale), qRound(30 * scale));
     }
     if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button"))) {
-        extension->setFixedSize(qRound(22 * scale), qRound(34 * scale));
-        extension->setStyleSheet(QStringLiteral("padding: 1px; min-width: 0; min-height: 0;"));
+        extension->setFixedSize(qRound(22 * scale), qRound(30 * scale));
+        extension->setStyleSheet(QStringLiteral("padding: 1px; min-width: 0; min-height: 0; border: 0;"));
         extension->setIcon(ThemeIcon::icon("browser-more.png"));
     }
     static_cast<ThumbnailDelegate*>(list_->itemDelegate())->scale = scale;
@@ -336,8 +345,6 @@ void ImageBrowserWindow::openDirectory(const QString& directory, const QString& 
     canvas_->setImage({}, true);
     directory_ = QDir(directory).absolutePath();
     pendingSelection_ = selection;
-    pathLabel_->setText(directory_);
-    pathLabel_->setToolTip(directory_);
     const auto paths = directoryWatcher_.directories() + directoryWatcher_.files();
     if (!paths.isEmpty()) directoryWatcher_.removePaths(paths);
     if (QFileInfo(directory_).isDir()) directoryWatcher_.addPath(directory_);
@@ -485,16 +492,26 @@ void ImageBrowserWindow::requestThumbnails() {
                          QSize(qRound(128 * scale), qRound(80 * scale)));
 }
 void ImageBrowserWindow::updateStatus() {
-    pathLabel_->setText(pathLabel_->fontMetrics().elidedText(directory_, Qt::ElideMiddle, qMax(0, pathLabel_->contentsRect().width() - 8)));
     const int row = model_->indexOf(document_.path);
     const QString name = QFileInfo(document_.path).fileName();
-    const QString text = QStringLiteral("%1%2   %3 x %4   %5 / %6   %7%")
-        .arg(name, document_.dirty() ? QStringLiteral(" *") : QString())
-        .arg(displayedSize_.width()).arg(displayedSize_.height()).arg(row + 1).arg(model_->rowCount())
-        .arg(qRound(canvas_->zoom() * 100));
+    const QString fileSize = document_.fileSize >= 0 ? QLocale().formattedDataSize(document_.fileSize) : QStringLiteral("-");
+    const QString text = name.isEmpty() ? QString() : QStringLiteral("%1 x %2   %3   %4 / %5   %6%")
+        .arg(qMax(0, displayedSize_.width())).arg(qMax(0, displayedSize_.height())).arg(fileSize)
+        .arg(row + 1).arg(model_->rowCount()).arg(qRound(canvas_->zoom() * 100));
     details_->setText(details_->fontMetrics().elidedText(text, Qt::ElideMiddle, qMax(0, details_->contentsRect().width())));
     details_->setToolTip(text);
     setWindowTitle(name.isEmpty() ? tr("图片浏览") : name + (document_.dirty() ? " * - " : " - ") + tr("图片浏览"));
+}
+void ImageBrowserWindow::toggleFullscreen() {
+    if (isFullScreen()) {
+        if (restoreMaximized_) showMaximized();
+        else showNormal();
+    } else {
+        restoreMaximized_ = isMaximized();
+        showFullScreen();
+    }
+    fullscreenAction_->setChecked(isFullScreen());
+    exitFullscreenAction_->setEnabled(isFullScreen());
 }
 void ImageBrowserWindow::updateActions() {
     if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button")))
@@ -503,7 +520,8 @@ void ImageBrowserWindow::updateActions() {
         const QString icon = a->property("browserIcon").toString();
         if (!icon.isEmpty()) a->setIcon(ThemeIcon::icon(icon));
         if (icon == QStringLiteral("browser-actual.png")) {
-            if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a))) button->setText(QStringLiteral("1:1"));
+            if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a)); button && button->toolButtonStyle() == Qt::ToolButtonTextOnly)
+                button->setText(QStringLiteral("1:1"));
         }
     }
     const bool available = !document_.current.isNull() && !loading_ && !busy_;
@@ -761,6 +779,10 @@ void ImageBrowserWindow::showEvent(QShowEvent* event) {
 }
 void ImageBrowserWindow::changeEvent(QEvent* event) {
     QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::WindowStateChange && fullscreenAction_) {
+        fullscreenAction_->setChecked(isFullScreen());
+        exitFullscreenAction_->setEnabled(isFullScreen());
+    }
     if (event->type() == QEvent::WindowStateChange && movie_) {
         if (isMinimized() && movie_->state() == QMovie::Running) { resumeMovie_ = true; movie_->setPaused(true); }
         else if (!isMinimized() && resumeMovie_) { resumeMovie_ = false; movie_->setPaused(false); }
@@ -769,7 +791,7 @@ void ImageBrowserWindow::changeEvent(QEvent* event) {
     if (event->type() == QEvent::PaletteChange && details_) { updateActions(); update(); list_->viewport()->update(); }
 }
 bool ImageBrowserWindow::eventFilter(QObject* watched, QEvent* event) {
-    if ((watched == pathLabel_ || watched == details_) && event->type() == QEvent::Resize)
+    if (watched == details_ && event->type() == QEvent::Resize)
         QTimer::singleShot(0, this, &ImageBrowserWindow::updateStatus);
     if (watched == list_->viewport() && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
         thumbnailsTimer_.start(); updateStatus();
