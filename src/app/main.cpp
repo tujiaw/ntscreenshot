@@ -9,6 +9,7 @@
 #include "modules/settings/SettingsModule.h"
 
 #include "modules/local_search/LocalSearchModule.h"
+#include "modules/image_browser/ImageBrowserModule.h"
 #include "core/theme/DarkStyle.h"
 #include "core/runtime/RunGuard.h"
 #include "core/platform/Util.h"
@@ -22,6 +23,9 @@
 #include <QStandardPaths>
 #ifdef NT_BUILD_SELECTION_TEST
 int runScreenshotSelectionTest(QApplication& app);
+#endif
+#ifdef NT_BUILD_IMAGE_BROWSER_TEST
+int runImageBrowserTest(QApplication& app);
 #endif
 
 #ifdef Q_OS_WIN
@@ -51,7 +55,14 @@ int main(int argc, char *argv[])
 #else
         false;
 #endif
-    RunGuard guard(selectionTest ? "ntscreenshot_selection_test_guard" : "ntscreenshot_run_guard");
+    const bool imageBrowserTest =
+#ifdef NT_BUILD_IMAGE_BROWSER_TEST
+        qEnvironmentVariableIsSet("NTSCREENSHOT_IMAGE_BROWSER_TEST");
+#else
+        false;
+#endif
+    RunGuard guard(imageBrowserTest ? "ntscreenshot_image_browser_test_guard" :
+                   selectionTest ? "ntscreenshot_selection_test_guard" : "ntscreenshot_run_guard");
     if (!guard.tryToRun()) {
         qInfo() << "main: another instance is already running, exiting";
         return 0;
@@ -60,6 +71,15 @@ int main(int argc, char *argv[])
 
     qInfo() << "main: constructing QApplication...";
 	MyApplication a(argc, argv);
+#ifdef NT_BUILD_IMAGE_BROWSER_TEST
+    if (imageBrowserTest) {
+        qInstallMessageHandler(nullptr);
+        QStandardPaths::setTestModeEnabled(true);
+        a.setApplicationName(QStringLiteral("ntscreenshot_image_browser_tests"));
+        a.setQuitOnLastWindowClosed(false);
+        return runImageBrowserTest(a);
+    }
+#endif
 #ifdef NT_BUILD_SELECTION_TEST
     if (selectionTest) {
         qInstallMessageHandler(nullptr);
@@ -104,6 +124,7 @@ int main(int argc, char *argv[])
     qInfo() << "main: registered SettingsModule";
 
 	auto* localSearch = modules.emplaceModule<LocalSearchModule>(windowManager.setting());
+    modules.emplaceModule<ImageBrowser::ImageBrowserModule>(windowManager.setting());
     qInfo() << "main: registered LocalSearchModule";
 	modules.emplaceModule<ShellModule>(&windowManager, clipboard);
     qInfo() << "main: registered ShellModule, total modules =" << modules.moduleIds().size();

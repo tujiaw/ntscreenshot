@@ -32,6 +32,33 @@
         <file>images/ctx_copy.png</file>
         <file>images/ctx_folder.png</file>
         <file>images/ctx_terminal.png</file>
+        <file>images/browser-folder.png</file>
+        <file>images/browser-home.png</file>
+        <file>images/browser-refresh.png</file>
+        <file>images/browser-sidebar.png</file>
+        <file>images/browser-previous.png</file>
+        <file>images/browser-next.png</file>
+        <file>images/browser-fit.png</file>
+        <file>images/browser-actual.png</file>
+        <file>images/browser-crop.png</file>
+        <file>images/browser-rotate-left.png</file>
+        <file>images/browser-rotate-right.png</file>
+        <file>images/browser-flip-horizontal.png</file>
+        <file>images/browser-flip-vertical.png</file>
+        <file>images/browser-resize.png</file>
+        <file>images/browser-redo.png</file>
+        <file>images/browser-reset.png</file>
+        <file>images/browser-play.png</file>
+        <file>images/browser-pause.png</file>
+        <file>images/browser-frame.png</file>
+        <file>images/browser-convert.png</file>
+        <file>images/browser-copy.png</file>
+        <file>images/browser-save.png</file>
+        <file>images/browser-more.png</file>
+        <file>images/browser-undo.png</file>
+        <file>images/browser-apply.png</file>
+        <file>images/browser-cancel.png</file>
+        <file>licenses/lucide-LICENSE</file>
         <file>images/chrome.png</file>
         <file>icons/bing.ico</file>
         <file>icons/google.ico</file>

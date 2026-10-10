@@ -20,6 +20,7 @@ namespace WidgetID {
 	const QString SCREENSHOT = "SCREENSHOT";
 
     const QString LOCAL_SEARCH = "LOCAL_SEARCH";
+    const QString IMAGE_BROWSER = "IMAGE_BROWSER";
     const QString LONG_SCREENSHOT = "LONG_SCREENSHOT";
     const QString GIF_RECORDER = "GIF_RECORDER";
     const QString MASK = "MASK";

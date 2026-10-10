@@ -17,6 +17,8 @@ endfunction()
 
 target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/capture/ScreenshotSelectionTest.cpp)
 target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_SELECTION_TEST=1)
+target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/image_browser/ImageBrowserTest.cpp)
+target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_IMAGE_BROWSER_TEST=1)
 
 # Imported targets expose the actual DLL directory for both prebuilt OpenCV
 # packages and locally built minimal runtimes.
@@ -34,6 +36,15 @@ add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
     "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
     $<TARGET_FILE:ntscreenshot>)
 set_tests_properties(screenshot_selection_release PROPERTIES TIMEOUT 30)
+
+add_test(NAME image_browser_workflow COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_IMAGE_BROWSER_TEST=1"
+    "QT_FORCE_STDERR_LOGGING=1"
+    "QT_QPA_PLATFORM=offscreen"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(image_browser_workflow PROPERTIES TIMEOUT 90)
 
 add_executable(translation_tests i18n/TranslationTest.cpp)
 target_include_directories(translation_tests PRIVATE ${NT_SOURCE_DIR})

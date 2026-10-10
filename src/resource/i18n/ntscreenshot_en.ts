@@ -2,6 +2,7 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>图片浏览</source><translation>Image Browser</translation></message>
     <message>
       <source>快捷启动</source>
       <translation>Quick Launch</translation>
@@ -1961,5 +1962,89 @@ Copied to clipboard</translation>
       <source>语言已保存，重启应用后生效</source>
       <translation>Language saved. Restart the app to apply it.</translation>
     </message>
+  </context>
+  <context>
+    <name>ImageBrowser::ImageBrowserWindow</name>
+    <message><source>无法预览</source><translation>Cannot preview</translation></message>
+    <message><source>保存图片</source><translation>Saving image</translation></message>
+    <message><source>正在保存图片…</source><translation>Saving image...</translation></message>
+    <message><source>图片浏览</source><translation>Image browser</translation></message>
+    <message><source>图片工具</source><translation>Image tools</translation></message>
+    <message><source>选择目录</source><translation>Choose directory</translation></message>
+    <message><source>截图目录</source><translation>Screenshot directory</translation></message>
+    <message><source>刷新</source><translation>Refresh</translation></message>
+    <message><source>缩略图</source><translation>Thumbnails</translation></message>
+    <message><source>上一张</source><translation>Previous image</translation></message>
+    <message><source>下一张</source><translation>Next image</translation></message>
+    <message><source>适应窗口</source><translation>Fit to window</translation></message>
+    <message><source>实际尺寸</source><translation>Actual size</translation></message>
+    <message><source>裁剪</source><translation>Crop</translation></message>
+    <message><source>应用裁剪</source><translation>Apply crop</translation></message>
+    <message><source>取消裁剪</source><translation>Cancel crop</translation></message>
+    <message><source>向左旋转</source><translation>Rotate left</translation></message>
+    <message><source>向右旋转</source><translation>Rotate right</translation></message>
+    <message><source>水平翻转</source><translation>Flip horizontally</translation></message>
+    <message><source>垂直翻转</source><translation>Flip vertically</translation></message>
+    <message><source>调整图片尺寸</source><translation>Resize image</translation></message>
+    <message><source>撤销</source><translation>Undo</translation></message>
+    <message><source>重做</source><translation>Redo</translation></message>
+    <message><source>恢复原图</source><translation>Restore original</translation></message>
+    <message><source>播放／暂停</source><translation>Play / pause</translation></message>
+    <message><source>编辑当前帧</source><translation>Edit current frame</translation></message>
+    <message><source>复制图片</source><translation>Copy image</translation></message>
+    <message><source>图片已复制</source><translation>Image copied</translation></message>
+    <message><source>另存为</source><translation>Save as</translation></message>
+    <message><source>格式转换</source><translation>Convert format</translation></message>
+    <message><source>目标格式</source><translation>Output format</translation></message>
+    <message><source>文件扩展名必须与所选格式一致。</source><translation>The filename extension must match the selected format.</translation></message>
+    <message><source>透明区域</source><translation>Transparency</translation></message>
+    <message><source>此格式会将透明区域替换为白色，是否继续？</source><translation>This format replaces transparent areas with white. Continue?</translation></message>
+    <message><source>将当前帧转换为静态图片，不保留动画，是否继续？</source><translation>Convert the current frame to a static image without animation. Continue?</translation></message>
+    <message><source>更多</source><translation>More</translation></message>
+    <message><source>覆盖原图</source><translation>Overwrite original</translation></message>
+    <message><source>在资源管理器中定位</source><translation>Show in Explorer</translation></message>
+    <message><source>正在读取目录…</source><translation>Loading directory...</translation></message>
+    <message><source>此目录中没有图片。</source><translation>No images in this directory.</translation></message>
+    <message><source>原文件已被外部修改，请将编辑结果另存为新文件。</source><translation>Source changed externally. Save your edits to a new file.</translation></message>
+    <message><source>原文件已不在当前目录中，仍可另存图片副本。</source><translation>Source is no longer in this directory. You can still save a copy.</translation></message>
+    <message><source>正在加载图片…</source><translation>Loading image...</translation></message>
+    <message><source>无法打开图片：%1</source><translation>Cannot open image: %1</translation></message>
+    <message><source>受限预览：超过 4000 万像素的图片不支持编辑或复制。</source><translation>Preview only: images above 40 megapixels cannot be edited or copied.</translation></message>
+    <message><source>无法播放动图，当前显示静态帧。</source><translation>Animation playback unavailable. Showing a static frame.</translation></message>
+    <message><source>当前图片插件不支持动图播放。</source><translation>Animation playback is not supported by the installed image plugin.</translation></message>
+    <message><source>正在编辑静态帧，请另存为 PNG 或 JPEG 图片。</source><translation>Editing a static frame. Save as PNG or JPEG.</translation></message>
+    <message><source>未保存的编辑</source><translation>Unsaved changes</translation></message>
+    <message><source>离开当前图片前，要保存编辑结果吗？</source><translation>Save your edits before leaving this image?</translation></message>
+    <message><source>放弃</source><translation>Discard</translation></message>
+    <message><source>无法覆盖</source><translation>Cannot overwrite</translation></message>
+    <message><source>确定替换原始图片吗？</source><translation>Replace the original image?</translation></message>
+    <message><source>PNG 图片 (*.png)</source><translation>PNG image (*.png)</translation></message>
+    <message><source>JPEG 图片 (*.jpg *.jpeg)</source><translation>JPEG image (*.jpg *.jpeg)</translation></message>
+    <message><source>请选择 PNG 或 JPEG 文件名。</source><translation>Choose a PNG or JPEG filename.</translation></message>
+    <message><source>请选择新文件名，或使用“覆盖原图”。</source><translation>Choose a new filename, or use Overwrite original.</translation></message>
+    <message><source>JPEG 透明区域</source><translation>JPEG transparency</translation></message>
+    <message><source>JPEG 会将透明区域替换为白色，是否继续？</source><translation>JPEG replaces transparent areas with white. Continue?</translation></message>
+    <message><source>保存失败</source><translation>Save failed</translation></message>
+    <message><source>图片已保存</source><translation>Image saved</translation></message>
+    <message><source>正在处理图片…</source><translation>Processing image...</translation></message>
+    <message><source>锁定宽高比</source><translation>Keep aspect ratio</translation></message>
+    <message><source>宽度（像素）</source><translation>Width (pixels)</translation></message>
+    <message><source>高度（像素）</source><translation>Height (pixels)</translation></message>
+    <message><source>请拖入本地图片或目录。</source><translation>Drop a local image or directory.</translation></message>
+    <message><source>已打开第一个有效项目，忽略了 %1 项。</source><translation>Opened the first valid item; %1 items ignored.</translation></message>
+  </context>
+  <context>
+    <name>ImageBrowser::ImageDirectoryModel</name>
+    <message><source>目录不存在或无法读取。</source><translation>Directory does not exist or cannot be read.</translation></message>
+  </context>
+  <context>
+    <name>ImageBrowser</name>
+    <message><source>原文件已被外部修改，请将编辑结果另存为新文件。</source><translation>Source changed externally. Save your edits to a new file.</translation></message>
+    <message><source>图片解码失败或内存不足。</source><translation>Image decoding failed or insufficient memory.</translation></message>
+    <message><source>裁剪区域无效。</source><translation>Invalid crop area.</translation></message>
+    <message><source>图片尺寸超过 4000 万像素的编辑上限。</source><translation>Image size exceeds the 40 megapixel editing limit.</translation></message>
+    <message><source>图片处理失败或内存不足。</source><translation>Image processing failed or insufficient memory.</translation></message>
+    <message><source>没有可保存的图片。</source><translation>No image to save.</translation></message>
+    <message><source>图片保存失败或内存不足。</source><translation>Image saving failed or insufficient memory.</translation></message>
   </context>
 </TS>

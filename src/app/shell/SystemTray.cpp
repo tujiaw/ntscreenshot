@@ -32,6 +32,11 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
     localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "快捷启动"));
     connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
 
+    QAction* imageBrowser = menu_->addAction(QCoreApplication::translate("App", "图片浏览"));
+    connect(imageBrowser, &QAction::triggered, this, [this] {
+        windowManager_->openWidget(WidgetID::IMAGE_BROWSER);
+    });
+
     QAction *settingAction = menu_->addAction(QCoreApplication::translate("App", "设置"));
     connect(settingAction, &QAction::triggered, this, &SystemTray::onSetting);
 
@@ -73,7 +78,7 @@ void SystemTray::onSetting()
 
 void SystemTray::onExit()
 {
-    qApp->exit();
+    qApp->quit();
 }
 
 void SystemTray::onClipboardMenuAboutToShow()

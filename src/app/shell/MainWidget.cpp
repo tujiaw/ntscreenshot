@@ -108,5 +108,5 @@ void MainWidget::slotLocalSearchShortcut()
 
 void MainWidget::slotExit()
 {
-    qApp->exit();
+    qApp->quit();
 }

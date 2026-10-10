@@ -13,6 +13,7 @@ ntscreenshot is licensed under Apache-2.0. The following third-party components 
 | libpng | OpenCV image codec dependency | libpng-2.0 |
 | zlib | Compression dependency | Zlib |
 | quirc | QR decoding dependency | ISC |
+| Lucide icons | Image browser toolbar icons, rasterized from v0.468.0 | ISC; full notice in `src/resource/licenses/lucide-LICENSE` and application resources |
 
 The Windows packaging script copies available vcpkg copyright files and QHotkey's license into the package's `licenses` directory. Qt deployment and redistribution must comply with the Qt license selected by the distributor. In particular, distributors using LGPL Qt builds must include the applicable Qt license texts, preserve the user's relinking and replacement rights, and meet the corresponding source-code requirements. See the [Qt licensing documentation](https://doc.qt.io/qt-6/licensing.html).
 

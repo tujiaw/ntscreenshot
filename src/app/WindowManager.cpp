@@ -11,6 +11,7 @@
 #include "modules/settings/SettingsModule.h"
 
 #include "modules/local_search/LocalSearchModule.h"
+#include "modules/image_browser/ImageBrowserModule.h"
 
 WindowManager::WindowManager()
     : settingModel_(std::make_unique<SettingModel>(nullptr))
@@ -68,6 +69,10 @@ void WindowManager::openWidget(const QString& id)
     } else if (id == WidgetID::SETTINGS) {
         if (auto* settings = modules_->module<SettingsModule>()) {
             settings->open();
+        }
+    } else if (id == WidgetID::IMAGE_BROWSER) {
+        if (auto* browser = modules_->module<ImageBrowser::ImageBrowserModule>()) {
+            browser->open();
         }
     } else if (id == WidgetID::LOCAL_SEARCH) {
         if (auto* localSearch = modules_->module<LocalSearchModule>()) {

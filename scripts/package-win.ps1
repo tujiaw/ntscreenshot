@@ -235,6 +235,10 @@ function Copy-PackageDocuments([string]$RepoRoot, [string]$StageDir, [string]$Qt
 
   $licenseDir = Join-Path $StageDir 'licenses'
   New-Item -ItemType Directory -Force -Path $licenseDir | Out-Null
+  $lucideLicense = Join-Path $RepoRoot 'src\resource\licenses\lucide-LICENSE'
+  if (Test-Path -LiteralPath $lucideLicense) {
+    Copy-Item -LiteralPath $lucideLicense -Destination (Join-Path $licenseDir 'Lucide-ISC.txt') -Force
+  }
   $qhotkeyLicense = Join-Path $RepoRoot 'src\libs\QHotkey\LICENSE'
   if (Test-Path $qhotkeyLicense) {
     Copy-Item -Force -Path $qhotkeyLicense -Destination (Join-Path $licenseDir 'QHotkey-BSD-3-Clause.txt')

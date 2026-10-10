@@ -4,6 +4,10 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- Added a tray image browser with asynchronous thumbnails, directory watching, drag and drop, GIF playback, and basic crop/rotate/flip/resize editing. Edits support undo/redo and atomic PNG/JPEG export, with source conflict checks before overwriting.
+
 ## [0.1.4] - 2026-10-08
 
 ### Changed

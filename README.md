@@ -28,6 +28,12 @@ Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier,
 
 ![Region capture and annotation](screenshot.png)
 
+### Image browser and editor
+
+Open **Image Browser** from the tray to browse the configured screenshot directory. Choose or drop a directory, drop an image to locate it, and browse with thumbnails, zoom, and pan. Crop, rotate, flip, resize, undo, and redo are available. `Ctrl+S` saves a new PNG/JPEG; overwriting the source requires explicit confirmation.
+
+Play or pause GIFs and use **Edit current frame** to export a static image. Animated WebP depends on the installed Qt image plugin, with a message when unsupported. Browsing is nonrecursive; images above 40 megapixels use a restricted preview.
+
 ### Local search
 
 One box for local apps, files, folders, and browser bookmarks. Arrow keys select, Enter opens.
