@@ -46,6 +46,25 @@ add_test(NAME image_browser_workflow COMMAND ${CMAKE_COMMAND} -E env
     $<TARGET_FILE:ntscreenshot>)
 set_tests_properties(image_browser_workflow PROPERTIES TIMEOUT 90)
 
+if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
+    add_test(NAME msvc_header_dependencies COMMAND ${CMAKE_COMMAND}
+        "-DNT_NINJA=${CMAKE_MAKE_PROGRAM}"
+        "-DNT_BUILD_DIR=${CMAKE_BINARY_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/build/VerifyHeaderDependencies.cmake")
+endif()
+
+if(WIN32)
+    add_test(NAME image_browser_windows_startup COMMAND ${CMAKE_COMMAND} -E env
+        "NTSCREENSHOT_IMAGE_BROWSER_TEST=1"
+        "NTSCREENSHOT_IMAGE_BROWSER_STARTUP_ONLY=1"
+        "QT_FORCE_STDERR_LOGGING=1"
+        "QT_QPA_PLATFORM=windows"
+        "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+        "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+        $<TARGET_FILE:ntscreenshot>)
+    set_tests_properties(image_browser_windows_startup PROPERTIES TIMEOUT 90)
+endif()
+
 add_executable(translation_tests i18n/TranslationTest.cpp)
 target_include_directories(translation_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(translation_tests PRIVATE Qt6::Core)

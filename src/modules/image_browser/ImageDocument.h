@@ -5,16 +5,28 @@
 #include <QRect>
 #include <QString>
 #include <QVector>
+#include <QColor>
+#include <QPolygonF>
 
 namespace ImageBrowser {
 
 constexpr qint64 MaxEditablePixels = 40000000;
 
 struct EditOperation {
-    enum Kind { Crop, RotateLeft, RotateRight, FlipHorizontal, FlipVertical, Resize };
+    enum Kind { Crop, RotateLeft, RotateRight, FlipHorizontal, FlipVertical, Resize,
+                Annotate, Perspective, Mosaic, Watermark, Sticker, Filter, AdjustColor };
     Kind kind = Crop;
     QRect rect;
     QSize size;
+    QColor color = Qt::red;
+    QString text;
+    QImage asset;
+    QPolygonF corners;
+    int variant = 0;
+    int strength = 12;
+    int brightness = 0;
+    int contrast = 0;
+    int saturation = 0;
 };
 
 struct ImageResult {

@@ -11,6 +11,8 @@
 #include <QMovie>
 #include <QPainter>
 #include <QSaveFile>
+#include <QPainterPath>
+#include <cmath>
 #include <new>
 
 namespace ImageBrowser {
@@ -85,6 +87,85 @@ ImageResult ImageDocument::render(const QImage& original,
                     return result;
                 }
                 image = image.copy(operation.rect);
+            } else if (operation.kind >= EditOperation::Annotate) {
+                image = image.convertToFormat(QImage::Format_ARGB32);
+                if (image.isNull()) throw std::bad_alloc();
+                const QRect region = operation.rect.intersected(image.rect());
+                if (operation.kind == EditOperation::Mosaic) {
+                    if (region.isEmpty()) { result.error = message("裁剪区域无效。"); return result; }
+                    const int block = qBound(2, operation.strength, 100);
+                    QImage tile = image.copy(region).scaled(qMax(1, region.width() / block),
+                        qMax(1, region.height() / block), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                        .scaled(region.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+                    QPainter painter(&image);
+                    painter.setCompositionMode(QPainter::CompositionMode_Source);
+                    painter.drawImage(region.topLeft(), tile);
+                } else if (operation.kind == EditOperation::Perspective) {
+                    if (operation.corners.size() != 4) { result.error = message("裁剪区域无效。"); return result; }
+                    std::vector<cv::Point2f> from;
+                    for (const auto& p : operation.corners) from.emplace_back(float(p.x()), float(p.y()));
+                    const QSize size = operation.size;
+                    if (!size.isValid() || pixels(size) > MaxEditablePixels ||
+                        !cv::isContourConvex(from) || std::abs(cv::contourArea(from)) < 1) {
+                        result.error = message("裁剪区域无效。"); return result;
+                    }
+                    const std::vector<cv::Point2f> to = {{0, 0}, {float(size.width()-1), 0},
+                        {float(size.width()-1), float(size.height()-1)}, {0, float(size.height()-1)}};
+                    cv::Mat output;
+                    const QImage premultiplied = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+                    cv::warpPerspective(CvBridge::QImageToMat(premultiplied), output,
+                        cv::getPerspectiveTransform(from, to), cv::Size(size.width(), size.height()),
+                        cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+                    image = QImage(output.data, output.cols, output.rows, int(output.step),
+                        QImage::Format_ARGB32_Premultiplied).convertToFormat(QImage::Format_ARGB32);
+                } else if (operation.kind == EditOperation::Filter || operation.kind == EditOperation::AdjustColor) {
+                    for (int y = 0; y < image.height(); ++y) {
+                        auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+                        for (int x = 0; x < image.width(); ++x) {
+                            const QRgb pixel = line[x];
+                            int r = qRed(pixel), g = qGreen(pixel), b = qBlue(pixel);
+                            if (operation.kind == EditOperation::Filter) {
+                                if (operation.variant == 0) r = g = b = qGray(pixel);
+                                else if (operation.variant == 1) {
+                                    r = qMin(255, qRound(.393*qRed(pixel) + .769*qGreen(pixel) + .189*qBlue(pixel)));
+                                    g = qMin(255, qRound(.349*qRed(pixel) + .686*qGreen(pixel) + .168*qBlue(pixel)));
+                                    b = qMin(255, qRound(.272*qRed(pixel) + .534*qGreen(pixel) + .131*qBlue(pixel)));
+                                } else { r = 255-r; g = 255-g; b = 255-b; }
+                            } else {
+                                const double gray = .299*r + .587*g + .114*b;
+                                const double sat = 1 + qBound(-100, operation.saturation, 100) / 100.;
+                                const double contrast = 1 + qBound(-100, operation.contrast, 100) / 100.;
+                                auto adjust = [&](int channel) { return qBound(0, qRound(((gray + (channel-gray)*sat)-127.5)*contrast + 127.5 + qBound(-100, operation.brightness, 100)*2.55), 255); };
+                                r = adjust(r); g = adjust(g); b = adjust(b);
+                            }
+                            line[x] = qRgba(r, g, b, qAlpha(pixel));
+                        }
+                    }
+                } else {
+                    if (region.isEmpty()) { result.error = message("裁剪区域无效。"); return result; }
+                    QPainter painter(&image);
+                    painter.setRenderHint(QPainter::Antialiasing);
+                    painter.setClipRect(region);
+                    const int width = qBound(1, operation.strength, 100);
+                    painter.setPen(QPen(operation.color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                    const QRectF bounds = QRectF(region).adjusted(width/2., width/2., -width/2., -width/2.);
+                    if (operation.kind == EditOperation::Sticker) painter.drawImage(region, operation.asset);
+                    else if (operation.kind == EditOperation::Watermark || operation.variant == 3) {
+                        QFont font = painter.font(); font.setPixelSize(qBound(8, operation.strength, 200));
+                        painter.setFont(font);
+                        if (operation.kind == EditOperation::Watermark) painter.setOpacity(.45);
+                        painter.drawText(region, Qt::AlignCenter | Qt::TextWordWrap, operation.text);
+                    } else if (operation.variant == 0) painter.drawRect(bounds);
+                    else if (operation.variant == 1) painter.drawEllipse(bounds);
+                    else {
+                        const QPointF start = bounds.bottomLeft(), end = bounds.topRight();
+                        painter.drawLine(start, end);
+                        const double angle = std::atan2(end.y()-start.y(), end.x()-start.x());
+                        const double head = qMin(double(qMin(region.width(), region.height())/2), qMax(12., width*4.));
+                        painter.drawLine(end, end - QPointF(std::cos(angle-.5)*head, std::sin(angle-.5)*head));
+                        painter.drawLine(end, end - QPointF(std::cos(angle+.5)*head, std::sin(angle+.5)*head));
+                    }
+                }
             } else {
                 // BGRA stays BGRA through geometric transforms; alpha is not discarded.
                 const QImage argb = image.convertToFormat(QImage::Format_ARGB32);

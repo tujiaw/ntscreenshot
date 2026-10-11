@@ -19,6 +19,14 @@ void ImageCanvas::setImage(const QImage& image, bool resetView) {
     update();
 }
 void ImageCanvas::setMessage(const QString& message) { message_ = message; update(); }
+void ImageCanvas::setLeftInset(int inset) {
+    inset = qBound(0, inset, qMax(0, width() - 80));
+    if (leftInset_ == inset) return;
+    const int delta = inset - leftInset_;
+    leftInset_ = inset;
+    if (fitted_) fit(fitUpscale_);
+    else { offset_.rx() += delta / 2.; update(); }
+}
 QPointF ImageCanvas::imagePoint(QPointF point) const { return (point - offset_) / scale_; }
 QPointF ImageCanvas::viewportPoint(QPointF point) const { return point * scale_ + offset_; }
 void ImageCanvas::fit(bool allowUpscale) {
@@ -26,10 +34,10 @@ void ImageCanvas::fit(bool allowUpscale) {
     fitUpscale_ = allowUpscale;
     if (!image_.isNull()) {
         const int margin = qMax(16, fontMetrics().height());
-        const double available = qMin(double(qMax(1, width() - 2 * margin)) / image_.width(),
+        const double available = qMin(double(qMax(1, width() - leftInset_ - 2 * margin)) / image_.width(),
                                       double(qMax(1, height() - 2 * margin)) / image_.height());
         scale_ = qMin(available, allowUpscale ? 8.0 : 1.0);
-        offset_ = QPointF((width() - image_.width() * scale_) / 2, (height() - image_.height() * scale_) / 2);
+        offset_ = QPointF(leftInset_ + (width() - leftInset_ - image_.width() * scale_) / 2, (height() - image_.height() * scale_) / 2);
     }
     emit zoomChanged();
     update();
@@ -42,14 +50,15 @@ void ImageCanvas::zoomAt(double scale, QPointF anchor) {
     emit zoomChanged();
     update();
 }
-void ImageCanvas::actualSize() { zoomAt(1, rect().center()); }
-void ImageCanvas::setZoom(double scale) { zoomAt(scale, rect().center()); }
+void ImageCanvas::actualSize() { zoomAt(1, QPointF((width() + leftInset_) / 2., height() / 2.)); }
+void ImageCanvas::setZoom(double scale) { zoomAt(scale, QPointF((width() + leftInset_) / 2., height() / 2.)); }
 void ImageCanvas::setCropping(bool enabled) {
     cropping_ = enabled && !image_.isNull();
     crop_ = {};
     dragging_ = false;
     setCursor(cropping_ ? Qt::CrossCursor : Qt::OpenHandCursor);
     if (cropping_) setFocus();
+    emit selectionChanged();
     update();
 }
 QRect ImageCanvas::cropRect() const {
@@ -65,7 +74,7 @@ void ImageCanvas::paintEvent(QPaintEvent*) {
     const auto& theme = ThemeManager::tokens();
     painter.fillRect(rect(), theme.canvas);
     const int margin = qMax(16, fontMetrics().height());
-    painter.setClipRect(rect().adjusted(margin, margin, -margin, -margin));
+    painter.setClipRect(rect().adjusted(leftInset_ + margin, margin, -margin, -margin));
     if (!image_.isNull()) {
         const QRectF target(offset_, QSizeF(image_.size()) * scale_);
         painter.save();
@@ -132,6 +141,7 @@ void ImageCanvas::mousePressEvent(QMouseEvent* event) {
         }
         if (!handle_) crop_ = QRectF(imagePos, imagePos);
     } else setCursor(Qt::ClosedHandCursor);
+    if (cropping_) emit selectionChanged();
 }
 void ImageCanvas::mouseMoveEvent(QMouseEvent* event) {
     if (!dragging_) return;
@@ -155,6 +165,7 @@ void ImageCanvas::mouseMoveEvent(QMouseEvent* event) {
             crop_ = QRectF(anchor, p).normalized();
         }
     }
+    if (cropping_) emit selectionChanged();
     update();
 }
 void ImageCanvas::mouseReleaseEvent(QMouseEvent*) {

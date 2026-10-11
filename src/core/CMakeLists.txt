@@ -11,6 +11,7 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/network/PaddleOcrClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pinyin/hanzi_to_pinyin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/Util.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/SystemBackground.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/LogHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/RunGuard.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/settings/SettingModel.cpp

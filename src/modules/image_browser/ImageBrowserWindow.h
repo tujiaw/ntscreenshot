@@ -21,6 +21,7 @@ namespace ImageBrowser {
 class ImageLoader;
 class ImageDirectoryModel;
 class ImageCanvas;
+class ImageEditorPanel;
 
 class ImageBrowserWindow final : public QMainWindow {
     Q_OBJECT
@@ -49,6 +50,7 @@ private:
     bool discardOrSave();
     bool save(bool overwrite = false, bool refreshListing = true, const QByteArray& format = {});
     void convertFormat();
+    void setSystemBackground(bool lockScreen);
     void showContextMenu(const QPoint& globalPosition);
     void edit(const EditOperation& operation);
     void renderDocument(ImageDocument candidate);
@@ -67,6 +69,10 @@ private:
     void layoutControlBar();
     QToolButton* controlButton(QAction* action);
     void setZoomStep(double factor);
+    void createEditorPanel();
+    void positionEditorPanel();
+    void selectEditRegion(const EditOperation& operation);
+    void applyEditRegion(const QRect& rect);
 
 private slots:
     void applyDpi(double scale = 0);
@@ -80,6 +86,10 @@ private:
     QListView* list_;
     QSplitter* splitter_;
     QToolBar* toolbar_;
+    ImageEditorPanel* editorPanel_ = nullptr;
+    QAction* editorAction_ = nullptr;
+    EditOperation regionOperation_;
+    bool regionFromPanel_ = false;
     QLabel* details_ = nullptr;
     QLabel* titleLabel_ = nullptr;
     QLabel* counterLabel_ = nullptr;
@@ -140,6 +150,8 @@ private:
     QAction* playAction_;
     QAction* frameAction_;
     QAction* convertAction_;
+    QAction* wallpaperAction_ = nullptr;
+    QAction* lockScreenAction_ = nullptr;
     QList<QAction*> editActions_;
     QList<QAction*> navigationActions_;
 };

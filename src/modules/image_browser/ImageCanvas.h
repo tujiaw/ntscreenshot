@@ -13,6 +13,7 @@ public:
     void fit(bool allowUpscale = true);
     void actualSize();
     void setZoom(double scale);
+    void setLeftInset(int inset);
     double zoom() const { return scale_; }
     void setCropping(bool enabled);
     bool cropping() const { return cropping_; }
@@ -26,6 +27,7 @@ signals:
     void cropCancelled();
     void navigate(int delta);
     void viewportChanged();
+    void selectionChanged();
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -53,5 +55,6 @@ private:
     QRectF crop_;
     QRectF initialCrop_;
     int handle_ = 0;
+    int leftInset_ = 0;
 };
 } // namespace ImageBrowser

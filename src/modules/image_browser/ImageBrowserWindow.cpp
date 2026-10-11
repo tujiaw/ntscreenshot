@@ -1,8 +1,10 @@
 #include "ImageBrowserWindow.h"
 #include "ImageCanvas.h"
+#include "ImageEditorPanel.h"
 #include "ImageDirectoryModel.h"
 #include "ImageLoader.h"
 #include "core/platform/Util.h"
+#include "core/platform/SystemBackground.h"
 #include "core/settings/SettingModel.h"
 #include "core/theme/ThemeIcon.h"
 #include "core/theme/ThemeManager.h"
@@ -140,13 +142,27 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         }
         if (primary) UiStyler::setRole(button, UiRole::PrimaryButton);
     };
-    // 顶栏只保留文件级操作，编辑工具全部移到下方控制栏的中间胶囊里。
-    cropAction_ = action(tr("裁剪"), "browser-crop.png", {}, [this] {
-        canvas_->setCropping(cropAction_->isChecked()); updateActions();
+    editorAction_ = action(tr("编辑"), {}, {}, [this] {
+        editorPanel_->setVisible(editorAction_->isChecked());
+        if (!editorAction_->isChecked() && regionFromPanel_) canvas_->setCropping(false);
+        positionEditorPanel();
+        updateActions();
+    });
+    editorAction_->setIcon(ImageEditorPanel::editIcon());
+    editorAction_->setCheckable(true);
+    barButton(editorAction_, tr("编辑"), true);
+    cropAction_ = new QAction(ThemeIcon::icon("browser-crop.png"), tr("裁剪"), this);
+    cropAction_->setProperty("browserIcon", "browser-crop.png");
+    addAction(cropAction_);
+    connect(cropAction_, &QAction::triggered, this, [this] {
+        regionOperation_ = {};
+        regionFromPanel_ = false;
+        canvas_->setCropping(cropAction_->isChecked());
+        if (canvas_->cropping()) showStatus(tr("拖动选择区域，按 Enter 应用，Esc 取消。"));
+        updateActions();
     });
     cropAction_->setCheckable(true);
     editActions_ << cropAction_;
-    barButton(cropAction_, tr("编辑"), true);
     toolbar_->addSeparator();
     navigationActions_ << action(tr("选择目录"), "browser-folder.png", QKeySequence("Ctrl+O"), [this] {
         const QString directory = QFileDialog::getExistingDirectory(this, tr("选择目录"), directory_);
@@ -175,6 +191,9 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     barButton(convertAction_, convertAction_->text());
     auto* more = action(tr("更多"), "browser-more.png", {}, [] {});
     auto* menu = new QMenu(this);
+    wallpaperAction_ = menu->addAction(tr("设为桌面背景"), this, [this] { setSystemBackground(false); });
+    lockScreenAction_ = menu->addAction(tr("设为锁屏背景"), this, [this] { setSystemBackground(true); });
+    menu->addSeparator();
     overwriteAction_ = menu->addAction(tr("覆盖原图"), this, [this] { save(true); });
     menu->addAction(tr("在资源管理器中定位"), this, [this] {
         if (!document_.path.isEmpty()) Util::locateFile(document_.path);
@@ -192,6 +211,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     addAction(exitFullscreenAction_);
     connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
         if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
+        else if (editorPanel_->isVisible()) { editorPanel_->hide(); editorAction_->setChecked(false); updateActions(); }
         else if (isFullScreen()) toggleFullscreen();
     });
 
@@ -337,10 +357,10 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         return line;
     };
     applyCropAction_ = panelAction(tr("应用裁剪"), "browser-apply.png", {}, [this] {
-        if (!canvas_->cropRect().isEmpty()) edit({EditOperation::Crop, canvas_->cropRect(), {}});
+        applyEditRegion(canvas_->cropRect());
     });
     cancelCropAction_ = panelAction(tr("取消裁剪"), "browser-cancel.png", {}, [this] {
-        canvas_->setCropping(false); updateActions();
+        canvas_->setCropping(false); showStatus(QString()); updateActions();
     });
     editActions_ << panelAction(tr("向左旋转"), "browser-rotate-left.png", {}, [this] { edit({EditOperation::RotateLeft, {}, {}}); });
     editActions_ << panelAction(tr("向右旋转"), "browser-rotate-right.png", {}, [this] { edit({EditOperation::RotateRight, {}, {}}); });
@@ -438,15 +458,67 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     connect(list_->verticalScrollBar(), &QScrollBar::valueChanged, this, [this] { thumbnailsTimer_.start(); });
     connect(canvas_, &ImageCanvas::zoomChanged, this, &ImageBrowserWindow::updateStatus);
     connect(canvas_, &ImageCanvas::viewportChanged, this, &ImageBrowserWindow::updateStatus);
-    connect(canvas_, &ImageCanvas::cropAccepted, this, [this](QRect rect) { edit({EditOperation::Crop, rect, {}}); });
-    connect(canvas_, &ImageCanvas::cropCancelled, this, &ImageBrowserWindow::updateActions);
+    connect(canvas_, &ImageCanvas::cropAccepted, this, &ImageBrowserWindow::applyEditRegion);
+    connect(canvas_, &ImageCanvas::cropCancelled, this, [this] { showStatus(QString()); updateActions(); });
     connect(canvas_, &ImageCanvas::navigate, this, [this](int delta) { selectRow(model_->indexOf(document_.path) + delta); });
+    createEditorPanel();
     applyDpi();
     screenshotDirectory();
     updateActions();
 }
 
 ImageBrowserWindow::~ImageBrowserWindow() { loadGeneration_->store(++imageVersion_); stopMovie(); }
+
+void ImageBrowserWindow::createEditorPanel() {
+    editorPanel_ = new ImageEditorPanel(this);
+    connect(editorPanel_, &ImageEditorPanel::closeRequested, this, [this] {
+        editorPanel_->hide(); editorAction_->setChecked(false);
+        canvas_->setCropping(false); showStatus({}); updateActions();
+    });
+    connect(editorPanel_, &ImageEditorPanel::toolChanged, this, [this] {
+        canvas_->setCropping(false); regionFromPanel_ = false; showStatus({}); updateActions();
+    });
+    connect(editorPanel_, &ImageEditorPanel::editRequested, this, [this](const EditOperation& operation, bool region) {
+        if (region) selectEditRegion(operation);
+        else edit(operation);
+    });
+    connect(editorPanel_, &ImageEditorPanel::applySelectionRequested, this, [this] { applyEditRegion(canvas_->cropRect()); });
+    connect(editorPanel_, &ImageEditorPanel::cancelSelectionRequested, this, [this] {
+        canvas_->setCropping(false); showStatus({}); updateActions();
+    });
+    connect(canvas_, &ImageCanvas::selectionChanged, this, [this] {
+        editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
+    });
+    editorPanel_->hide();
+}
+
+void ImageBrowserWindow::positionEditorPanel() {
+    if (!editorPanel_) return;
+    const int gap = qRound(8 * scaleFactor_);
+    const int top = toolbar_->geometry().bottom() + gap;
+    editorPanel_->setMetrics(scaleFactor_, qMax(1, statusBar()->geometry().top() - top - gap));
+    editorPanel_->move(gap, top);
+    editorPanel_->raise();
+    const int inset = editorPanel_->isVisible()
+        ? qMax(0, canvas_->mapFrom(this, QPoint(editorPanel_->geometry().right() + gap, 0)).x()) : 0;
+    canvas_->setLeftInset(inset);
+}
+
+void ImageBrowserWindow::selectEditRegion(const EditOperation& operation) {
+    regionOperation_ = operation;
+    regionFromPanel_ = true;
+    canvas_->setCropping(true);
+    showStatus(tr("拖动选择区域，按 Enter 应用，Esc 取消。"));
+    updateActions();
+}
+
+void ImageBrowserWindow::applyEditRegion(const QRect& rect) {
+    if (rect.isEmpty()) return;
+    auto operation = regionFromPanel_ ? editorPanel_->currentOperation() : regionOperation_;
+    if (regionFromPanel_ && !editorPanel_->validateOperation(operation)) return;
+    operation.rect = rect;
+    edit(operation);
+}
 
 void ImageBrowserWindow::applyDpi(double scale) {
     if (scale <= 0) scale = Util::getScreenScaleFactor(frameGeometry().center());
@@ -463,6 +535,7 @@ void ImageBrowserWindow::applyDpi(double scale) {
         .arg(qRound(13 * scale)).arg(qRound(12 * scale)));
     styleToolButtons();
     toolbar_->setIconSize(QSize(qRound(20 * scale), qRound(20 * scale)));
+    positionEditorPanel();
     const int barHeight = qRound(32 * scale);
     for (auto* a : toolbar_->actions()) {
         auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a));
@@ -858,6 +931,12 @@ void ImageBrowserWindow::updateActions() {
     styleToolButtons();
     const bool available = !document_.current.isNull() && !loading_ && !busy_;
     const bool editable = available && !document_.limited && !movie_;
+    wallpaperAction_->setEnabled(editable && SystemBackground::supported());
+    lockScreenAction_->setEnabled(editable && SystemBackground::supported());
+    editorAction_->setEnabled(editable);
+    editorPanel_->setDocumentContext(document_.path, document_.current.size(), editable);
+    editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
+    positionEditorPanel();
     for (auto* action : editActions_) action->setEnabled(editable);
     for (auto* action : navigationActions_) action->setEnabled(!busy_);
     const int row = model_->indexOf(document_.path);
@@ -880,6 +959,9 @@ void ImageBrowserWindow::updateActions() {
     zoomOutAction_->setEnabled(available);
     fullscreenAction_->setChecked(isFullScreen());
     cropAction_->setChecked(canvas_->cropping());
+    exitFullscreenAction_->setEnabled(isFullScreen() || canvas_->cropping() || editorPanel_->isVisible());
+    applyCropAction_->setText(regionOperation_.kind == EditOperation::Crop ? tr("应用裁剪") : tr("应用编辑"));
+    cancelCropAction_->setText(regionOperation_.kind == EditOperation::Crop ? tr("取消裁剪") : tr("取消编辑"));
     applyCropAction_->setVisible(canvas_->cropping());
     cancelCropAction_->setVisible(canvas_->cropping());
     applyCropAction_->setEnabled(editable);
@@ -975,6 +1057,21 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
     updateActions();
     return true;
 }
+void ImageBrowserWindow::setSystemBackground(bool lockScreen) {
+    if (busy_ || loading_ || movie_ || document_.limited || document_.current.isNull() || !SystemBackground::supported()) return;
+    busy_ = true;
+    updateActions();
+    showStatus(lockScreen ? tr("正在设置锁屏背景…") : tr("正在设置桌面背景…"));
+    loader_->run(this, [image = document_.current, lockScreen] {
+        return SystemBackground::apply(image, lockScreen ? SystemBackground::Target::LockScreen : SystemBackground::Target::Desktop);
+    }, [this, lockScreen](const SystemBackground::Result& result) {
+        busy_ = false;
+        updateActions();
+        if (result.success) showStatus(lockScreen ? tr("已设为锁屏背景") : tr("已设为桌面背景"), 5000);
+        else showStatus(result.error);
+    });
+}
+
 void ImageBrowserWindow::convertFormat() {
     if (busy_ || loading_ || document_.current.isNull() || document_.limited) return;
     if (movie_) {
@@ -1145,10 +1242,11 @@ bool ImageBrowserWindow::eventFilter(QObject* watched, QEvent* event) {
         thumbnailsTimer_.start();
     if (watched == canvas_ && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
         positionOverlays(); updateOverlays();
+        QTimer::singleShot(0, this, &ImageBrowserWindow::positionEditorPanel);
     }
     if (watched == controlBar_ && event->type() == QEvent::Resize) layoutControlBar();
     if (watched == toolbar_ && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
-        QTimer::singleShot(0, this, &ImageBrowserWindow::positionTitle);
+        QTimer::singleShot(0, this, [this] { positionTitle(); positionEditorPanel(); });
     // 悬停显形：Enter / Leave 都要判一次，且箭头自己也算「还在悬停」，否则指针碰到箭头会闪。
     if ((watched == canvas_ || watched == overlayPrevious_ || watched == overlayNext_) &&
         (event->type() == QEvent::Enter || event->type() == QEvent::Leave))

@@ -2037,6 +2037,48 @@ Copied to clipboard</translation>
     <message><source>高度（像素）</source><translation>Height (pixels)</translation></message>
     <message><source>请拖入本地图片或目录。</source><translation>Drop a local image or directory.</translation></message>
     <message><source>已打开第一个有效项目，忽略了 %1 项。</source><translation>Opened the first valid item; %1 items ignored.</translation></message>
+    <message><source>图片编辑</source><translation>Image editing</translation></message>
+    <message><source>关闭编辑面板</source><translation>Close editor panel</translation></message>
+    <message><source>裁剪旋转</source><translation>Crop / rotate</translation></message>
+    <message><source>标注</source><translation>Annotate</translation></message>
+    <message><source>矫正</source><translation>Perspective</translation></message>
+    <message><source>马赛克</source><translation>Mosaic</translation></message>
+    <message><source>水印</source><translation>Watermark</translation></message>
+    <message><source>素材</source><translation>Sticker</translation></message>
+    <message><source>滤镜</source><translation>Filters</translation></message>
+    <message><source>调色</source><translation>Color</translation></message>
+    <message><source>拖动选择区域，按 Enter 应用，Esc 取消。</source><translation>Drag to select an area. Press Enter to apply or Esc to cancel.</translation></message>
+    <message><source>形状</source><translation>Shape</translation></message>
+    <message><source>矩形</source><translation>Rectangle</translation></message>
+    <message><source>椭圆</source><translation>Ellipse</translation></message>
+    <message><source>箭头</source><translation>Arrow</translation></message>
+    <message><source>文字</source><translation>Text</translation></message>
+    <message><source>输入标注文字或水印</source><translation>Enter annotation or watermark text</translation></message>
+    <message><source>选择颜色</source><translation>Choose color</translation></message>
+    <message><source>颜色</source><translation>Color</translation></message>
+    <message><source>线宽 / 字号（像素）</source><translation>Line width / font size (pixels)</translation></message>
+    <message><source>按左上、右上、右下、左下顺序输入原图四角坐标，输出为矩形。</source><translation>Enter original-image corners in top-left, top-right, bottom-right, bottom-left order. Output is rectangular.</translation></message>
+    <message><source>左上</source><translation>Top left</translation></message>
+    <message><source>右上</source><translation>Top right</translation></message>
+    <message><source>右下</source><translation>Bottom right</translation></message>
+    <message><source>左下</source><translation>Bottom left</translation></message>
+    <message><source>马赛克块大小（像素）</source><translation>Mosaic block size (pixels)</translation></message>
+    <message><source>选择素材图片</source><translation>Choose sticker image</translation></message>
+    <message><source>图片 (*.png *.jpg *.jpeg *.bmp *.webp)</source><translation>Images (*.png *.jpg *.jpeg *.bmp *.webp)</translation></message>
+    <message><source>黑白</source><translation>Grayscale</translation></message>
+    <message><source>复古</source><translation>Sepia</translation></message>
+    <message><source>反色</source><translation>Invert</translation></message>
+    <message><source>亮度</source><translation>Brightness</translation></message>
+    <message><source>对比度</source><translation>Contrast</translation></message>
+    <message><source>饱和度</source><translation>Saturation</translation></message>
+    <message><source>应用编辑</source><translation>Apply edit</translation></message>
+    <message><source>取消编辑</source><translation>Cancel edit</translation></message>
+    <message><source>设为桌面背景</source><translation>Set as desktop background</translation></message>
+    <message><source>设为锁屏背景</source><translation>Set as lock screen background</translation></message>
+    <message><source>正在设置锁屏背景…</source><translation>Setting lock screen background...</translation></message>
+    <message><source>正在设置桌面背景…</source><translation>Setting desktop background...</translation></message>
+    <message><source>已设为锁屏背景</source><translation>Lock screen background set</translation></message>
+    <message><source>已设为桌面背景</source><translation>Desktop background set</translation></message>
   </context>
   <context>
     <name>ImageBrowser::ImageDirectoryModel</name>
@@ -2051,5 +2093,78 @@ Copied to clipboard</translation>
     <message><source>图片处理失败或内存不足。</source><translation>Image processing failed or insufficient memory.</translation></message>
     <message><source>没有可保存的图片。</source><translation>No image to save.</translation></message>
     <message><source>图片保存失败或内存不足。</source><translation>Image saving failed or insufficient memory.</translation></message>
+  </context>
+  <context>
+    <name>ImageBrowser::ImageEditorPanel</name>
+    <message><source>图片编辑</source><translation>Image editing</translation></message>
+    <message><source>关闭编辑面板</source><translation>Close editor panel</translation></message>
+    <message><source>裁剪旋转</source><translation>Crop / rotate</translation></message>
+    <message><source>标注</source><translation>Annotate</translation></message>
+    <message><source>矫正</source><translation>Perspective</translation></message>
+    <message><source>马赛克</source><translation>Mosaic</translation></message>
+    <message><source>水印</source><translation>Watermark</translation></message>
+    <message><source>素材</source><translation>Sticker</translation></message>
+    <message><source>滤镜</source><translation>Filters</translation></message>
+    <message><source>调色</source><translation>Color</translation></message>
+    <message><source>拖动选区裁剪，或直接旋转、翻转和调整尺寸。</source><translation>Select an area to crop, or rotate, flip and resize directly.</translation></message>
+    <message><source>向左旋转</source><translation>Rotate left</translation></message>
+    <message><source>向右旋转</source><translation>Rotate right</translation></message>
+    <message><source>水平翻转</source><translation>Flip horizontally</translation></message>
+    <message><source>垂直翻转</source><translation>Flip vertically</translation></message>
+    <message><source>宽度（像素）</source><translation>Width (pixels)</translation></message>
+    <message><source>高度（像素）</source><translation>Height (pixels)</translation></message>
+    <message><source>锁定宽高比</source><translation>Keep aspect ratio</translation></message>
+    <message><source>应用尺寸</source><translation>Apply size</translation></message>
+    <message><source>图片尺寸超过 4000 万像素的编辑上限。</source><translation>Image size exceeds the 40 megapixel editing limit.</translation></message>
+    <message><source>选择形状和样式，再在图片上拖动绘制区域。</source><translation>Choose a shape and style, then drag an area on the image.</translation></message>
+    <message><source>矩形</source><translation>Rectangle</translation></message>
+    <message><source>椭圆</source><translation>Ellipse</translation></message>
+    <message><source>箭头</source><translation>Arrow</translation></message>
+    <message><source>文字</source><translation>Text</translation></message>
+    <message><source>形状</source><translation>Shape</translation></message>
+    <message><source>输入标注文字</source><translation>Enter annotation text</translation></message>
+    <message><source>线宽（像素）</source><translation>Line width (pixels)</translation></message>
+    <message><source>字号（像素）</source><translation>Font size (pixels)</translation></message>
+    <message><source>按左上、右上、右下、左下顺序输入原图坐标。</source><translation>Enter original-image coordinates in top-left, top-right, bottom-right, bottom-left order.</translation></message>
+    <message><source>左上</source><translation>Top left</translation></message>
+    <message><source>右上</source><translation>Top right</translation></message>
+    <message><source>右下</source><translation>Bottom right</translation></message>
+    <message><source>左下</source><translation>Bottom left</translation></message>
+    <message><source>选中需要遮挡的区域，块越大，马赛克越明显。</source><translation>Select the area to obscure. Larger blocks produce stronger pixelation.</translation></message>
+    <message><source>块大小（像素）</source><translation>Block size (pixels)</translation></message>
+    <message><source>输入水印文字，再选择放置区域。</source><translation>Enter watermark text, then select its placement area.</translation></message>
+    <message><source>输入水印文字</source><translation>Enter watermark text</translation></message>
+    <message><source>导入本地图片作为素材，再选择放置区域。</source><translation>Import a local image, then select its placement area.</translation></message>
+    <message><source>素材图片路径</source><translation>Sticker image path</translation></message>
+    <message><source>选择素材图片</source><translation>Choose sticker image</translation></message>
+    <message><source>图片 (*.png *.jpg *.jpeg *.bmp *.webp)</source><translation>Images (*.png *.jpg *.jpeg *.bmp *.webp)</translation></message>
+    <message><source>选择滤镜，点击应用后生效。</source><translation>Choose a filter and click Apply.</translation></message>
+    <message><source>黑白</source><translation>Grayscale</translation></message>
+    <message><source>复古</source><translation>Sepia</translation></message>
+    <message><source>反色</source><translation>Invert</translation></message>
+    <message><source>调整参数后点击应用，可使用撤销恢复。</source><translation>Adjust values and click Apply. Use Undo to restore the image.</translation></message>
+    <message><source>亮度</source><translation>Brightness</translation></message>
+    <message><source>对比度</source><translation>Contrast</translation></message>
+    <message><source>饱和度</source><translation>Saturation</translation></message>
+    <message><source>重置参数</source><translation>Reset values</translation></message>
+    <message><source>应用选区</source><translation>Apply selection</translation></message>
+    <message><source>取消选区</source><translation>Cancel selection</translation></message>
+    <message><source>颜色</source><translation>Color</translation></message>
+    <message><source>请输入有效颜色，例如 #ff0000。</source><translation>Enter a valid color, such as #ff0000.</translation></message>
+    <message><source>请先输入文字。</source><translation>Enter text first.</translation></message>
+    <message><source>请选择可读取的素材图片。</source><translation>Choose a readable sticker image.</translation></message>
+    <message><source>在图片上拖动选择区域。</source><translation>Drag on the image to select an area.</translation></message>
+    <message><source>选区 %1 × %2，按 Enter 或点击应用选区。</source><translation>Selection %1 × %2. Press Enter or click Apply selection.</translation></message>
+    <message><source>重新选择区域</source><translation>Reselect area</translation></message>
+    <message><source>选择区域</source><translation>Select area</translation></message>
+    <message><source>应用</source><translation>Apply</translation></message>
+  </context>
+  <context>
+    <name>SystemBackground</name>
+    <message><source>没有可用的背景图片。</source><translation>No background image is available.</translation></message>
+    <message><source>背景图片处理失败。</source><translation>Failed to process background image.</translation></message>
+    <message><source>无法创建背景图片缓存目录。</source><translation>Cannot create the background image cache directory.</translation></message>
+    <message><source>当前系统不支持设置背景。</source><translation>Setting backgrounds is not supported on this system.</translation></message>
+    <message><source>系统未能设置背景：%1（错误码 %2）。</source><translation>The system could not set the background: %1 (error %2).</translation></message>
   </context>
 </TS>

@@ -53,6 +53,7 @@ function(nt_configure_target target_name)
             comsuppw
             uuid
             UIAutomationCore
+            windowsapp
         )
     elseif(UNIX AND NOT APPLE)
         find_package(X11 REQUIRED)

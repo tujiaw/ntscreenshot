@@ -3,7 +3,9 @@
 #include "modules/image_browser/ImageLoader.h"
 #include "modules/image_browser/ImageCanvas.h"
 #include "modules/image_browser/ImageBrowserWindow.h"
+#include "modules/image_browser/ImageBrowserModule.h"
 #include "core/platform/Util.h"
+#include "core/platform/SystemBackground.h"
 #include "core/settings/SettingModel.h"
 #include "core/theme/ThemeManager.h"
 
@@ -37,6 +39,8 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QStackedWidget>
+#include <QScrollArea>
 #include <QStatusBar>
 #include <QTemporaryDir>
 #include <QThread>
@@ -134,6 +138,18 @@ int runImageBrowserTest(QApplication& app) {
     source.setPixel(319, 179, qRgba(80, 170, 30, 0));
     const QString path = directory.filePath(QStringLiteral("测试图片.png"));
     check(source.save(path), "save source fixture");
+    const QString backgroundCache = directory.filePath(QStringLiteral("背景缓存"));
+    const auto background = SystemBackground::prepare(source, backgroundCache);
+    const QImage backgroundImage(background.path);
+    check(background.success && backgroundImage.size() == source.size() && !backgroundImage.hasAlphaChannel(), "background snapshot is a persistent opaque image");
+    QImage transparentBackground(16, 16, QImage::Format_ARGB32); transparentBackground.fill(Qt::transparent);
+    const auto whiteBackground = SystemBackground::prepare(transparentBackground, backgroundCache);
+    check(whiteBackground.success && QImage(whiteBackground.path).pixelColor(8, 8) == QColor(Qt::white), "transparent background area flattened to white");
+    check(SystemBackground::prepare(source, backgroundCache).path == background.path, "same image has a stable background snapshot path");
+    QImage changedBackground = source; changedBackground.fill(Qt::green);
+    check(SystemBackground::prepare(changedBackground, backgroundCache).path != background.path, "edited image gets its own background snapshot");
+    check(!SystemBackground::prepare({}, backgroundCache).success, "empty background is rejected");
+    check(!SystemBackground::prepare(source, path).success, "background cache file conflict is reported");
     check(source.save(directory.filePath("other.png")), "save second fixture");
     check(source.save(directory.filePath("nested/hidden.png")), "nested fixture");
     QFile broken(directory.filePath("broken.png"));
@@ -174,6 +190,36 @@ int runImageBrowserTest(QApplication& app) {
     check(result.image.size() == QSize(160, 90) && result.image.hasAlphaChannel() && qAlpha(result.image.pixel(0, 0)) == 128, "resize preserves alpha");
     check(!ImageDocument::render(source, {{EditOperation::Crop, QRect(-1, 0, 2, 2), {}}}, 1).error.isEmpty(), "reject out of bounds crop");
     check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(10000, 10000)}}, 1).error.isEmpty(), "resize pixel budget");
+    EditOperation filter; filter.kind = EditOperation::Filter;
+    const auto gray = ImageDocument::render(source, {filter}, 1).image;
+    check(qRed(gray.pixel(0, 0)) == qGreen(gray.pixel(0, 0)) && qAlpha(gray.pixel(0, 0)) == 128, "grayscale preserves alpha");
+    filter.variant = 2;
+    check(ImageDocument::render(source, {filter}, 1).image.pixel(0, 0) == qRgba(35, 225, 175, 128), "invert RGB without changing alpha");
+    EditOperation color; color.kind = EditOperation::AdjustColor; color.saturation = -100;
+    const auto desaturated = ImageDocument::render(source, {color}, 1).image;
+    check(qRed(desaturated.pixel(0, 0)) == qBlue(desaturated.pixel(0, 0)) && qAlpha(desaturated.pixel(0, 0)) == 128, "color adjustment preserves alpha");
+    EditOperation mosaic; mosaic.kind = EditOperation::Mosaic; mosaic.rect = QRect(150, 80, 30, 30); mosaic.strength = 30;
+    const auto pixelated = ImageDocument::render(source, {mosaic}, 1).image;
+    check(pixelated.pixel(150, 80) != source.pixel(150, 80) && pixelated.pixel(150, 80) == pixelated.pixel(179, 109) && pixelated.pixel(0, 0) == source.pixel(0, 0), "mosaic affects only selected region");
+    EditOperation annotation; annotation.kind = EditOperation::Annotate; annotation.rect = QRect(20, 20, 70, 50);
+    check(ImageDocument::render(source, {annotation}, 1).image != source, "rectangle annotation rendered");
+    annotation.variant = 1;
+    check(ImageDocument::render(source, {annotation}, 1).image != source, "ellipse annotation rendered");
+    annotation.variant = 2;
+    check(ImageDocument::render(source, {annotation}, 1).image != source, "arrow annotation rendered");
+    EditOperation watermark; watermark.kind = EditOperation::Watermark; watermark.rect = source.rect(); watermark.text = "watermark"; watermark.strength = 30;
+    check(ImageDocument::render(source, {watermark}, 1).image != source, "text watermark rendered");
+    EditOperation sticker; sticker.kind = EditOperation::Sticker; sticker.rect = QRect(10, 10, 20, 20);
+    sticker.asset = QImage(2, 2, QImage::Format_ARGB32); sticker.asset.fill(Qt::green);
+    const auto pasted = ImageDocument::render(source, {sticker}, 1).image;
+    check(pasted.pixel(15, 15) == qRgb(0, 255, 0) && pasted.pixel(0, 0) == source.pixel(0, 0), "sticker is composited inside selection");
+    EditOperation perspective; perspective.kind = EditOperation::Perspective;
+    perspective.corners << QPointF(0, 0) << QPointF(319, 0) << QPointF(319, 179) << QPointF(0, 179);
+    perspective.size = source.size();
+    const auto rectified = ImageDocument::render(source, {perspective}, 1);
+    check(rectified.error.isEmpty() && rectified.image.size() == source.size() && qAlpha(rectified.image.pixel(0, 0)) == 128, "perspective output size and alpha");
+    perspective.corners[1] = perspective.corners[0];
+    check(!ImageDocument::render(source, {perspective}, 1).error.isEmpty(), "reject degenerate perspective corners");
     const QString savedPath = ImageDocument::suggestedPath(path);
     check(ImageDocument::save(savedPath, source, "png").success, "atomic PNG save");
     check(ImageDocument::read(savedPath).image == source, "PNG round trip");
@@ -209,6 +255,25 @@ int runImageBrowserTest(QApplication& app) {
     ImageDirectoryModel::enumerate(directory.filePath("missing"), &error);
     check(!error.isEmpty(), "invalid directory has explicit error");
     ImageLoader loader;
+#ifdef Q_OS_WIN
+    if (qEnvironmentVariableIsSet("NTSCREENSHOT_IMAGE_BROWSER_STARTUP_ONLY")) {
+        for (const auto target : {SystemBackground::Target::Desktop, SystemBackground::Target::LockScreen}) {
+            bool completed = false;
+            loader.run(&app, [target] { return SystemBackground::checkAvailability(target); },
+                [&, target](const SystemBackground::Result& result) {
+                    check(result.success, target == SystemBackground::Target::Desktop
+                        ? "native desktop wallpaper COM activation and query"
+                        : "native lock screen and storage WinRT activation");
+                    if (!result.success) qCritical() << result.error;
+                    completed = true;
+                });
+            if (!waitUntil([&] { return completed; }, 20000)) {
+                qCritical() << "Native background service probe timed out";
+                return 1;
+            }
+        }
+    }
+#endif
     ImageDirectoryModel model(&loader);
     int scans = 0;
     QObject::connect(&model, &ImageDirectoryModel::scanned, &app, [&](const QString&) { ++scans; });
@@ -267,13 +332,103 @@ int runImageBrowserTest(QApplication& app) {
     testSettings.setValue("UI_LANGUAGE", "zh"); testSettings.sync();
     SettingModel settings(nullptr);
     settings.setAutoSaveImage(false, temp.path());
+    // Exercise the production allocator in ImageBrowserModule.cpp, not just this
+    // translation unit: a stale object after a header edit can allocate too little.
+    {
+        ImageBrowserModule module(&settings);
+        module.initialize();
+        for (int i = 0; i < 10; ++i) {
+            module.open();
+            QPointer<ImageBrowserWindow> opened;
+            for (auto* widget : QApplication::topLevelWidgets()) {
+                if (auto* browser = qobject_cast<ImageBrowserWindow*>(widget)) opened = browser;
+            }
+            check(opened && opened->isVisible(), "module opens image browser");
+            if (!opened) break;
+            auto* images = opened->findChild<QListView*>();
+            check(waitUntil([&] { return images->isEnabled() && images->model()->rowCount() == 6; }), "module startup completes directory load");
+            drop(opened, {QUrl::fromLocalFile(path)});
+            check(waitUntil([&] { return action(opened, QStringLiteral("裁剪"))->isEnabled(); }), "module startup loads image");
+            opened->close();
+            check(waitUntil([&] { return opened.isNull(); }), "module closes and releases browser");
+        }
+        module.shutdown();
+        // Destruction must also cancel a pending directory/image load safely.
+        module.open();
+        module.shutdown();
+        QCoreApplication::processEvents();
+    }
+    if (qEnvironmentVariableIsSet("NTSCREENSHOT_IMAGE_BROWSER_STARTUP_ONLY")) {
+        qInfo() << "Image browser module startup test failures:" << failures;
+        return failures ? 1 : 0;
+    }
     QPointer<ImageBrowserWindow> window = new ImageBrowserWindow(&settings, &loader);
+    check(!action(window, QStringLiteral("设为桌面背景"))->isEnabled() && !action(window, QStringLiteral("设为锁屏背景"))->isEnabled(), "background actions disabled without an image");
     window->show();
     auto* list = window->findChild<QListView*>();
     check(waitUntil([&] { return list->isEnabled() && list->model()->rowCount() == 6; }), "default screenshot directory with autosave disabled");
     drop(window, {QUrl::fromLocalFile(path), QUrl::fromLocalFile(jpeg)});
     check(waitUntil([&] { auto* a = action(window, QStringLiteral("向右旋转")); return a && a->isEnabled(); }), "drop selects image");
     check(window->windowTitle().startsWith(QFileInfo(path).fileName()), "dropped file selected");
+    auto* moreMenu = action(window, QStringLiteral("更多"))->menu();
+    check(moreMenu && moreMenu->actions().contains(action(window, QStringLiteral("设为桌面背景"))) &&
+        moreMenu->actions().contains(action(window, QStringLiteral("设为锁屏背景"))), "background actions available in top-right more menu");
+    check(action(window, QStringLiteral("设为桌面背景"))->isEnabled() == SystemBackground::supported() &&
+        action(window, QStringLiteral("设为锁屏背景"))->isEnabled() == SystemBackground::supported(), "background actions enabled for supported static image");
+    trigger(window, QStringLiteral("编辑"));
+    auto* editorPanel = window->findChild<QWidget*>(QStringLiteral("browserEditorPanel"));
+    auto* browserCanvas = window->findChild<ImageCanvas*>();
+    check(editorPanel && editorPanel->isVisible() && !browserCanvas->cropping(), "edit opens floating panel without entering crop");
+    int editorTools = 0;
+    for (auto* button : editorPanel->findChildren<QToolButton*>()) if (button->property("editorTool").isValid()) ++editorTools;
+    check(editorTools == 8, "eight editor tools");
+    for (int tool = 0; tool < 8; ++tool) {
+        editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool%1").arg(tool))->click();
+        check(!QApplication::activeModalWidget() && !QApplication::activePopupWidget() && editorPanel->isVisible(), "tool details stay inline without popup");
+        check(editorPanel->findChild<QStackedWidget*>()->currentIndex() == tool, "lower details match selected tool");
+    }
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool4"))->click();
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(!browserCanvas->cropping() && !window->windowTitle().contains('*'), "empty watermark validates inline without editing");
+    check(editorPanel->findChild<QLabel*>(QStringLiteral("editorMessage"))->isVisible(), "validation appears inside panel");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool0"))->click();
+    auto* inlineWidth = editorPanel->findChild<QSpinBox*>(QStringLiteral("editorResizeWidth"));
+    auto* inlineHeight = editorPanel->findChild<QSpinBox*>(QStringLiteral("editorResizeHeight"));
+    inlineWidth->setValue(160);
+    check(inlineHeight->value() == 90, "inline resize locks aspect ratio");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool6"))->click();
+    check(!window->windowTitle().contains('*'), "switching tools does not commit a draft");
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "filter enters undo history");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == gray, "filter UI changes actual document");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo filter");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == source, "undo restores unedited image");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(browserCanvas->cropping() && editorPanel->isVisible(), "mosaic keeps details visible while selecting");
+    check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isEnabled(), "empty selection cannot be applied");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool6"))->click();
+    check(!browserCanvas->cropping() && !window->windowTitle().contains('*'), "switching tools cancels uncommitted selection");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(browserCanvas->viewportPoint(QPointF(0, 0)).x() >= browserCanvas->mapFrom(window, editorPanel->geometry().topRight()).x(), "image stays clear of floating panel");
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(150, 80)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(180, 110)));
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(180, 110)));
+    check(editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isEnabled(), "valid selection enables inline apply");
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorMosaicBlock"))->setValue(20);
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "mosaic enters history");
+    trigger(window, QStringLiteral("复制图片"));
+    auto expectedMosaic = mosaic; expectedMosaic.strength = 20;
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {expectedMosaic}, 1).image, "mosaic UI applies selected pixels");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo mosaic");
+    trigger(window, QStringLiteral("编辑"));
+    check(!editorPanel->isVisible(), "edit toggles floating panel closed");
     auto* details = window->findChild<QLabel*>(QStringLiteral("browserImageDetails"));
     check(details && !details->toolTip().contains(QFileInfo(path).fileName()) && !details->toolTip().contains(temp.path()) &&
           details->toolTip().contains(QLocale().formattedDataSize(QFileInfo(path).size())), "status shows file size without filename or directory");
@@ -282,6 +437,8 @@ int runImageBrowserTest(QApplication& app) {
     trigger(window, QStringLiteral("全屏"));
     check(!window->isFullScreen(), "leave fullscreen");
     window->showMaximized();
+    check(waitUntil([&] { return window->isMaximized(); }), "maximize before fullscreen");
+    QCoreApplication::processEvents();
     trigger(window, QStringLiteral("全屏"));
     QAction* escapeFullscreen = nullptr;
     for (auto* a : window->actions()) if (a->shortcut() == QKeySequence(Qt::Key_Escape)) escapeFullscreen = a;
@@ -290,7 +447,7 @@ int runImageBrowserTest(QApplication& app) {
     if (escapeFullscreen) escapeFullscreen->trigger();
     check(window->isFullScreen() && !action(window, QStringLiteral("裁剪"))->isChecked(), "Escape cancels crop before exiting fullscreen");
     if (escapeFullscreen) escapeFullscreen->trigger();
-    check(window->isMaximized(), "fullscreen restores maximized state");
+    check(waitUntil([&] { return window->isMaximized(); }), "fullscreen restores maximized state");
     window->showNormal();
     QTimer::singleShot(0, [&] {
         auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
@@ -386,6 +543,7 @@ int runImageBrowserTest(QApplication& app) {
     discardPrompt();
     drop(window, {QUrl::fromLocalFile(gif)});
     check(waitUntil([&] { return action(window, QStringLiteral("播放／暂停"))->isVisible(); }), "GIF opens playback controls");
+    check(!action(window, QStringLiteral("设为桌面背景"))->isEnabled() && !action(window, QStringLiteral("设为锁屏背景"))->isEnabled(), "animation requires freezing a frame before setting background");
     window->hide();
     check(window->findChildren<QMovie*>().last()->state() == QMovie::Paused, "hidden window pauses GIF");
     window->show();
@@ -446,6 +604,29 @@ int runImageBrowserTest(QApplication& app) {
                     check(bar->styleSheet().contains("border: 0") && bar->styleSheet().contains("spacing: 0"), "borderless compact toolbar");
                     qa->grab().save(QDir(screenshots).filePath(QStringLiteral("browser-%1-%2-%3.png")
                         .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
+                    trigger(qa, QStringLiteral("编辑"));
+                    QCoreApplication::processEvents();
+                    auto* editor = qa->findChild<QWidget*>(QStringLiteral("browserEditorPanel"));
+                    check(editor && qa->rect().contains(editor->geometry()), "editor panel fits at DPI");
+                    qa->grab().save(QDir(screenshots).filePath(QStringLiteral("editor-%1-%2-%3.png")
+                        .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
+                    if ((size.width() == 1100 && scale == 1) || (size.width() == 560 && scale == 2)) {
+                        for (int tool = 0; tool < 8; ++tool) {
+                            editor->findChild<QToolButton*>(QStringLiteral("browserEditorTool%1").arg(tool))->click();
+                            QCoreApplication::processEvents();
+                            qa->grab().save(QDir(screenshots).filePath(QStringLiteral("inline-%1-%2-%3-tool%4.png")
+                                .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale*100)).arg(tool)));
+                        }
+                        editor->findChild<QToolButton*>(QStringLiteral("browserEditorTool0"))->click();
+                        if (size.width() == 560) {
+                            auto* scroll = editor->findChild<QScrollArea*>();
+                            auto* resizeApply = editor->findChild<QPushButton*>(QStringLiteral("editorResizeApply"));
+                            scroll->ensureWidgetVisible(resizeApply);
+                            QCoreApplication::processEvents();
+                            check(!resizeApply->visibleRegion().isEmpty(), "small-window detail controls reachable by scrolling");
+                        }
+                    }
+                    trigger(qa, QStringLiteral("编辑"));
                 }
             }
         }
