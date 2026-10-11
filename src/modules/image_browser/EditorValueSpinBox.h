@@ -9,11 +9,13 @@ namespace ImageBrowser {
 // Equal button geometry and mirrored vector chevrons at every application scale.
 class EditorValueSpinBox final : public QSpinBox {
 public:
-    explicit EditorValueSpinBox(QWidget* parent) : QSpinBox(parent) {}
+    explicit EditorValueSpinBox(QWidget* parent) : QSpinBox(parent) { setControlScale(1); }
+    // Color rows use a fixed 78px control; form fields and dialogs follow the layout width.
+    void setFixedControlWidth(bool fixed) { fixedWidth_ = fixed; setControlScale(scale_); }
     void setControlScale(double scale) {
         scale_ = scale;
         const int height = qRound(26*scale), buttonHeight = (height-2)/2;
-        setFixedSize(qRound(78*scale), height);
+        if (fixedWidth_) setFixedSize(qRound(78*scale), height); else setFixedHeight(height);
         setStyleSheet(QStringLiteral(
             "QSpinBox { padding:0px %1px 0px %2px; }"
             "QSpinBox::up-button { subcontrol-origin:border; subcontrol-position:top right; width:%3px; height:%4px; margin:1px 1px 0px 0px; }"
@@ -43,5 +45,6 @@ protected:
     }
 private:
     double scale_ = 1;
+    bool fixedWidth_ = false;
 };
 } // namespace ImageBrowser

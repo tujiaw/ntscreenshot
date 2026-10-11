@@ -5,6 +5,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QFont>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QLabel>
@@ -61,6 +62,24 @@ QIcon editorToolIcon(int tool, const QColor& color) {
         p.drawEllipse(QRectF(3, 19, 7, 7)); p.drawEllipse(QRectF(12, 22, 7, 7));
         p.drawLine(8, 20, 24, 4); p.drawLine(15, 23, 7, 5);
         p.setPen(QPen(color, 1.5, Qt::DashLine)); p.drawRect(QRectF(17, 11, 11, 15));
+    }
+    return QIcon(pixmap);
+}
+
+// Mirrors the annotation shapes drawn on the canvas, so the picker reads as a picture.
+QIcon annotationShapeIcon(int shape, const QColor& color) {
+    QPixmap pixmap(64, 64); pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap); p.scale(2, 2); p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(QPen(color, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    if (shape == 0) p.drawRect(QRectF(6, 9, 20, 14));
+    else if (shape == 1) p.drawEllipse(QRectF(6, 8, 20, 16));
+    else if (shape == 2) {
+        p.drawLine(QPointF(7, 25), QPointF(25, 8));
+        p.drawLine(QPointF(25, 8), QPointF(15.5, 9.5));
+        p.drawLine(QPointF(25, 8), QPointF(23.5, 17.5));
+    } else {
+        QFont font = p.font(); font.setPixelSize(19); font.setBold(true); p.setFont(font);
+        p.drawText(QRectF(0, 0, 32, 32), Qt::AlignCenter, QStringLiteral("A"));
     }
     return QIcon(pixmap);
 }
@@ -160,22 +179,39 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
 
     auto* annotate = createPage(names[1], tr("选择图形后直接拖动绘制，松开完成；文字点击放置，Esc 取消当前绘制。"));
     auto* annotationForm = qobject_cast<QFormLayout*>(annotate->layout());
-    annotationShape_ = new QComboBox(annotate); annotationShape_->setObjectName("editorAnnotationShape");
-    annotationShape_->addItems({tr("矩形"), tr("椭圆"), tr("箭头"), tr("文字")});
-    annotationForm->addRow(tr("形状"), annotationShape_);
+    // 形状用一排图标按钮而不是下拉框：四种形状一眼看全，少一次展开。
+    auto* shapeRow = new QWidget(annotate);
+    auto* shapeLayout = new QHBoxLayout(shapeRow);
+    shapeLayout->setContentsMargins(0, 0, 0, 0); shapeLayout->setSpacing(4);
+    annotationShape_ = new QButtonGroup(this); annotationShape_->setExclusive(true);
+    const QStringList shapeNames = {tr("矩形"), tr("椭圆"), tr("箭头"), tr("文字")};
+    for (int i = 0; i < shapeNames.size(); ++i) {
+        auto* button = new QToolButton(shapeRow);
+        button->setObjectName(QStringLiteral("editorAnnotationShape%1").arg(i));
+        button->setProperty("annotationShape", i);
+        button->setCheckable(true); button->setCursor(Qt::PointingHandCursor);
+        button->setToolTip(shapeNames[i]);
+        button->setIconSize(QSize(22, 22));
+        button->setIcon(annotationShapeIcon(i, ThemeManager::tokens().textPrimary));
+        annotationShape_->addButton(button, i);
+        shapeLayout->addWidget(button);
+    }
+    shapeLayout->addStretch();
+    annotationShape_->button(0)->setChecked(true);
+    annotationForm->addRow(tr("形状"), shapeRow);
     annotationText_ = new QLineEdit(annotate); annotationText_->setObjectName("editorAnnotationText");
     annotationText_->setPlaceholderText(tr("输入标注文字")); annotationForm->addRow(tr("文字"), annotationText_);
     annotationColor_ = addColor(annotate, "editorAnnotationColor");
-    annotationWidth_ = addSpin(annotate, tr("线宽（像素）"), "editorAnnotationWidth", 1, 100, 4);
-    annotationFont_ = addSpin(annotate, tr("字号（像素）"), "editorAnnotationFont", 8, 200, 28);
+    annotationWidth_ = addSpin(annotate, tr("线宽（像素）"), "editorAnnotationWidth", 1, 100, 6);
+    annotationFont_ = addSpin(annotate, tr("字号（像素）"), "editorAnnotationFont", 8, 200, 42);
     auto updateAnnotation = [this, annotationForm] {
-        const bool text = annotationShape_->currentIndex() == 3;
+        const bool text = annotationShape_->checkedId() == 3;
         annotationForm->setRowVisible(annotationText_, text);
         annotationForm->setRowVisible(annotationFont_, text);
         annotationForm->setRowVisible(annotationWidth_, !text);
         pages_->updateGeometry();
     };
-    connect(annotationShape_, &QComboBox::currentIndexChanged, this, updateAnnotation); updateAnnotation();
+    connect(annotationShape_, &QButtonGroup::idClicked, this, updateAnnotation); updateAnnotation();
 
     auto* perspective = createPage(names[2], tr("按左上、右上、右下、左下顺序输入原图坐标。"));
     const QStringList cornerNames = {tr("左上"), tr("右上"), tr("右下"), tr("左下")};
@@ -184,7 +220,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         fields->setContentsMargins(0, 0, 0, 0);
         for (int axis = 0; axis < 2; ++axis) {
             fields->addWidget(new QLabel(axis ? "Y" : "X", row));
-            auto* coordinate = new QSpinBox(row); coordinate->setRange(0, 0);
+            auto* coordinate = new EditorValueSpinBox(row); coordinate->setRange(0, 0);
             coordinate->setObjectName(QStringLiteral("editorCorner%1").arg(i*2+axis));
             fields->addWidget(coordinate, 1); corners_ << coordinate;
         }
@@ -241,7 +277,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     auto colorControl = [this, color](const QString& label, const QString& name, const QString& gradient, bool alpha = false) {
         auto* row = new QWidget(color); auto* layout = new QVBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0); layout->setSpacing(2);
         auto* header = new QHBoxLayout;
-        auto* spin = new EditorValueSpinBox(row); spin->setRange(alpha ? 0 : -100, 100); spin->setObjectName(name); spin->setFixedWidth(78); spin->setFixedHeight(26);
+        auto* spin = new EditorValueSpinBox(row); spin->setFixedControlWidth(true); spin->setRange(alpha ? 0 : -100, 100); spin->setObjectName(name);
         header->addWidget(new QLabel(label, row)); header->addStretch(); header->addWidget(spin); layout->addLayout(header);
         auto* slider = new QSlider(Qt::Horizontal, row); slider->setRange(alpha ? 0 : -100, 100);
         slider->setObjectName(name + "Slider"); slider->setFixedHeight(16);
@@ -288,7 +324,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         connect(field, &QSpinBox::valueChanged, this, &ImageEditorPanel::drawingStyleChanged);
     for (auto* field : {annotationColor_, annotationText_})
         connect(field, &QLineEdit::textChanged, this, &ImageEditorPanel::drawingStyleChanged);
-    connect(annotationShape_, &QComboBox::currentIndexChanged, this, &ImageEditorPanel::drawingStyleChanged);
+    connect(annotationShape_, &QButtonGroup::idClicked, this, &ImageEditorPanel::drawingStyleChanged);
     connect(watermarkMode_, &QComboBox::currentIndexChanged, this, [this] {
         if (selecting_) emit cancelSelectionRequested();
         syncButtons();
@@ -309,7 +345,7 @@ QWidget* ImageEditorPanel::createPage(const QString& title, const QString& descr
 
 QSpinBox* ImageEditorPanel::addSpin(QWidget* page, const QString& label, const QString& name,
                                   int minimum, int maximum, int value) {
-    auto* field = new QSpinBox(page); field->setObjectName(name); field->setRange(minimum, maximum); field->setValue(value);
+    auto* field = new EditorValueSpinBox(page); field->setObjectName(name); field->setRange(minimum, maximum); field->setValue(value);
     qobject_cast<QFormLayout*>(page->layout())->addRow(label, field); return field;
 }
 
@@ -341,7 +377,7 @@ EditOperation ImageEditorPanel::currentOperation() const {
     operation.kind = static_cast<EditOperation::Kind>(EditOperation::Annotate + currentTool_ - 1);
     switch (currentTool_) {
     case 1:
-        operation.variant = annotationShape_->currentIndex(); operation.text = annotationText_->text();
+        operation.variant = qMax(0, annotationShape_->checkedId()); operation.text = annotationText_->text();
         operation.color = QColor(annotationColor_->text());
         operation.strength = operation.variant == 3 ? annotationFont_->value() : annotationWidth_->value(); break;
     case 2: {
@@ -412,9 +448,16 @@ void ImageEditorPanel::syncButtons() {
     const bool region = currentTool_ == 0 || currentTool_ == 3 || (currentTool_ == 4 && watermarkMode_->currentIndex() == 0) || currentTool_ == 5 || currentTool_ == 8;
     submit_->setText(region ? (selecting_ ? tr("重新选择区域") : tr("选择区域")) : tr("应用"));
     submit_->setVisible(currentTool_ != 1);
-    submit_->setEnabled(editable_);
+    submit_->setEnabled(editable_ && !busy_);
     applySelection_->setVisible(selecting_); cancelSelection_->setVisible(selecting_);
-    applySelection_->setEnabled(editable_ && validSelection_); cancelSelection_->setEnabled(editable_);
+    applySelection_->setEnabled(editable_ && validSelection_ && !busy_); cancelSelection_->setEnabled(editable_ && !busy_);
+}
+
+void ImageEditorPanel::setBusy(bool busy) {
+    if (busy_ == busy) return;
+    busy_ = busy;
+    showMessage(busy ? tr("正在处理图片，请稍候…") : QString());
+    syncButtons();
 }
 
 void ImageEditorPanel::showMessage(const QString& text) { message_->setText(text); message_->setVisible(!text.isEmpty()); }
@@ -446,10 +489,16 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
     }
     for (auto* swatch : findChildren<QToolButton*>())
         if (swatch->property("colorSwatch").toBool()) swatch->setFixedSize(qRound(22*scale), qRound(22*scale));
-    for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_, opacity_}) {
-        static_cast<EditorValueSpinBox*>(field)->setControlScale(scale);
-        if (auto* slider = field->parentWidget()->findChild<QSlider*>()) slider->setFixedHeight(qRound(16*scale));
+    for (auto* abstract : annotationShape_->buttons()) {
+        auto* button = qobject_cast<QToolButton*>(abstract);
+        button->setFixedSize(QSize(qRound(36*scale), qRound(32*scale)));
+        button->setIconSize(QSize(qRound(22*scale), qRound(22*scale)));
+        button->setIcon(annotationShapeIcon(annotationShape_->id(button), theme.textPrimary));
     }
+    for (auto* field : findChildren<QSpinBox*>())
+        if (auto* spin = dynamic_cast<EditorValueSpinBox*>(field)) spin->setControlScale(scale);
+    for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_, opacity_})
+        if (auto* slider = field->parentWidget()->findChild<QSlider*>()) slider->setFixedHeight(qRound(16*scale));
     setFixedWidth(qRound(344*scale));
     setFixedHeight(qMin(qRound((currentTool_ == 7 || currentTool_ == 8 || currentTool_ == 6 ? 740 : 620)*scale), availableHeight));
 }

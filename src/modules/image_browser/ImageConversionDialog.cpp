@@ -1,5 +1,6 @@
 #include "ImageConversionDialog.h"
 #include "ImageDocument.h"
+#include "EditorValueSpinBox.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -27,7 +28,7 @@ ImageConversionDialog::ImageConversionDialog(const QSize& imageSize, QWidget* pa
     resize_->setObjectName("conversionResize");
     form_->addRow(resize_);
     auto spin = [this](const char* name, int minimum, int maximum, int value) {
-        auto* input = new QSpinBox(this);
+        auto* input = new EditorValueSpinBox(this);
         input->setObjectName(QString::fromLatin1(name));
         input->setRange(minimum, maximum); input->setValue(value);
         return input;

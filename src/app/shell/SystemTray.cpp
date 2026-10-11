@@ -64,9 +64,9 @@ void SystemTray::setFixedShortcutsAvailable(bool imageBrowser, bool settings)
     // The native hotkey registry handles activation; the menu displays the keys.
     // Avoid a second QAction shortcut which could activate the same command twice.
     imageBrowserAction_->setText(QCoreApplication::translate("App", "图片浏览") +
-        (imageBrowser ? "\t" + ShellShortcuts::imageBrowser() : QString()));
+        (imageBrowser ? " " + ShellShortcuts::imageBrowser() : QString()));
     settingAction_->setText(QCoreApplication::translate("App", "设置") +
-        (settings ? "\t" + ShellShortcuts::settings() : QString()));
+        (settings ? " " + ShellShortcuts::settings() : QString()));
 }
 
 void SystemTray::onScreenshot()

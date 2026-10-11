@@ -26,6 +26,8 @@ public:
     void setMetrics(double scale, int availableHeight);
     void setDocumentContext(const QString& path, QSize size, bool editable);
     void setSelectionState(bool selecting, const QRect& rect);
+    // 后台图像处理期间在面板内提示并锁住按钮，否则用户会以为点击没有生效。
+    void setBusy(bool busy);
     EditOperation currentOperation() const;
     bool drawingActive() const { return currentTool_ == 1 && editable_; }
     bool validateOperation(const EditOperation& operation);
@@ -56,7 +58,7 @@ private:
     QPushButton* submit_;
     QPushButton* applySelection_;
     QPushButton* cancelSelection_;
-    QComboBox* annotationShape_;
+    QButtonGroup* annotationShape_;
     QComboBox* filter_;
     QComboBox* watermarkMode_;
     QSpinBox *filterStrength_, *cutoutIterations_, *cutoutFeather_;
@@ -70,6 +72,7 @@ private:
     QString imagePath_;
     int currentTool_ = 0;
     bool editable_ = false;
+    bool busy_ = false;
     bool selecting_ = false;
     bool validSelection_ = false;
     double lastScale_ = -1;

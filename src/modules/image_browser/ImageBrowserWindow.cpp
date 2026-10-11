@@ -3,6 +3,7 @@
 #include "ImageEditorPanel.h"
 #include "ImageConversionDialog.h"
 #include "ImageDirectoryModel.h"
+#include "EditorValueSpinBox.h"
 #include "ImageLoader.h"
 #include "core/platform/Util.h"
 #include "core/platform/SystemBackground.h"
@@ -22,6 +23,7 @@
 #include <QDragEnterEvent>
 #include <QFileDialog>
 #include <QDir>
+#include <QFile>
 #include <QFormLayout>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -306,11 +308,10 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         if (movie_) {
             const int frame = movie_->currentFrameNumber();
             const QString path = document_.path;
-            busy_ = true;
-            updateActions();
+            setBusy(true);
             loader_->run(this, [path, frame] { return ImageDocument::readFrame(path, frame); },
                          [this](const ImageResult& result) {
-                busy_ = false;
+                setBusy(false);
                 if (!result.error.isEmpty()) showStatus(result.error);
                 else {
                     QApplication::clipboard()->setImage(result.image);
@@ -324,6 +325,11 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         }
     });
     saveAction_ = panelAction(tr("另存为"), "browser-save.png", QKeySequence::Save, [this] { save(); });
+    // 只出现在右键菜单底部，所以不进工具栏，也不挂快捷键。
+    deleteAction_ = new QAction(ThemeIcon::icon(QStringLiteral("remove.png"), IconTone::Danger), tr("删除图片"), this);
+    deleteAction_->setObjectName(QStringLiteral("browserDelete"));
+    deleteAction_->setProperty("browserIcon", QStringLiteral("remove.png"));
+    connect(deleteAction_, &QAction::triggered, this, &ImageBrowserWindow::deleteImage);
     details_ = new QLabel(controlLeft_);
     details_->setObjectName(QStringLiteral("browserImageDetails"));
     details_->setTextFormat(Qt::PlainText);
@@ -432,6 +438,15 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     statusBar()->addWidget(controlBar_, 1);
     statusTimer_.setSingleShot(true);
     connect(&statusTimer_, &QTimer::timeout, this, [this] { statusText_.clear(); layoutControlBar(); updateStatus(); });
+    // 只有超过 1 秒的操作才提示：快操作闪一下等待光标和面板文案反而更烦。
+    busyCursorTimer_.setSingleShot(true);
+    connect(&busyCursorTimer_, &QTimer::timeout, this, [this] {
+        if (!busy_ || busyHintShown_) return;
+        busyHintShown_ = true;
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        if (editorPanel_) editorPanel_->setBusy(true);
+        if (!busyMessage_.isEmpty()) showStatus(busyMessage_);
+    });
     for (QWidget* surface : {static_cast<QWidget*>(canvas_), list_->viewport(), static_cast<QWidget*>(toolbar_)}) {
         surface->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(surface, &QWidget::customContextMenuRequested, this, [this, surface](const QPoint& point) {
@@ -451,7 +466,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     thumbnailsTimer_.setSingleShot(true);
     connect(&directoryWatcher_, &QFileSystemWatcher::directoryChanged, this, [this] { refreshTimer_.start(); });
     connect(&directoryWatcher_, &QFileSystemWatcher::fileChanged, this, [this] { refreshTimer_.start(); });
-    connect(&refreshTimer_, &QTimer::timeout, this, &ImageBrowserWindow::refresh);
+    connect(&refreshTimer_, &QTimer::timeout, this, [this] { refresh(); });
     connect(&thumbnailsTimer_, &QTimer::timeout, this, &ImageBrowserWindow::requestThumbnails);
     connect(model_, &ImageDirectoryModel::scanned, this, &ImageBrowserWindow::listingReady);
     connect(list_->selectionModel(), &QItemSelectionModel::currentChanged, this, [this](const QModelIndex& current) {
@@ -469,7 +484,11 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     updateActions();
 }
 
-ImageBrowserWindow::~ImageBrowserWindow() { loadGeneration_->store(++imageVersion_); stopMovie(); }
+ImageBrowserWindow::~ImageBrowserWindow() {
+    loadGeneration_->store(++imageVersion_);
+    stopMovie();
+    if (busyHintShown_) QApplication::restoreOverrideCursor();
+}
 
 void ImageBrowserWindow::createEditorPanel() {
     editorPanel_ = new ImageEditorPanel(this);
@@ -632,6 +651,18 @@ void ImageBrowserWindow::styleToolButtons() {
     }
 }
 
+void ImageBrowserWindow::setBusy(bool busy, const QString& message) {
+    busy_ = busy;
+    busyMessage_ = message;
+    if (busy) busyCursorTimer_.start(1000);
+    else {
+        busyCursorTimer_.stop();
+        if (busyHintShown_) { QApplication::restoreOverrideCursor(); busyHintShown_ = false; }
+        if (editorPanel_) editorPanel_->setBusy(false);
+    }
+    updateActions();
+}
+
 void ImageBrowserWindow::showStatus(const QString& message, int timeout) {
     statusText_ = message;
     statusTimer_.stop();
@@ -760,9 +791,9 @@ void ImageBrowserWindow::openDirectory(const QString& directory, const QString& 
     model_->scan(directory_);
     updateActions();
 }
-void ImageBrowserWindow::refresh() {
+void ImageBrowserWindow::refresh(const QString& selectPath) {
     if (busy_ || scanning_) { refreshTimer_.start(); return; }
-    pendingSelection_ = document_.path;
+    pendingSelection_ = selectPath.isEmpty() ? document_.path : selectPath;
     scanning_ = true;
     list_->setEnabled(false);
     model_->scan(directory_);
@@ -808,6 +839,9 @@ void ImageBrowserWindow::selectRow(int row) {
 }
 void ImageBrowserWindow::loadImage(const QString& path) {
     stopMovie();
+    // 切换图片时画布上闪一下“正在加载图片”比空白更烦，只有画布本来就空着（首次打开、
+    // 上一张打不开）才提示。
+    const bool blankCanvas = document_.current.isNull();
     const quint64 version = ++imageVersion_;
     loadGeneration_->store(version);
     loading_ = true;
@@ -816,7 +850,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
     document_.path = path;
     displayedSize_ = {};
     canvas_->setImage({}, true);
-    canvas_->setMessage(tr("正在加载图片…"));
+    if (blankCanvas) canvas_->setMessage(tr("正在加载图片…"));
     showStatus(QString());
     updateActions();
     const auto files = directoryWatcher_.files();
@@ -868,11 +902,10 @@ void ImageBrowserWindow::freezeFrame(std::function<void()> after) {
     const int frameNumber = movie_->currentFrameNumber();
     movie_->setPaused(true);
     const QString path = document_.path;
-    busy_ = true;
-    updateActions();
+    setBusy(true);
     loader_->run(this, [path, frameNumber] { return ImageDocument::readFrame(path, frameNumber); },
                  [this, after](const ImageResult& result) {
-        busy_ = false;
+        setBusy(false);
         if (!result.error.isEmpty()) showStatus(result.error);
         else {
             stopMovie();
@@ -955,6 +988,7 @@ void ImageBrowserWindow::updateActions() {
     nextAction_->setEnabled(!busy_ && row >= 0 && row + 1 < model_->rowCount());
     saveAction_->setEnabled(available && !document_.limited && !movie_);
     copyAction_->setEnabled(available && !document_.limited);
+    deleteAction_->setEnabled(available && !document_.path.isEmpty());
     convertAction_->setEnabled(available && !document_.limited);
     overwriteAction_->setEnabled(editable && !animationSource_ && document_.sourceUnchanged() &&
         (QFileInfo(document_.path).suffix().toLower() == "png" || QFileInfo(document_.path).suffix().toLower() == "jpg" || QFileInfo(document_.path).suffix().toLower() == "jpeg"));
@@ -1036,8 +1070,7 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
         if (QMessageBox::question(this, tr("透明区域"), tr("此格式会将透明区域替换为白色，是否继续？"), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return false;
     }
     if (overwrite && !document_.sourceUnchanged()) return false;
-    busy_ = true;
-    updateActions();
+    setBusy(true);
     SaveProgress progress(this);
     auto result = std::make_shared<SaveResult>();
     const QImage image = document_.current;
@@ -1048,7 +1081,7 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
     },
                  [&progress, result](const SaveResult& saved) { *result = saved; progress.accept(); });
     progress.exec();
-    busy_ = false;
+    setBusy(false);
     if (!result->success) {
         QMessageBox::warning(this, tr("保存失败"), result->error);
         updateActions();
@@ -1077,14 +1110,11 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
 }
 void ImageBrowserWindow::setSystemBackground(bool lockScreen) {
     if (busy_ || loading_ || movie_ || document_.limited || document_.current.isNull() || !SystemBackground::supported()) return;
-    busy_ = true;
-    updateActions();
-    showStatus(lockScreen ? tr("正在设置锁屏背景…") : tr("正在设置桌面背景…"));
+    setBusy(true, lockScreen ? tr("正在设置锁屏背景…") : tr("正在设置桌面背景…"));
     loader_->run(this, [image = document_.current, lockScreen] {
         return SystemBackground::apply(image, lockScreen ? SystemBackground::Target::LockScreen : SystemBackground::Target::Desktop);
     }, [this, lockScreen](const SystemBackground::Result& result) {
-        busy_ = false;
-        updateActions();
+        setBusy(false);
         if (result.success) showStatus(lockScreen ? tr("已设为锁屏背景") : tr("已设为桌面背景"), 5000);
         else showStatus(result.error);
     });
@@ -1101,6 +1131,40 @@ void ImageBrowserWindow::convertFormat() {
     ImageConversionDialog dialog(document_.current.size(), this);
     if (dialog.exec() == QDialog::Accepted) save(false, true, dialog.format(), dialog.options());
 }
+
+void ImageBrowserWindow::deleteImage() {
+    if (busy_ || loading_ || scanning_ || document_.current.isNull() || document_.path.isEmpty()) return;
+    const QString path = document_.path;
+    const QString name = QFileInfo(path).fileName();
+    const QString question = document_.dirty() ? tr("删除「%1」？未保存的编辑会一并丢弃。").arg(name)
+                                               : tr("删除「%1」？").arg(name);
+    if (QMessageBox::question(this, tr("删除图片"), question,
+                              QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes)
+        return;
+    // 先算好邻居：优先下面那张（删除后它正好补位），到底了再退回上面那张。
+    const int row = model_->indexOf(path);
+    QString next;
+    if (row >= 0) {
+        if (row + 1 < model_->rowCount()) next = model_->pathAt(row + 1);
+        else if (row > 0) next = model_->pathAt(row - 1);
+    }
+    QString error;
+    if (!QFile::moveToTrash(path, &error)) {
+        QMessageBox::warning(this, tr("删除图片"), tr("无法删除「%1」。\n%2").arg(
+            name, error.isEmpty() ? tr("文件可能正被占用。") : error));
+        return;
+    }
+    // 先清空文档再刷新，否则 listingReady 会把这个已经不存在的路径又选中一次。
+    loadGeneration_->store(++imageVersion_);
+    stopMovie();
+    document_ = {};
+    displayedSize_ = {};
+    animationSource_ = false;
+    canvas_->setImage({}, true);
+    showStatus(tr("已删除「%1」").arg(name), 3000);
+    refresh(next);
+}
+
 void ImageBrowserWindow::showContextMenu(const QPoint& globalPosition) {
     updateActions();
     QMenu menu(this);
@@ -1119,6 +1183,8 @@ void ImageBrowserWindow::showContextMenu(const QPoint& globalPosition) {
     for (auto* action : std::as_const(editActions_)) if (action->isVisible()) menu.addAction(action);
     for (auto* action : {undoAction_, redoAction_, resetAction_, copyAction_, saveAction_})
         if (action->isVisible()) menu.addAction(action);
+    // 删除是唯一会动磁盘文件的菜单项，用一条分隔线单独隔在底部。
+    if (deleteAction_->isEnabled()) { menu.addSeparator(); menu.addAction(deleteAction_); }
     menu.exec(globalPosition);
 }
 void ImageBrowserWindow::contextMenuEvent(QContextMenuEvent* event) {
@@ -1133,16 +1199,14 @@ void ImageBrowserWindow::edit(const EditOperation& operation) {
 }
 void ImageBrowserWindow::renderDocument(ImageDocument candidate) {
     if (busy_) return;
-    busy_ = true;
     canvas_->setCropping(false);
     const quint64 version = ++imageVersion_;
-    updateActions();
-    showStatus(tr("正在处理图片…"));
+    setBusy(true, tr("正在处理图片…"));
     loader_->run(this, [base = candidate.original, operations = candidate.operations, count = candidate.position] {
         return ImageDocument::render(base, operations, count);
     }, [this, candidate, version](const ImageResult& result) mutable {
         if (version != imageVersion_) return;
-        busy_ = false;
+        setBusy(false);
         if (!result.error.isEmpty()) showStatus(result.error);
         else {
             const bool sizeChanged = result.image.size() != document_.current.size();
@@ -1160,8 +1224,8 @@ void ImageBrowserWindow::resizeImage() {
     QDialog dialog(this);
     dialog.setWindowTitle(tr("调整图片尺寸"));
     auto* form = new QFormLayout(&dialog);
-    auto* width = new QSpinBox(&dialog);
-    auto* height = new QSpinBox(&dialog);
+    auto* width = new EditorValueSpinBox(&dialog);
+    auto* height = new EditorValueSpinBox(&dialog);
     width->setRange(1, int(MaxEditablePixels));
     height->setRange(1, int(MaxEditablePixels));
     width->setValue(document_.current.width());

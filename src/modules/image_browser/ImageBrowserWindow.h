@@ -41,7 +41,8 @@ protected:
 
 private:
     void openDirectory(const QString& directory, const QString& selection = {});
-    void refresh();
+    // selectPath 为空时沿用当前图片；删除后要靠它接着选中相邻的那张。
+    void refresh(const QString& selectPath = QString());
     void listingReady(const QString& error);
     void selectRow(int row);
     void loadImage(const QString& path);
@@ -51,6 +52,7 @@ private:
     bool save(bool overwrite = false, bool refreshListing = true, const QByteArray& format = {},
               const ImageConversionOptions& options = {});
     void convertFormat();
+    void deleteImage();
     void setSystemBackground(bool lockScreen);
     void showContextMenu(const QPoint& globalPosition);
     void edit(const EditOperation& operation);
@@ -74,6 +76,9 @@ private:
     void positionEditorPanel();
     void selectEditRegion(const EditOperation& operation);
     void applyEditRegion(const QRect& rect);
+    // Single entry point for busy_ so every slow image operation reports progress
+    // the same way. Hints only fire past the one-second mark (see setBusy).
+    void setBusy(bool busy, const QString& message = QString());
 
 private slots:
     void applyDpi(double scale = 0);
@@ -111,6 +116,7 @@ private:
     QMovie* movie_ = nullptr;
     QFileSystemWatcher directoryWatcher_;
     QTimer refreshTimer_;
+    QTimer busyCursorTimer_;
     QTimer thumbnailsTimer_;
     QTimer statusTimer_;
     QString directory_;
@@ -124,6 +130,8 @@ private:
     bool hasDetails_ = false;
     bool canvasHovered_ = false;
     bool busy_ = false;
+    bool busyHintShown_ = false;
+    QString busyMessage_;
     bool loading_ = false;
     bool scanning_ = false;
     bool animationSource_ = false;
@@ -139,6 +147,7 @@ private:
     QAction* actualAction_ = nullptr;
     QAction* zoomInAction_ = nullptr;
     QAction* zoomOutAction_ = nullptr;
+    QAction* deleteAction_;
     QAction* saveAction_;
     QAction* overwriteAction_;
     QAction* copyAction_;
