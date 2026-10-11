@@ -1,4 +1,5 @@
 #include "ImageEditorPanel.h"
+#include "EditorValueSpinBox.h"
 #include "core/theme/ThemeManager.h"
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -51,11 +52,15 @@ QIcon editorToolIcon(int tool, const QColor& color) {
         p.drawRoundedRect(QRectF(3, 4, 18, 18), 5, 5); p.drawRoundedRect(QRectF(12, 13, 17, 17), 3, 3);
     } else if (tool == 6) {
         p.drawEllipse(QRectF(10, 3, 13, 13)); p.drawEllipse(QRectF(3, 14, 13, 13)); p.drawEllipse(QRectF(17, 14, 13, 13));
-    } else {
+    } else if (tool == 7) {
         p.drawEllipse(QRectF(3, 4, 26, 24));
         p.setBrush(color);
         for (const QPointF& point : {QPointF(10, 11), QPointF(16, 8), QPointF(23, 12), QPointF(9, 18)}) p.drawEllipse(point, 1.2, 1.2);
         p.setBrush(Qt::NoBrush); p.drawEllipse(QRectF(17, 19, 8, 8));
+    } else {
+        p.drawEllipse(QRectF(3, 19, 7, 7)); p.drawEllipse(QRectF(12, 22, 7, 7));
+        p.drawLine(8, 20, 24, 4); p.drawLine(15, 23, 7, 5);
+        p.setPen(QPen(color, 1.5, Qt::DashLine)); p.drawRect(QRectF(17, 11, 11, 15));
     }
     return QIcon(pixmap);
 }
@@ -89,7 +94,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     auto* grid = new QGridLayout(toolGrid_);
     grid->setContentsMargins(0, 0, 0, 0);
     const QStringList names = {tr("裁剪旋转"), tr("标注"), tr("矫正"), tr("马赛克"),
-                               tr("水印"), tr("素材"), tr("滤镜"), tr("调色")};
+                               tr("水印"), tr("素材"), tr("滤镜"), tr("调色"), tr("抠图")};
     for (int i = 0; i < names.size(); ++i) {
         auto* button = new QToolButton(toolGrid_);
         button->setObjectName(QStringLiteral("browserEditorTool%1").arg(i));
@@ -146,14 +151,14 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     connect(resize, &QPushButton::clicked, this, [this] {
         const QSize size(resizeWidth_->value(), resizeHeight_->value());
         if (qint64(size.width()) * size.height() > MaxEditablePixels) {
-            showMessage(tr("图片尺寸超过 1 亿像素的编辑上限。")); return;
+            showMessage(tr("图片尺寸超过 7200 万像素的编辑上限。")); return;
         }
         if (size == imageSize_) return;
         EditOperation operation; operation.kind = EditOperation::Resize; operation.size = size;
         emit editRequested(operation, false);
     });
 
-    auto* annotate = createPage(names[1], tr("选择形状和样式，再在图片上拖动绘制区域。"));
+    auto* annotate = createPage(names[1], tr("选择图形后直接拖动绘制，松开完成；文字点击放置，Esc 取消当前绘制。"));
     auto* annotationForm = qobject_cast<QFormLayout*>(annotate->layout());
     annotationShape_ = new QComboBox(annotate); annotationShape_->setObjectName("editorAnnotationShape");
     annotationShape_->addItems({tr("矩形"), tr("椭圆"), tr("箭头"), tr("文字")});
@@ -187,12 +192,18 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     }
     auto* mosaic = createPage(names[3], tr("选中需要遮挡的区域，块越大，马赛克越明显。"));
     mosaicBlock_ = addSpin(mosaic, tr("块大小（像素）"), "editorMosaicBlock", 2, 100, 12);
-    auto* watermark = createPage(names[4], tr("输入水印文字，再选择放置区域。"));
+    auto* watermark = createPage(names[4], tr("选择常用水印布局，或自定义放置区域。"));
     watermarkText_ = new QLineEdit(watermark); watermarkText_->setObjectName("editorWatermarkText");
     watermarkText_->setPlaceholderText(tr("输入水印文字"));
     qobject_cast<QFormLayout*>(watermark->layout())->addRow(tr("文字"), watermarkText_);
+    watermarkMode_ = new QComboBox(watermark); watermarkMode_->setObjectName("editorWatermarkMode");
+    watermarkMode_->addItems({tr("自定义区域"), tr("右下角"), tr("左下角"), tr("右上角"), tr("左上角"), tr("居中"), tr("平铺")});
+    watermarkMode_->setCurrentIndex(1);
+    qobject_cast<QFormLayout*>(watermark->layout())->addRow(tr("布局"), watermarkMode_);
     watermarkColor_ = addColor(watermark, "editorWatermarkColor");
     watermarkFont_ = addSpin(watermark, tr("字号（像素）"), "editorWatermarkFont", 8, 200, 36);
+    watermarkOpacity_ = addSpin(watermark, tr("不透明度（%）"), "editorWatermarkOpacity", 0, 100, 45);
+    watermarkMargin_ = addSpin(watermark, tr("边距（像素）"), "editorWatermarkMargin", 0, 1000, 24);
     auto* sticker = createPage(names[5], tr("导入本地图片作为素材，再选择放置区域。"));
     assetPath_ = new QLineEdit(sticker); assetPath_->setObjectName("editorAssetPath");
     assetPath_->setPlaceholderText(tr("素材图片路径"));
@@ -206,24 +217,59 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     });
     auto* filters = createPage(names[6], tr("选择滤镜，点击应用后生效。"));
     filter_ = new QComboBox(filters); filter_->setObjectName("editorFilter");
-    filter_->addItems({tr("黑白"), tr("复古"), tr("反色")});
+    filter_->addItems({tr("黑白"), tr("复古"), tr("反色"), tr("高斯模糊"), tr("中值降噪"), tr("锐化"),
+        tr("边缘检测"), tr("自动二值化"), tr("自动对比度")});
     qobject_cast<QFormLayout*>(filters->layout())->addRow(tr("滤镜"), filter_);
+    filterStrength_ = addSpin(filters, tr("强度"), "editorFilterStrength", 1, 20, 3);
+    auto* filterHint = new QLabel(filters); filterHint->setWordWrap(true);
+    qobject_cast<QFormLayout*>(filters->layout())->addRow(filterHint);
+    auto updateFilter = [this, filters, filterHint] {
+        const int mode = filter_->currentIndex();
+        const bool parameter = mode >= 3 && mode <= 6;
+        auto* form = qobject_cast<QFormLayout*>(filters->layout());
+        form->setRowVisible(filterStrength_, parameter);
+        filterStrength_->setMaximum(mode == 6 ? 255 : mode == 4 ? 4 : 20);
+        filterStrength_->setValue(mode == 6 ? 80 : mode == 5 ? 10 : 3);
+        qobject_cast<QLabel*>(form->labelForField(filterStrength_))->setText(mode == 6 ? tr("边缘阈值") : mode == 3 || mode == 4 ? tr("半径（像素）") : tr("强度"));
+        const QStringList hints = {tr("转为灰度，保留透明度。"), tr("使用复古色彩效果。"), tr("反转颜色，保留透明度。"),
+            tr("平滑图像，半径越大越模糊。"), tr("去除椒盐噪点，适合少量孤立杂点。"), tr("增强边缘细节，强度过高可能出现光晕。"),
+            tr("输出黑底白色轮廓，阈值越高保留的边缘越少。"), tr("自动计算阈值，输出黑白图像。"), tr("拉伸明暗范围，改善偏灰图像。")};
+        filterHint->setText(hints[mode]); pages_->updateGeometry();
+    };
+    connect(filter_, &QComboBox::currentIndexChanged, this, updateFilter); updateFilter();
     auto* color = createPage(names[7], tr("调整参数后点击应用，可使用撤销恢复。"));
-    auto colorControl = [this, color](const QString& label, const QString& name) {
-        auto* row = new QWidget(color); auto* layout = new QHBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0);
-        auto* slider = new QSlider(Qt::Horizontal, row); slider->setRange(-100, 100);
-        auto* spin = new QSpinBox(row); spin->setRange(-100, 100); spin->setObjectName(name);
-        layout->addWidget(slider, 1); layout->addWidget(spin);
+    auto colorControl = [this, color](const QString& label, const QString& name, const QString& gradient, bool alpha = false) {
+        auto* row = new QWidget(color); auto* layout = new QVBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0); layout->setSpacing(2);
+        auto* header = new QHBoxLayout;
+        auto* spin = new EditorValueSpinBox(row); spin->setRange(alpha ? 0 : -100, 100); spin->setObjectName(name); spin->setFixedWidth(78); spin->setFixedHeight(26);
+        header->addWidget(new QLabel(label, row)); header->addStretch(); header->addWidget(spin); layout->addLayout(header);
+        auto* slider = new QSlider(Qt::Horizontal, row); slider->setRange(alpha ? 0 : -100, 100);
+        slider->setObjectName(name + "Slider"); slider->setFixedHeight(16);
+        slider->setStyleSheet(QStringLiteral("QSlider::groove:horizontal { height: 8px; border-radius: 2px; background: qlineargradient(x1:0,y1:0,x2:1,y2:0,%1); } QSlider::sub-page:horizontal { background:transparent; border:0; } QSlider::handle:horizontal { background:white; width:8px; margin:-4px 0; border-radius:1px; }").arg(gradient));
+        layout->addWidget(slider);
         connect(slider, &QSlider::valueChanged, spin, &QSpinBox::setValue);
         connect(spin, &QSpinBox::valueChanged, slider, &QSlider::setValue);
-        qobject_cast<QFormLayout*>(color->layout())->addRow(label, row); return spin;
+        spin->setValue(alpha ? 100 : 0);
+        qobject_cast<QFormLayout*>(color->layout())->addRow(row); return spin;
     };
-    brightness_ = colorControl(tr("亮度"), "editorBrightness");
-    contrast_ = colorControl(tr("对比度"), "editorContrast");
-    saturation_ = colorControl(tr("饱和度"), "editorSaturation");
-    auto* reset = new QPushButton(tr("重置参数"), color);
+    brightness_ = colorControl(tr("亮度"), "editorBrightness", "stop:0 #252525, stop:1 #eeeeee");
+    contrast_ = colorControl(tr("对比度"), "editorContrast", "stop:0 #777777, stop:0.5 #eeeeee, stop:1 #252525");
+    saturation_ = colorControl(tr("饱和度"), "editorSaturation", "stop:0 #888888, stop:0.5 #53be72, stop:1 #eb533c");
+    temperature_ = colorControl(tr("色温"), "editorTemperature", "stop:0 #397bd5, stop:1 #d8a72c");
+    tint_ = colorControl(tr("色调"), "editorTint", "stop:0 #30c85a, stop:1 #b84dc9");
+    opacity_ = colorControl(tr("不透明度"), "editorOpacity", "stop:0 #555555, stop:1 #ffffff", true);
+    auto* reset = new QPushButton(tr("重置参数"), color); reset->setObjectName("editorColorReset");
     qobject_cast<QFormLayout*>(color->layout())->addRow(reset);
-    connect(reset, &QPushButton::clicked, this, [this] { brightness_->setValue(0); contrast_->setValue(0); saturation_->setValue(0); });
+    connect(reset, &QPushButton::clicked, this, [this] {
+        for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_}) field->setValue(0);
+        opacity_->setValue(100);
+    });
+
+    auto* cutout = createPage(names[8], tr("框选完整主体，选区外保留背景，再应用选区去除背景。适合主体与背景较清晰的图片；复杂发丝和透明物体可能需要重新选区。"));
+    cutoutIterations_ = addSpin(cutout, tr("细化次数"), "editorCutoutIterations", 1, 5, 3);
+    cutoutFeather_ = addSpin(cutout, tr("边缘羽化（像素）"), "editorCutoutFeather", 0, 10, 1);
+    auto* cutoutHint = new QLabel(tr("保留原图尺寸和透明度，建议另存为 PNG。增加细化次数会延长处理时间。"), cutout);
+    cutoutHint->setWordWrap(true); qobject_cast<QFormLayout*>(cutout->layout())->addRow(cutoutHint);
 
     message_ = new QLabel(this); message_->setObjectName("editorMessage"); message_->setWordWrap(true);
     message_->setTextFormat(Qt::PlainText); layout->addWidget(message_);
@@ -238,6 +284,15 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     });
     connect(cancelSelection_, &QPushButton::clicked, this, &ImageEditorPanel::cancelSelectionRequested);
     connect(tools_, &QButtonGroup::idClicked, this, &ImageEditorPanel::selectTool);
+    for (auto* field : {annotationWidth_, annotationFont_})
+        connect(field, &QSpinBox::valueChanged, this, &ImageEditorPanel::drawingStyleChanged);
+    for (auto* field : {annotationColor_, annotationText_})
+        connect(field, &QLineEdit::textChanged, this, &ImageEditorPanel::drawingStyleChanged);
+    connect(annotationShape_, &QComboBox::currentIndexChanged, this, &ImageEditorPanel::drawingStyleChanged);
+    connect(watermarkMode_, &QComboBox::currentIndexChanged, this, [this] {
+        if (selecting_) emit cancelSelectionRequested();
+        syncButtons();
+    });
     tools_->button(0)->setChecked(true); selectTool(0);
 }
 
@@ -273,9 +328,11 @@ QLineEdit* ImageEditorPanel::addColor(QWidget* page, const QString& name) {
 }
 
 void ImageEditorPanel::selectTool(int tool) {
-    if (currentTool_ != tool) emit toolChanged();
+    const bool changed = currentTool_ != tool;
     currentTool_ = tool; pages_->setCurrentIndex(tool); pages_->updateGeometry();
     scroll_->verticalScrollBar()->setValue(0); showMessage({}); syncButtons();
+    if (changed) emit toolChanged();
+    emit drawingStyleChanged();
 }
 
 EditOperation ImageEditorPanel::currentOperation() const {
@@ -296,10 +353,13 @@ EditOperation ImageEditorPanel::currentOperation() const {
     case 3: operation.strength = mosaicBlock_->value(); break;
     case 4:
         operation.text = watermarkText_->text(); operation.color = QColor(watermarkColor_->text());
-        operation.strength = watermarkFont_->value(); break;
+        operation.strength = watermarkFont_->value(); operation.variant = watermarkMode_->currentIndex();
+        operation.opacity = watermarkOpacity_->value(); operation.margin = watermarkMargin_->value(); break;
     case 5: operation.asset = ImageDocument::read(assetPath_->text()).image; break;
-    case 6: operation.variant = filter_->currentIndex(); break;
-    case 7: operation.brightness = brightness_->value(); operation.contrast = contrast_->value(); operation.saturation = saturation_->value(); break;
+    case 6: operation.variant = filter_->currentIndex(); operation.strength = filterStrength_->value(); break;
+    case 7: operation.brightness = brightness_->value(); operation.contrast = contrast_->value(); operation.saturation = saturation_->value();
+        operation.temperature = temperature_->value(); operation.tint = tint_->value(); operation.opacity = opacity_->value(); break;
+    case 8: operation.strength = cutoutIterations_->value(); operation.feather = cutoutFeather_->value(); break;
     }
     return operation;
 }
@@ -308,9 +368,9 @@ void ImageEditorPanel::submit() {
     if (!editable_) return;
     const auto operation = currentOperation();
     if (!validateOperation(operation)) return;
-    if (currentTool_ == 7 && operation.brightness == 0 && operation.contrast == 0 && operation.saturation == 0) return;
+    if (currentTool_ == 7 && operation.brightness == 0 && operation.contrast == 0 && operation.saturation == 0 && operation.temperature == 0 && operation.tint == 0 && operation.opacity == 100) return;
     showMessage({});
-    emit editRequested(operation, currentTool_ == 0 || currentTool_ == 1 || currentTool_ == 3 || currentTool_ == 4 || currentTool_ == 5);
+    emit editRequested(operation, currentTool_ == 0 || currentTool_ == 3 || (currentTool_ == 4 && watermarkMode_->currentIndex() == 0) || currentTool_ == 5 || currentTool_ == 8);
 }
 
 bool ImageEditorPanel::validateOperation(const EditOperation& operation) {
@@ -349,8 +409,9 @@ void ImageEditorPanel::setSelectionState(bool selecting, const QRect& rect) {
 }
 
 void ImageEditorPanel::syncButtons() {
-    const bool region = currentTool_ == 0 || currentTool_ == 1 || currentTool_ == 3 || currentTool_ == 4 || currentTool_ == 5;
+    const bool region = currentTool_ == 0 || currentTool_ == 3 || (currentTool_ == 4 && watermarkMode_->currentIndex() == 0) || currentTool_ == 5 || currentTool_ == 8;
     submit_->setText(region ? (selecting_ ? tr("重新选择区域") : tr("选择区域")) : tr("应用"));
+    submit_->setVisible(currentTool_ != 1);
     submit_->setEnabled(editable_);
     applySelection_->setVisible(selecting_); cancelSelection_->setVisible(selecting_);
     applySelection_->setEnabled(editable_ && validSelection_); cancelSelection_->setEnabled(editable_);
@@ -361,7 +422,7 @@ void ImageEditorPanel::showMessage(const QString& text) { message_->setText(text
 void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
     const auto& theme = ThemeManager::tokens();
     const QString key = theme.surface.name() + theme.border.name() + theme.surfaceRaised.name()
-        + theme.textPrimary.name() + theme.accentSubtle.name() + theme.accent.name();
+        + theme.textPrimary.name() + theme.accentSubtle.name() + theme.accent.name() + QString::number(currentTool_);
     if (lastScale_ == scale && lastHeight_ == availableHeight && lastStyleKey_ == key) return;
     lastScale_ = scale; lastHeight_ = availableHeight; lastStyleKey_ = key;
     setStyleSheet(QStringLiteral(
@@ -375,7 +436,7 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
     auto* outer = qobject_cast<QVBoxLayout*>(layout());
     outer->setContentsMargins(qRound(10*scale), qRound(8*scale), qRound(10*scale), qRound(8*scale));
     outer->setSpacing(qRound(6*scale));
-    const bool compact = availableHeight < qRound(420*scale);
+    const bool compact = availableHeight < qRound(660*scale);
     findChild<QToolButton*>(QStringLiteral("editorClose"))->setFixedSize(qRound(24*scale), qRound(24*scale));
     for (auto* abstract : tools_->buttons()) {
         auto* button = qobject_cast<QToolButton*>(abstract);
@@ -385,7 +446,11 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
     }
     for (auto* swatch : findChildren<QToolButton*>())
         if (swatch->property("colorSwatch").toBool()) swatch->setFixedSize(qRound(22*scale), qRound(22*scale));
+    for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_, opacity_}) {
+        static_cast<EditorValueSpinBox*>(field)->setControlScale(scale);
+        if (auto* slider = field->parentWidget()->findChild<QSlider*>()) slider->setFixedHeight(qRound(16*scale));
+    }
     setFixedWidth(qRound(344*scale));
-    setFixedHeight(qMin(qRound(550*scale), availableHeight));
+    setFixedHeight(qMin(qRound((currentTool_ == 7 || currentTool_ == 8 || currentTool_ == 6 ? 740 : 620)*scale), availableHeight));
 }
 } // namespace ImageBrowser

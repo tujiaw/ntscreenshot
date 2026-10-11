@@ -19,7 +19,7 @@ ImageConversionDialog::ImageConversionDialog(const QSize& imageSize, QWidget* pa
     formats_ = new QComboBox(this);
     formats_->setObjectName("conversionFormat");
     const auto supported = QImageWriter::supportedImageFormats();
-    for (const QByteArray& format : {QByteArray("png"), QByteArray("jpeg"), QByteArray("bmp"), QByteArray("webp")})
+    for (const QByteArray& format : {QByteArray("png"), QByteArray("jpeg"), QByteArray("bmp"), QByteArray("webp"), QByteArray("ico")})
         if (supported.contains(format)) formats_->addItem(QString::fromLatin1(format).toUpper(), format);
     formats_->addItem(QStringLiteral("PDF"), QByteArray("pdf"));
     form_->addRow(tr("目标格式"), formats_);
@@ -54,6 +54,12 @@ ImageConversionDialog::ImageConversionDialog(const QSize& imageSize, QWidget* pa
     connect(lockRatio_, &QCheckBox::toggled, this, [syncSize](bool locked) { if (locked) syncSize(true); });
     color_ = new QComboBox(this); color_->setObjectName("conversionColor");
     color_->addItems({tr("彩色"), tr("灰度")}); form_->addRow(tr("色彩"), color_);
+    icoSize_ = new QComboBox(this); icoSize_->setObjectName("conversionIcoSize");
+    for (int size : {16, 24, 32, 48, 64, 128, 256})
+        icoSize_->addItem(QStringLiteral("%1 × %1").arg(size), size);
+    icoSize_->setCurrentIndex(icoSize_->count()-1); form_->addRow(tr("图标尺寸（像素）"), icoSize_);
+    auto* icoHint = new QLabel(tr("等比缩放并居中，空白区域补透明；导出单尺寸 ICO 图标。"), this);
+    icoHint->setObjectName("conversionIcoHint"); icoHint->setWordWrap(true); form_->addRow(icoHint);
     quality_ = spin("conversionQuality", 1, 100, 95); form_->addRow(tr("图片质量"), quality_);
     compression_ = spin("conversionCompression", 0, 100, 60);
     compression_->setToolTip(tr("数值越大，文件通常越小，保存越慢；不会损失画质。"));
@@ -69,8 +75,8 @@ ImageConversionDialog::ImageConversionDialog(const QSize& imageSize, QWidget* pa
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     form_->addRow(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, [this] {
-        if (resize_->isChecked() && qint64(width_->value()) * height_->value() > MaxEditablePixels) {
-            QMessageBox::warning(this, tr("格式转换"), tr("输出尺寸不能超过 1 亿像素。")); return;
+        if (format() != "ico" && resize_->isChecked() && qint64(width_->value()) * height_->value() > MaxEditablePixels) {
+            QMessageBox::warning(this, tr("格式转换"), tr("输出尺寸不能超过 7200 万像素。")); return;
         }
         accept();
     });
@@ -82,7 +88,8 @@ ImageConversionDialog::ImageConversionDialog(const QSize& imageSize, QWidget* pa
 QByteArray ImageConversionDialog::format() const { return formats_->currentData().toByteArray(); }
 ImageConversionOptions ImageConversionDialog::options() const {
     ImageConversionOptions result;
-    if (resize_->isChecked()) result.outputSize = QSize(width_->value(), height_->value());
+    if (format() != "ico" && resize_->isChecked()) result.outputSize = QSize(width_->value(), height_->value());
+    result.icoSize = icoSize_->currentData().toInt();
     result.quality = quality_->value(); result.pngCompression = compression_->value();
     result.grayscale = color_->currentIndex() == 1;
     result.pdfA4 = paper_->currentIndex() == 1;
@@ -91,6 +98,11 @@ ImageConversionOptions ImageConversionDialog::options() const {
 }
 void ImageConversionDialog::updateFormat() {
     const auto selected = format();
+    const bool ico = selected == "ico";
+    for (auto* field : {static_cast<QWidget*>(resize_), static_cast<QWidget*>(width_), static_cast<QWidget*>(height_), static_cast<QWidget*>(lockRatio_)})
+        form_->setRowVisible(field, !ico);
+    form_->setRowVisible(icoSize_, ico);
+    form_->setRowVisible(findChild<QLabel*>("conversionIcoHint"), ico);
     form_->setRowVisible(quality_, selected == "jpeg" || selected == "webp");
     form_->setRowVisible(compression_, selected == "png");
     form_->setRowVisible(paper_, selected == "pdf");

@@ -1,4 +1,5 @@
 #include "modules/image_browser/ImageDocument.h"
+#include "core/imaging/CvBridge.h"
 #include "modules/image_browser/ImageDirectoryModel.h"
 #include "modules/image_browser/ImageLoader.h"
 #include "modules/image_browser/ImageCanvas.h"
@@ -31,6 +32,7 @@
 #include <QListView>
 #include <QLocale>
 #include <QLineF>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMenu>
@@ -191,7 +193,7 @@ int runImageBrowserTest(QApplication& app) {
     result = ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(160, 90)}}, 1);
     check(result.image.size() == QSize(160, 90) && result.image.hasAlphaChannel() && qAlpha(result.image.pixel(0, 0)) == 128, "resize preserves alpha");
     check(!ImageDocument::render(source, {{EditOperation::Crop, QRect(-1, 0, 2, 2), {}}}, 1).error.isEmpty(), "reject out of bounds crop");
-    check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(10000, 10001)}}, 1).error.isEmpty(), "resize pixel budget");
+    check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(9000, 8001)}}, 1).error.isEmpty(), "resize pixel budget");
     EditOperation filter; filter.kind = EditOperation::Filter;
     const auto gray = ImageDocument::render(source, {filter}, 1).image;
     check(qRed(gray.pixel(0, 0)) == qGreen(gray.pixel(0, 0)) && qAlpha(gray.pixel(0, 0)) == 128, "grayscale preserves alpha");
@@ -200,6 +202,60 @@ int runImageBrowserTest(QApplication& app) {
     EditOperation color; color.kind = EditOperation::AdjustColor; color.saturation = -100;
     const auto desaturated = ImageDocument::render(source, {color}, 1).image;
     check(qRed(desaturated.pixel(0, 0)) == qBlue(desaturated.pixel(0, 0)) && qAlpha(desaturated.pixel(0, 0)) == 128, "color adjustment preserves alpha");
+    EditOperation balance; balance.kind = EditOperation::AdjustColor;
+    check(ImageDocument::render(source, {balance}, 1).image == source, "neutral color controls preserve exact pixels");
+    balance.temperature = 50;
+    auto balanced = ImageDocument::render(source, {balance}, 1).image.pixel(0, 0);
+    check(qRed(balanced) == 250 && qBlue(balanced) == 50 && qGreen(balanced) == 30, "temperature warms red and cools blue");
+    balance.temperature = 0; balance.tint = 50; balance.opacity = 50;
+    balanced = ImageDocument::render(source, {balance}, 1).image.pixel(0, 0);
+    check(qRed(balanced) == 235 && qGreen(balanced) == 15 && qBlue(balanced) == 95 && qAlpha(balanced) == 64, "tint and opacity affect actual pixels");
+    for (int mode = 3; mode <= 8; ++mode) {
+        EditOperation cvFilter; cvFilter.kind = EditOperation::Filter; cvFilter.variant = mode; cvFilter.strength = 3;
+        const auto processed = ImageDocument::render(source, {cvFilter}, 1);
+        check(processed.error.isEmpty() && processed.image.size() == source.size() && processed.image.pixelColor(0, 0).alpha() == 128,
+            "OpenCV filters preserve original dimensions and alpha");
+    }
+    QImage tiledFixture(1100, 580, QImage::Format_ARGB32);
+    for (int y = 0; y < tiledFixture.height(); ++y) for (int x = 0; x < tiledFixture.width(); ++x)
+        tiledFixture.setPixel(x, y, qRgb((x*17+y)%256, (x+y*9)%256, (x*5+y*3)%256));
+    EditOperation blur; blur.kind = EditOperation::Filter; blur.variant = 3; blur.strength = 3;
+    cv::Mat fullBlur;
+    cv::GaussianBlur(CvBridge::QImageToMat(tiledFixture), fullBlur, cv::Size(7, 7), 0);
+    check(ImageDocument::render(tiledFixture, {blur}, 1).image == CvBridge::MatToQImage(fullBlur), "tiled OpenCV blur matches full-frame filtering without seams");
+    QImage noisy(25, 25, QImage::Format_ARGB32); noisy.fill(Qt::white); noisy.setPixelColor(12, 12, Qt::black);
+    EditOperation denoise = blur; denoise.variant = 4; denoise.strength = 1;
+    check(ImageDocument::render(noisy, {denoise}, 1).image.pixelColor(12, 12) == QColor(Qt::white), "median denoise removes isolated noise");
+    QImage lowContrast(3, 1, QImage::Format_ARGB32);
+    lowContrast.setPixel(0, 0, qRgba(50, 50, 50, 128)); lowContrast.setPixel(1, 0, qRgb(100, 100, 100)); lowContrast.setPixel(2, 0, qRgb(150, 150, 150));
+    EditOperation autoContrast = blur; autoContrast.variant = 8;
+    const auto stretched = ImageDocument::render(lowContrast, {autoContrast}, 1).image;
+    check(qRed(stretched.pixel(0, 0)) == 0 && qRed(stretched.pixel(2, 0)) == 255 && qAlpha(stretched.pixel(0, 0)) == 128, "automatic contrast stretches range and retains alpha");
+    QImage cutoutSource(96, 96, QImage::Format_ARGB32); cutoutSource.fill(Qt::white);
+    { QPainter subject(&cutoutSource); subject.setCompositionMode(QPainter::CompositionMode_Source);
+      subject.setPen(Qt::NoPen); subject.setBrush(QColor(220, 30, 60, 128)); subject.drawEllipse(QRect(24, 16, 48, 64)); }
+    const QString cutoutPath = directory.filePath("nested/cutout-source.png"); check(cutoutSource.save(cutoutPath), "cutout fixture saved");
+    EditOperation cutout; cutout.kind = EditOperation::Cutout; cutout.rect = QRect(12, 8, 72, 80); cutout.strength = 2; cutout.feather = 0;
+    const auto removed = ImageDocument::render(cutoutSource, {cutout}, 1);
+    check(removed.error.isEmpty() && removed.image.size() == cutoutSource.size() && removed.image.pixelColor(0, 0).alpha() == 0 &&
+        removed.image.pixelColor(48, 48).alpha() == 128, "GrabCut removes background and preserves subject transparency and resolution");
+    const QString cutoutPng = directory.filePath("nested/cutout-result.png");
+    check(ImageDocument::save(cutoutPng, removed.image, "png").success && QImage(cutoutPng) == removed.image, "cutout PNG round-trip retains alpha");
+    check(ImageDocument::render(cutoutSource, {cutout}, 1).image == removed.image, "GrabCut replay is deterministic for undo and redo");
+    EditOperation invalidCutout = cutout; invalidCutout.rect = cutoutSource.rect();
+    check(!ImageDocument::render(cutoutSource, {invalidCutout}, 1).error.isEmpty(), "GrabCut rejects full-image selection without background samples");
+    invalidCutout.rect = QRect(1, 1, 2, 2);
+    check(!ImageDocument::render(cutoutSource, {invalidCutout}, 1).error.isEmpty(), "GrabCut rejects insufficient foreground samples without invoking clustering");
+    QImage tinyCutout(3, 3, QImage::Format_ARGB32); tinyCutout.fill(Qt::white);
+    invalidCutout.rect = QRect(0, 0, 3, 2);
+    check(!ImageDocument::render(tinyCutout, {invalidCutout}, 1).error.isEmpty(), "GrabCut rejects insufficient background samples safely");
+    cutout.feather = 2;
+    const auto feathered = ImageDocument::render(cutoutSource, {cutout}, 1);
+    bool softEdge = false;
+    for (int y = 0; y < cutoutSource.height(); ++y) for (int x = 0; x < cutoutSource.width(); ++x)
+        if (cutoutSource.pixelColor(x, y).alpha() == 255 && feathered.image.pixelColor(x, y).alpha() > 0 && feathered.image.pixelColor(x, y).alpha() < 255) softEdge = true;
+    check(feathered.error.isEmpty() && softEdge, "cutout feather smooths the mask boundary");
+    cutout.feather = 0;
     EditOperation mosaic; mosaic.kind = EditOperation::Mosaic; mosaic.rect = QRect(150, 80, 30, 30); mosaic.strength = 30;
     const auto pixelated = ImageDocument::render(source, {mosaic}, 1).image;
     check(pixelated.pixel(150, 80) != source.pixel(150, 80) && pixelated.pixel(150, 80) == pixelated.pixel(179, 109) && pixelated.pixel(0, 0) == source.pixel(0, 0), "mosaic affects only selected region");
@@ -211,6 +267,14 @@ int runImageBrowserTest(QApplication& app) {
     check(ImageDocument::render(source, {annotation}, 1).image != source, "arrow annotation rendered");
     EditOperation watermark; watermark.kind = EditOperation::Watermark; watermark.rect = source.rect(); watermark.text = "watermark"; watermark.strength = 30;
     check(ImageDocument::render(source, {watermark}, 1).image != source, "text watermark rendered");
+    watermark.rect = {}; watermark.opacity = 45;
+    for (int mode = 1; mode <= 6; ++mode) {
+        watermark.variant = mode;
+        const auto marked = ImageDocument::render(source, {watermark}, 1);
+        check(marked.error.isEmpty() && marked.image != source && marked.image.size() == source.size(), "watermark preset needs no region");
+    }
+    watermark.opacity = 0;
+    check(ImageDocument::render(source, {watermark}, 1).image == source, "transparent watermark preserves image");
     EditOperation sticker; sticker.kind = EditOperation::Sticker; sticker.rect = QRect(10, 10, 20, 20);
     sticker.asset = QImage(2, 2, QImage::Format_ARGB32); sticker.asset.fill(Qt::green);
     const auto pasted = ImageDocument::render(source, {sticker}, 1).image;
@@ -260,14 +324,16 @@ int runImageBrowserTest(QApplication& app) {
     {
         // A one-bit fixture exercises the upper boundary without allocating a
         // full 400 MiB RGBA source just to test the restricted-preview branch.
-        const QString oversizedPath = directory.filePath("nested/over100mp.png");
-        QImage oversized(10000, 10001, QImage::Format_Mono);
+        const QString oversizedPath = directory.filePath("nested/over72mp.png");
+        QImage oversized(9000, 8001, QImage::Format_Mono);
         oversized.setColorTable({qRgb(255, 255, 255), qRgb(0, 0, 0)}); oversized.fill(0);
         check(oversized.save(oversizedPath), "save image above new pixel cap");
+        EditOperation invalidEdit; invalidEdit.kind = EditOperation::Crop; invalidEdit.rect = QRect(0, 0, 2, 2);
+        check(!ImageDocument::render(oversized, {invalidEdit}, 1).error.isEmpty(), "document rendering also enforces the 72 megapixel budget");
         oversized = {};
         const auto preview = ImageDocument::read(oversizedPath);
         check(preview.limited && !preview.image.isNull() && preview.image.width() <= 2048 && preview.image.height() <= 2048,
-            "images above 100 megapixels retain bounded preview");
+            "images above 72 megapixels retain bounded preview");
     }
 
     auto contents = [](const QString& fileName) { QFile file(fileName); file.open(QIODevice::ReadOnly); return file.readAll(); };
@@ -293,6 +359,19 @@ int runImageBrowserTest(QApplication& app) {
     outputOptions.quality = 100;
     check(ImageDocument::save(highJpeg, source, "jpeg", {}, -1, outputOptions).success &&
         QFileInfo(highJpeg).size() > QFileInfo(lowJpeg).size(), "JPEG quality changes encoded output");
+    const QString icoPath = directory.filePath("nested/image.ico");
+    for (int size : {16, 24, 32, 48, 64, 128, 256}) {
+        outputOptions = {}; outputOptions.icoSize = size;
+        check(ImageDocument::save(icoPath, source, "ico", {}, -1, outputOptions).success, "ICO encodes common icon sizes");
+        const QImage icon(icoPath);
+        check(contents(icoPath).startsWith(QByteArray::fromHex("000001000100")) && icon.size() == QSize(size, size), "ICO header and decoded square dimensions");
+        check(icon.pixelColor(0, 0).alpha() == 0 && icon.pixelColor(size/2, size/2).alpha() > 0, "ICO centers proportional image with transparent padding");
+    }
+    const QByteArray iconData = contents(icoPath);
+    outputOptions.icoSize = 257;
+    check(!ImageDocument::save(icoPath, source, "ico", {}, -1, outputOptions).success && contents(icoPath) == iconData,
+        "invalid ICO size preserves existing file");
+    check(ImageDocument::suggestedPath(path, "ico").endsWith("-edited.ico"), "ICO suggested extension");
     const QString pdfPath = directory.filePath("nested/image.pdf");
     const QString a4Path = directory.filePath("nested/a4.pdf");
     check(ImageDocument::save(pdfPath, source, "pdf").success, "atomic PDF export");
@@ -307,8 +386,8 @@ int runImageBrowserTest(QApplication& app) {
     check(!ImageDocument::save(grayPath, source, "png", {}, -1, outputOptions).success && QImage(grayPath) == grayImage,
         "oversized conversion rejected before replacing file");
     ImageConversionDialog conversionDialog(source.size());
-    check(MaxEditablePixels == 100000000 && conversionDialog.findChild<QSpinBox*>("conversionWidth")->maximum() == MaxEditablePixels,
-        "conversion and editing share the 100 megapixel limit");
+    check(MaxEditablePixels == 72000000 && conversionDialog.findChild<QSpinBox*>("conversionWidth")->maximum() == MaxEditablePixels,
+        "conversion and editing share the 72 megapixel limit");
     auto* conversionFormat = conversionDialog.findChild<QComboBox*>("conversionFormat");
     conversionFormat->setCurrentIndex(conversionFormat->findData(QByteArray("pdf")));
     check(!conversionDialog.findChild<QSpinBox*>("conversionQuality")->isVisibleTo(&conversionDialog) &&
@@ -321,6 +400,13 @@ int runImageBrowserTest(QApplication& app) {
     check(conversionDialog.options().outputSize == QSize(160, 90) && conversionDialog.options().pdfA4 &&
         conversionDialog.options().pdfOrientation == 2 && conversionDialog.options().pdfMarginMm == 12,
         "conversion dialog collects settings and locks aspect ratio");
+    check(conversionFormat->findData(QByteArray("ico")) >= 0, "converter exposes ICO");
+    conversionFormat->setCurrentIndex(conversionFormat->findData(QByteArray("ico")));
+    auto* iconSizes = conversionDialog.findChild<QComboBox*>("conversionIcoSize");
+    iconSizes->setCurrentIndex(iconSizes->findData(64));
+    check(iconSizes->isVisibleTo(&conversionDialog) && !conversionDialog.findChild<QSpinBox*>("conversionWidth")->isVisibleTo(&conversionDialog) &&
+        conversionDialog.options().icoSize == 64 && conversionDialog.options().outputSize.isEmpty(), "ICO uses icon sizes and ignores hidden resize draft");
+    conversionFormat->setCurrentIndex(conversionFormat->findData(QByteArray("pdf")));
     const QString conversionQa = qEnvironmentVariable("NTSCREENSHOT_CONVERSION_QA_DIR");
     if (!conversionQa.isEmpty()) {
         QDir().mkpath(conversionQa);
@@ -329,6 +415,10 @@ int runImageBrowserTest(QApplication& app) {
         source.save(QDir(conversionQa).filePath("source.png"));
         conversionDialog.show(); QCoreApplication::processEvents();
         conversionDialog.grab().save(QDir(conversionQa).filePath("conversion-pdf.png"));
+        conversionFormat->setCurrentIndex(conversionFormat->findData(QByteArray("ico")));
+        QCoreApplication::processEvents();
+        conversionDialog.grab().save(QDir(conversionQa).filePath("conversion-ico.png"));
+        QFile::copy(icoPath, QDir(conversionQa).filePath("image.ico"));
         conversionDialog.hide();
     }
 
@@ -419,6 +509,27 @@ int runImageBrowserTest(QApplication& app) {
     mouse(&canvas, QEvent::MouseMove, canvas.viewportPoint(QPointF(100, 80)));
     mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(100, 80)));
     check(canvas.cropRect() == QRect(20, 30, 80, 50), "resize crop handle");
+    canvas.setCropping(false);
+    EditOperation stroke; stroke.kind = EditOperation::Annotate; stroke.variant = 2; stroke.strength = 4;
+    int drawn = 0; EditOperation committed;
+    QObject::connect(&canvas, &ImageCanvas::annotationAccepted, &canvas, [&](const EditOperation& op) { ++drawn; committed = op; });
+    canvas.setAnnotation(stroke, true);
+    mouse(&canvas, QEvent::MouseButtonPress, canvas.viewportPoint(QPointF(100, 60)));
+    mouse(&canvas, QEvent::MouseMove, canvas.viewportPoint(QPointF(20, 60)));
+    mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(20, 60)));
+    check(drawn == 1 && committed.directDrawing && QLineF(committed.start, QPointF(100, 60)).length() < .001 &&
+        QLineF(committed.end, QPointF(20, 60)).length() < .001, "direct horizontal arrow retains drag direction under zoom and pan");
+    const auto arrowImage = ImageDocument::render(source, {committed}, 1).image;
+    check(arrowImage != source && arrowImage.pixel(60, 60) != source.pixel(60, 60), "horizontal direct arrow renders without rectangular selection");
+    mouse(&canvas, QEvent::MouseButtonPress, canvas.viewportPoint(QPointF(30, 30)));
+    check(canvas.cancelDrawing(), "cancel active drawing");
+    mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(80, 80)));
+    check(drawn == 1, "cancelled drawing is never committed");
+    stroke.variant = 3; stroke.text = "Text"; stroke.strength = 24; canvas.setAnnotation(stroke, true);
+    mouse(&canvas, QEvent::MouseButtonPress, canvas.viewportPoint(QPointF(20, 20)));
+    mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(20, 20)));
+    check(drawn == 2 && ImageDocument::render(source, {committed}, 1).image != source, "text places with a click");
+    canvas.setAnnotation({}, false);
     canvas.hide();
 
     // Seed only the dedicated test application's settings, avoiding startup registry changes.
@@ -475,8 +586,8 @@ int runImageBrowserTest(QApplication& app) {
     check(editorPanel && editorPanel->isVisible() && !browserCanvas->cropping(), "edit opens floating panel without entering crop");
     int editorTools = 0;
     for (auto* button : editorPanel->findChildren<QToolButton*>()) if (button->property("editorTool").isValid()) ++editorTools;
-    check(editorTools == 8, "eight editor tools");
-    for (int tool = 0; tool < 8; ++tool) {
+    check(editorTools == 9, "nine editor tools");
+    for (int tool = 0; tool < 9; ++tool) {
         editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool%1").arg(tool))->click();
         check(!QApplication::activeModalWidget() && !QApplication::activePopupWidget() && editorPanel->isVisible(), "tool details stay inline without popup");
         check(editorPanel->findChild<QStackedWidget*>()->currentIndex() == tool, "lower details match selected tool");
@@ -485,6 +596,23 @@ int runImageBrowserTest(QApplication& app) {
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
     check(!browserCanvas->cropping() && !window->windowTitle().contains('*'), "empty watermark validates inline without editing");
     check(editorPanel->findChild<QLabel*>(QStringLiteral("editorMessage"))->isVisible(), "validation appears inside panel");
+    auto* watermarkMode = editorPanel->findChild<QComboBox*>(QStringLiteral("editorWatermarkMode"));
+    check(watermarkMode->currentIndex() == 1 && watermarkMode->count() == 7, "watermark defaults to bottom-right preset with seven layouts");
+    editorPanel->findChild<QLineEdit*>(QStringLiteral("editorWatermarkText"))->setText("Sample");
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "watermark preset applies without selecting region");
+    check(!browserCanvas->cropping(), "watermark preset never enters selection mode");
+    trigger(window, QStringLiteral("复制图片"));
+    EditOperation uiWatermark; uiWatermark.kind = EditOperation::Watermark; uiWatermark.variant = 1;
+    uiWatermark.text = "Sample"; uiWatermark.color = Qt::red; uiWatermark.strength = 36; uiWatermark.opacity = 45;
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiWatermark}, 1).image, "preset watermark controls change actual image");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo preset watermark");
+    watermarkMode->setCurrentIndex(0);
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(browserCanvas->cropping(), "custom watermark retains region selection");
+    watermarkMode->setCurrentIndex(6);
+    check(!browserCanvas->cropping(), "switching watermark layout cancels stale selection");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool0"))->click();
     auto* inlineWidth = editorPanel->findChild<QSpinBox*>(QStringLiteral("editorResizeWidth"));
     auto* inlineHeight = editorPanel->findChild<QSpinBox*>(QStringLiteral("editorResizeHeight"));
@@ -500,6 +628,43 @@ int runImageBrowserTest(QApplication& app) {
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo filter");
     trigger(window, QStringLiteral("复制图片"));
     check(QApplication::clipboard()->image() == source, "undo restores unedited image");
+    editorPanel->findChild<QComboBox*>(QStringLiteral("editorFilter"))->setCurrentIndex(3);
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorFilterStrength"))->setValue(3);
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "OpenCV blur enters undo history");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {blur}, 1).image, "inline OpenCV filter applies selected parameters");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo OpenCV filter");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool7"))->click();
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->setValue(50);
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorOpacity"))->setValue(50);
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "new color controls enter history");
+    trigger(window, QStringLiteral("复制图片"));
+    EditOperation uiColor; uiColor.kind = EditOperation::AdjustColor; uiColor.temperature = 50; uiColor.opacity = 50;
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiColor}, 1).image, "inline color controls change actual pixels");
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorColorReset"))->click();
+    check(editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->value() == 0 &&
+        editorPanel->findChild<QSpinBox*>(QStringLiteral("editorOpacity"))->value() == 100, "color reset includes new controls");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo new color controls");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool1"))->click();
+    check(browserCanvas->annotating() && !browserCanvas->cropping() && !editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "selecting annotation immediately arms direct drawing");
+    browserCanvas->setZoom(1.5);
+    const QPointF drawingOrigin = browserCanvas->viewportPoint(QPointF(0, 0));
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(150, 80)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(180, 110)));
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(180, 110)));
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "release commits annotation without selection confirmation");
+    check(browserCanvas->annotating(), "drawing remains armed for consecutive annotations");
+    check(browserCanvas->zoom() == 1.5 && QLineF(browserCanvas->viewportPoint(QPointF(0, 0)), drawingOrigin).length() < .001,
+        "committing annotations preserves zoom and pan");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo direct annotation");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == source, "undo direct annotation restores original pixels");
+    browserCanvas->fit(false);
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
     check(browserCanvas->cropping() && editorPanel->isVisible(), "mosaic keeps details visible while selecting");
@@ -521,6 +686,31 @@ int runImageBrowserTest(QApplication& app) {
     check(QApplication::clipboard()->image() == ImageDocument::render(source, {expectedMosaic}, 1).image, "mosaic UI applies selected pixels");
     trigger(window, QStringLiteral("撤销"));
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo mosaic");
+    drop(window, {QUrl::fromLocalFile(cutoutPath)});
+    check(waitUntil([&] { return window->windowTitle().startsWith("cutout-source.png") && action(window, QStringLiteral("编辑"))->isEnabled(); }), "cutout subject loaded");
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool8"))->click();
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorCutoutIterations"))->setValue(2);
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorCutoutFeather"))->setValue(0);
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(browserCanvas->cropping() && !QApplication::activeModalWidget(), "cutout selects subject inline");
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(12, 8)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(84, 88)));
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(84, 88)));
+    editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "cutout UI commits transparent result");
+    const QString cvQa = qEnvironmentVariable("NTSCREENSHOT_OPENCV_QA_DIR");
+    if (!cvQa.isEmpty()) {
+        QDir().mkpath(cvQa); QCoreApplication::processEvents();
+        window->grab().save(QDir(cvQa).filePath("cutout-editor.png"));
+        cutoutSource.save(QDir(cvQa).filePath("cutout-source.png")); removed.image.save(QDir(cvQa).filePath("cutout-result.png"));
+    }
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == removed.image, "cutout UI matches selected subject and parameters");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo cutout");
+    trigger(window, QStringLiteral("复制图片")); check(QApplication::clipboard()->image() == cutoutSource, "undo cutout restores full background");
+    drop(window, {QUrl::fromLocalFile(path)});
+    check(waitUntil([&] { return window->windowTitle().startsWith(QFileInfo(path).fileName()) && action(window, QStringLiteral("编辑"))->isEnabled(); }), "return from cutout to original file");
     trigger(window, QStringLiteral("编辑"));
     check(!editorPanel->isVisible(), "edit toggles floating panel closed");
     auto* details = window->findChild<QLabel*>(QStringLiteral("browserImageDetails"));
@@ -555,7 +745,7 @@ int runImageBrowserTest(QApplication& app) {
     QTimer::singleShot(0, [] {
         if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
             auto* formats = dialog->findChild<QComboBox*>();
-            check(formats && formats->findData(QByteArray("png")) >= 0 && formats->findData(QByteArray("bmp")) >= 0 && formats->findData(QByteArray("pdf")) >= 0,
+            check(formats && formats->findData(QByteArray("png")) >= 0 && formats->findData(QByteArray("bmp")) >= 0 && formats->findData(QByteArray("pdf")) >= 0 && formats->findData(QByteArray("ico")) >= 0,
                   "converter offers installed output formats");
             dialog->reject();
         }
@@ -642,6 +832,23 @@ int runImageBrowserTest(QApplication& app) {
     check(waitUntil([&] { return action(window, QStringLiteral("格式转换"))->isEnabled(); }), "converted file loaded");
     check(QFileInfo::exists(uiConverted) && ImageDocument::read(uiConverted).image.size() == QSize(180, 320), "converter saves full resolution output");
     check(window->windowTitle().startsWith("ui-converted.bmp") && !window->windowTitle().contains('*'), "conversion establishes new baseline");
+    const QString uiIcon = directory.filePath("nested/ui-icon.ico");
+    QTimer icoSteps; icoSteps.setInterval(10);
+    QObject::connect(&icoSteps, &QTimer::timeout, &app, [&] {
+        auto* modal = QApplication::activeModalWidget();
+        if (auto* fileDialog = qobject_cast<QFileDialog*>(modal)) {
+            check(fileDialog->defaultSuffix() == "ico", "ICO save dialog uses ico extension");
+            fileDialog->selectFile(uiIcon); QMetaObject::invokeMethod(fileDialog, "accept", Qt::QueuedConnection);
+        } else if (auto* dialog = qobject_cast<ImageConversionDialog*>(modal)) {
+            auto* formats = dialog->findChild<QComboBox*>("conversionFormat");
+            formats->setCurrentIndex(formats->findData(QByteArray("ico")));
+            auto* sizes = dialog->findChild<QComboBox*>("conversionIcoSize");
+            sizes->setCurrentIndex(sizes->findData(32)); dialog->accept();
+        }
+    });
+    icoSteps.start(); trigger(window, QStringLiteral("格式转换")); icoSteps.stop();
+    check(waitUntil([&] { return action(window, QStringLiteral("格式转换"))->isEnabled(); }), "ICO conversion reload completes");
+    check(QImage(uiIcon).size() == QSize(32, 32) && window->windowTitle().startsWith("ui-icon.ico"), "ICO UI writes and reloads selected icon size");
     drop(window, {QUrl::fromLocalFile(uiSave)});
     check(waitUntil([&] { return action(window, QStringLiteral("向左旋转"))->isEnabled(); }), "return to source directory after conversion");
     trigger(window, QStringLiteral("向左旋转"));
@@ -723,7 +930,7 @@ int runImageBrowserTest(QApplication& app) {
                     qa->grab().save(QDir(screenshots).filePath(QStringLiteral("editor-%1-%2-%3.png")
                         .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
                     if ((size.width() == 1100 && scale == 1) || (size.width() == 560 && scale == 2)) {
-                        for (int tool = 0; tool < 8; ++tool) {
+                        for (int tool = 0; tool < 9; ++tool) {
                             editor->findChild<QToolButton*>(QStringLiteral("browserEditorTool%1").arg(tool))->click();
                             QCoreApplication::processEvents();
                             qa->grab().save(QDir(screenshots).filePath(QStringLiteral("inline-%1-%2-%3-tool%4.png")
@@ -768,7 +975,7 @@ int runImageBrowserTest(QApplication& app) {
         check(heartbeats > 0, "directory scan keeps event loop responsive");
         largeWindow->close(); waitUntil([&] { return largeWindow.isNull(); });
         {
-            QImage huge(10000, 10001, QImage::Format_RGB32); huge.fill(Qt::white);
+            QImage huge(9000, 8001, QImage::Format_RGB32); huge.fill(Qt::white);
             const QString hugePath = directory.filePath("huge.png"); huge.save(hugePath);
             huge = {};
             const auto preview = ImageDocument::read(hugePath);

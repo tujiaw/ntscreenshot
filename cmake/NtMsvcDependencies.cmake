@@ -17,6 +17,9 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
         message(FATAL_ERROR "Cannot detect MSVC header dependencies: ${nt_dependency_error}")
     endif()
     set(CMAKE_CL_SHOWINCLUDES_PREFIX "${CMAKE_MATCH_1}")
+    # Subdirectories may reload CMakeCXXCompiler.cmake when enabling languages.
+    # Keep the language-specific value in sync so it cannot restore raw bytes.
+    set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "${CMAKE_CL_SHOWINCLUDES_PREFIX}")
     unset(nt_dependency_probe)
     unset(nt_dependency_output)
     unset(nt_dependency_error)

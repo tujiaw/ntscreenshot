@@ -2,6 +2,7 @@
 #include "MainWidget.h"
 
 #include "app/shell/GlobalHotkeyRegistry.h"
+#include "app/shell/ShellShortcuts.h"
 
 #include <QtWidgets>
 #include <QApplication>
@@ -48,6 +49,14 @@ MainWidget::MainWidget(WindowManager* windowManager, ClipboardLiteManager* clipb
     } else {
         qInfo() << "MainWidget: local search hotkey registered successfully:" << localSearchKey;
     }
+
+    const bool imageBrowserKey = hotkeys_->setHotkey(QStringLiteral("image_browser"), ShellShortcuts::imageBrowser(), [this] {
+        windowManager_->openWidget(WidgetID::IMAGE_BROWSER);
+    });
+    const bool settingsKey = hotkeys_->setHotkey(QStringLiteral("settings"), ShellShortcuts::settings(), [this] {
+        windowManager_->openWidget(WidgetID::SETTINGS);
+    });
+    tray_->setFixedShortcutsAvailable(imageBrowserKey, settingsKey);
 
     hotkeys_->setHotkey(kExitHotkey, QStringLiteral("Alt+Q"), [this]() { slotExit(); });
 

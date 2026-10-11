@@ -13,6 +13,7 @@ class SystemTray : public QSystemTrayIcon
 public:
 	SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipboard, QWidget *parent);
 	~SystemTray();
+    void setFixedShortcutsAvailable(bool imageBrowser, bool settings);
 
 private slots:
     void onScreenshot();
@@ -31,6 +32,8 @@ private:
     QAction *screenshotAction_;
 
     QAction *pinAction_;
+    QAction *imageBrowserAction_;
+    QAction *settingAction_;
 
 	QAction *localSearchAction_;
 	QAction *clipboardAction_;

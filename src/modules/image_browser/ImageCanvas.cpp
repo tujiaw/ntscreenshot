@@ -1,4 +1,5 @@
 #include "ImageCanvas.h"
+#include "ImageAnnotation.h"
 #include "core/theme/ThemeManager.h"
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -13,6 +14,7 @@ ImageCanvas::ImageCanvas(QWidget* parent) : QWidget(parent) {
     setMouseTracking(true);
 }
 void ImageCanvas::setImage(const QImage& image, bool resetView) {
+    drawing_ = false;
     image_ = image;
     message_.clear();
     if (resetView) { setCropping(false); fit(false); }
@@ -52,11 +54,24 @@ void ImageCanvas::zoomAt(double scale, QPointF anchor) {
 }
 void ImageCanvas::actualSize() { zoomAt(1, QPointF((width() + leftInset_) / 2., height() / 2.)); }
 void ImageCanvas::setZoom(double scale) { zoomAt(scale, QPointF((width() + leftInset_) / 2., height() / 2.)); }
+bool ImageCanvas::cancelDrawing() {
+    if (!drawing_) return false;
+    drawing_ = false; update(); return true;
+}
+void ImageCanvas::setAnnotation(const EditOperation& operation, bool enabled) {
+    annotation_ = operation;
+    const bool active = enabled && !image_.isNull();
+    if (annotating_ != active) { drawing_ = false; dragging_ = false; }
+    annotating_ = active;
+    setCursor((annotating_ || cropping_) ? Qt::CrossCursor : Qt::OpenHandCursor);
+    update();
+}
 void ImageCanvas::setCropping(bool enabled) {
+    if (enabled) { annotating_ = false; drawing_ = false; }
     cropping_ = enabled && !image_.isNull();
     crop_ = {};
     dragging_ = false;
-    setCursor(cropping_ ? Qt::CrossCursor : Qt::OpenHandCursor);
+    setCursor((cropping_ || annotating_) ? Qt::CrossCursor : Qt::OpenHandCursor);
     if (cropping_) setFocus();
     emit selectionChanged();
     update();
@@ -83,7 +98,8 @@ void ImageCanvas::paintEvent(QPaintEvent*) {
             if (checkerboard_.isNull() || checkerColor_ != theme.surface) {
                 checkerColor_ = theme.surface;
                 checkerboard_ = QImage(24, 24, QImage::Format_RGB32);
-                checkerboard_.fill(theme.surfaceRaised);
+                // Light themes may use the same color for surface and raised surface.
+                checkerboard_.fill(theme.surface.lightness() > 128 ? theme.surface.darker(112) : theme.surface.lighter(145));
                 QPainter tile(&checkerboard_);
                 tile.fillRect(0, 0, 12, 12, theme.surface);
                 tile.fillRect(12, 12, 12, 12, theme.surface);
@@ -93,6 +109,11 @@ void ImageCanvas::paintEvent(QPaintEvent*) {
         painter.setRenderHint(QPainter::SmoothPixmapTransform, scale_ < 1);
         painter.drawImage(target, image_);
         painter.restore();
+        if (drawing_) {
+            painter.save(); painter.setClipRect(target, Qt::IntersectClip);
+            painter.translate(offset_); painter.scale(scale_, scale_);
+            paintAnnotation(painter, stroke_); painter.restore();
+        }
         if (cropping_ && !crop_.isEmpty()) {
             const QRectF selection(viewportPoint(crop_.topLeft()), viewportPoint(crop_.bottomRight()));
             QRegion outside(rect());
@@ -123,6 +144,14 @@ void ImageCanvas::wheelEvent(QWheelEvent* event) {
 void ImageCanvas::mousePressEvent(QMouseEvent* event) {
     if (event->button() != Qt::LeftButton || image_.isNull()) return;
     setFocus();
+    if (annotating_) {
+        const QPointF point = imagePoint(event->position());
+        const int margin = qMax(16, fontMetrics().height());
+        if (!rect().adjusted(leftInset_ + margin, margin, -margin, -margin).contains(event->position().toPoint()) ||
+            !QRectF(image_.rect()).contains(point)) return;
+        stroke_ = annotation_; stroke_.directDrawing = true; stroke_.start = stroke_.end = point;
+        drawing_ = true; update(); return;
+    }
     dragging_ = true;
     press_ = event->position();
     initialOffset_ = offset_;
@@ -144,6 +173,12 @@ void ImageCanvas::mousePressEvent(QMouseEvent* event) {
     if (cropping_) emit selectionChanged();
 }
 void ImageCanvas::mouseMoveEvent(QMouseEvent* event) {
+    if (drawing_) {
+        QPointF point = imagePoint(event->position());
+        point.setX(qBound(0., point.x(), double(image_.width()-1)));
+        point.setY(qBound(0., point.y(), double(image_.height()-1)));
+        stroke_.end = point; update(); return;
+    }
     if (!dragging_) return;
     if (!cropping_) { fitted_ = false; offset_ = initialOffset_ + event->position() - press_; }
     else {
@@ -168,11 +203,21 @@ void ImageCanvas::mouseMoveEvent(QMouseEvent* event) {
     if (cropping_) emit selectionChanged();
     update();
 }
-void ImageCanvas::mouseReleaseEvent(QMouseEvent*) {
+void ImageCanvas::mouseReleaseEvent(QMouseEvent* event) {
+    if (event->button() != Qt::LeftButton) return;
+    if (drawing_) {
+        mouseMoveEvent(event);
+        drawing_ = false; update();
+        if (stroke_.variant == 3 || QLineF(stroke_.start, stroke_.end).length() >= 1) emit annotationAccepted(stroke_);
+        return;
+    }
     dragging_ = false;
-    setCursor(cropping_ ? Qt::CrossCursor : Qt::OpenHandCursor);
+    setCursor((cropping_ || annotating_) ? Qt::CrossCursor : Qt::OpenHandCursor);
 }
 void ImageCanvas::keyPressEvent(QKeyEvent* event) {
+    if (annotating_ && event->key() == Qt::Key_Escape) {
+        drawing_ = false; update(); return;
+    }
     if (cropping_ && (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)) {
         if (!cropRect().isEmpty()) emit cropAccepted(cropRect());
     } else if (cropping_ && event->key() == Qt::Key_Escape) {

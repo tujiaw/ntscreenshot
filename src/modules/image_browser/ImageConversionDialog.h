@@ -25,6 +25,7 @@ private:
     QSpinBox* width_;
     QSpinBox* height_;
     QComboBox* color_;
+    QComboBox* icoSize_;
     QSpinBox* quality_;
     QSpinBox* compression_;
     QComboBox* paper_;

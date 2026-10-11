@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "SystemTray.h"
+#include "ShellShortcuts.h"
 #include <QtWidgets>
 #include "app/WindowManager.h"
 #include "modules/clipboard/ClipboardLiteManager.h"
@@ -32,13 +33,15 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
     localSearchAction_ = menu_->addAction(QCoreApplication::translate("App", "快捷启动"));
     connect(localSearchAction_, &QAction::triggered, this, &SystemTray::onLocalSearch);
 
-    QAction* imageBrowser = menu_->addAction(QCoreApplication::translate("App", "图片浏览"));
-    connect(imageBrowser, &QAction::triggered, this, [this] {
+    imageBrowserAction_ = menu_->addAction(QCoreApplication::translate("App", "图片浏览"));
+    imageBrowserAction_->setObjectName("trayImageBrowser");
+    connect(imageBrowserAction_, &QAction::triggered, this, [this] {
         windowManager_->openWidget(WidgetID::IMAGE_BROWSER);
     });
 
-    QAction *settingAction = menu_->addAction(QCoreApplication::translate("App", "设置"));
-    connect(settingAction, &QAction::triggered, this, &SystemTray::onSetting);
+    settingAction_ = menu_->addAction(QCoreApplication::translate("App", "设置"));
+    settingAction_->setObjectName("traySettings");
+    connect(settingAction_, &QAction::triggered, this, &SystemTray::onSetting);
 
     menu_->addSeparator();
 
@@ -54,6 +57,16 @@ SystemTray::SystemTray(WindowManager* windowManager, ClipboardLiteManager* clipb
 
 SystemTray::~SystemTray()
 {
+}
+
+void SystemTray::setFixedShortcutsAvailable(bool imageBrowser, bool settings)
+{
+    // The native hotkey registry handles activation; the menu displays the keys.
+    // Avoid a second QAction shortcut which could activate the same command twice.
+    imageBrowserAction_->setText(QCoreApplication::translate("App", "图片浏览") +
+        (imageBrowser ? "\t" + ShellShortcuts::imageBrowser() : QString()));
+    settingAction_->setText(QCoreApplication::translate("App", "设置") +
+        (settings ? "\t" + ShellShortcuts::settings() : QString()));
 }
 
 void SystemTray::onScreenshot()

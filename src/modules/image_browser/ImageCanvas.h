@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ImageDocument.h"
 #include <QImage>
 #include <QWidget>
 
@@ -16,12 +17,16 @@ public:
     void setLeftInset(int inset);
     double zoom() const { return scale_; }
     void setCropping(bool enabled);
+    void setAnnotation(const EditOperation& operation, bool enabled);
+    bool cancelDrawing();
+    bool annotating() const { return annotating_; }
     bool cropping() const { return cropping_; }
     QRect cropRect() const;
     QPointF imagePoint(QPointF viewportPoint) const;
     QPointF viewportPoint(QPointF imagePoint) const;
 
 signals:
+    void annotationAccepted(const ImageBrowser::EditOperation& operation);
     void zoomChanged();
     void cropAccepted(const QRect& rect);
     void cropCancelled();
@@ -40,6 +45,9 @@ protected:
 
 private:
     void zoomAt(double scale, QPointF anchor);
+    EditOperation annotation_, stroke_;
+    bool annotating_ = false;
+    bool drawing_ = false;
     QImage image_;
     QImage checkerboard_;
     QColor checkerColor_;

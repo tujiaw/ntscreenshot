@@ -6,6 +6,7 @@ namespace ImageBrowser {
 struct ImageConversionOptions {
     QSize outputSize;
     int quality = 95;
+    int icoSize = 256;
     int pngCompression = 60;
     bool grayscale = false;
     bool pdfA4 = false;

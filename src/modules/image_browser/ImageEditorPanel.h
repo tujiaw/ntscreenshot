@@ -27,11 +27,13 @@ public:
     void setDocumentContext(const QString& path, QSize size, bool editable);
     void setSelectionState(bool selecting, const QRect& rect);
     EditOperation currentOperation() const;
+    bool drawingActive() const { return currentTool_ == 1 && editable_; }
     bool validateOperation(const EditOperation& operation);
 
 signals:
     void closeRequested();
     void toolChanged();
+    void drawingStyleChanged();
     void editRequested(const ImageBrowser::EditOperation& operation, bool selectRegion);
     void applySelectionRequested();
     void cancelSelectionRequested();
@@ -56,6 +58,9 @@ private:
     QPushButton* cancelSelection_;
     QComboBox* annotationShape_;
     QComboBox* filter_;
+    QComboBox* watermarkMode_;
+    QSpinBox *filterStrength_, *cutoutIterations_, *cutoutFeather_;
+    QSpinBox *watermarkOpacity_, *watermarkMargin_, *temperature_, *tint_, *opacity_;
     QLineEdit *annotationText_, *watermarkText_, *annotationColor_, *watermarkColor_, *assetPath_;
     QSpinBox *annotationWidth_, *annotationFont_, *watermarkFont_, *mosaicBlock_;
     QSpinBox *brightness_, *contrast_, *saturation_, *resizeWidth_, *resizeHeight_;

@@ -211,6 +211,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     exitFullscreenAction_->setEnabled(false);
     addAction(exitFullscreenAction_);
     connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
+        if (canvas_->cancelDrawing()) return;
         if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
         else if (editorPanel_->isVisible()) { editorPanel_->hide(); editorAction_->setChecked(false); updateActions(); }
         else if (isFullScreen()) toggleFullscreen();
@@ -478,6 +479,13 @@ void ImageBrowserWindow::createEditorPanel() {
     });
     connect(editorPanel_, &ImageEditorPanel::toolChanged, this, [this] {
         canvas_->setCropping(false); regionFromPanel_ = false; showStatus({}); updateActions();
+    });
+    connect(editorPanel_, &ImageEditorPanel::drawingStyleChanged, this, [this] {
+        canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
+            editorPanel_->isVisible() && editorPanel_->drawingActive());
+    });
+    connect(canvas_, &ImageCanvas::annotationAccepted, this, [this](const EditOperation& operation) {
+        if (editorPanel_->isVisible() && editorPanel_->drawingActive() && editorPanel_->validateOperation(operation)) edit(operation);
     });
     connect(editorPanel_, &ImageEditorPanel::editRequested, this, [this](const EditOperation& operation, bool region) {
         if (region) selectEditRegion(operation);
@@ -825,7 +833,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
         animationSource_ = result.animated;
         canvas_->setImage(result.image, true);
         if (!result.error.isEmpty()) canvas_->setMessage(tr("无法打开图片：%1").arg(result.error));
-        if (result.limited) showStatus(tr("受限预览：超过 1 亿像素的图片不支持编辑或复制。"));
+        if (result.limited) showStatus(tr("受限预览：超过 7200 万像素的图片不支持编辑或复制。"));
         if (result.animated && result.animationSupported && !result.limited) {
             QSize playbackSize = result.image.size();
             if (playbackSize.width() > 1600 || playbackSize.height() > 1600)
@@ -937,6 +945,8 @@ void ImageBrowserWindow::updateActions() {
     editorAction_->setEnabled(editable);
     editorPanel_->setDocumentContext(document_.path, document_.current.size(), editable);
     editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
+    canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
+            editorPanel_->isVisible() && editorPanel_->drawingActive());
     positionEditorPanel();
     for (auto* action : editActions_) action->setEnabled(editable);
     for (auto* action : navigationActions_) action->setEnabled(!busy_);
@@ -1135,10 +1145,12 @@ void ImageBrowserWindow::renderDocument(ImageDocument candidate) {
         busy_ = false;
         if (!result.error.isEmpty()) showStatus(result.error);
         else {
+            const bool sizeChanged = result.image.size() != document_.current.size();
             candidate.current = result.image;
             document_ = candidate;
             displayedSize_ = result.image.size();
-            canvas_->setImage(result.image, true);
+            // Keep zoom and pan while drawing consecutive annotations or adjusting color.
+            canvas_->setImage(result.image, sizeChanged);
             showStatus(QString());
         }
         updateActions();

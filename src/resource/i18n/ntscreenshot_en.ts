@@ -2014,7 +2014,7 @@ Copied to clipboard</translation>
     <message><source>原文件已不在当前目录中，仍可另存图片副本。</source><translation>Source is no longer in this directory. You can still save a copy.</translation></message>
     <message><source>正在加载图片…</source><translation>Loading image...</translation></message>
     <message><source>无法打开图片：%1</source><translation>Cannot open image: %1</translation></message>
-    <message><source>受限预览：超过 1 亿像素的图片不支持编辑或复制。</source><translation>Preview only: images above 100 megapixels cannot be edited or copied.</translation></message>
+    <message><source>受限预览：超过 7200 万像素的图片不支持编辑或复制。</source><translation>Preview only: images above 72 megapixels cannot be edited or copied.</translation></message>
     <message><source>无法播放动图，当前显示静态帧。</source><translation>Animation playback unavailable. Showing a static frame.</translation></message>
     <message><source>当前图片插件不支持动图播放。</source><translation>Animation playback is not supported by the installed image plugin.</translation></message>
     <message><source>正在编辑静态帧，请另存为 PNG 或 JPEG 图片。</source><translation>Editing a static frame. Save as PNG or JPEG.</translation></message>
@@ -2090,14 +2090,18 @@ Copied to clipboard</translation>
     <message><source>原文件已被外部修改，请将编辑结果另存为新文件。</source><translation>Source changed externally. Save your edits to a new file.</translation></message>
     <message><source>图片解码失败或内存不足。</source><translation>Image decoding failed or insufficient memory.</translation></message>
     <message><source>裁剪区域无效。</source><translation>Invalid crop area.</translation></message>
-    <message><source>图片尺寸超过 1 亿像素的编辑上限。</source><translation>Image size exceeds the 100 megapixel editing limit.</translation></message>
+    <message><source>图片尺寸超过 7200 万像素的编辑上限。</source><translation>Image size exceeds the 72 megapixel editing limit.</translation></message>
     <message><source>图片处理失败或内存不足。</source><translation>Image processing failed or insufficient memory.</translation></message>
     <message><source>没有可保存的图片。</source><translation>No image to save.</translation></message>
     <message><source>图片保存失败或内存不足。</source><translation>Image saving failed or insufficient memory.</translation></message>
-    <message><source>输出尺寸不能超过 1 亿像素。</source><translation>Output dimensions must not exceed 100 million pixels.</translation></message>
+    <message><source>输出尺寸不能超过 7200 万像素。</source><translation>Output dimensions must not exceed 72 million pixels.</translation></message>
     <message><source>PDF 页面设置无效。</source><translation>Invalid PDF page settings.</translation></message>
     <message><source>PDF 保存失败。</source><translation>Failed to save PDF.</translation></message>
-  </context>
+      <message><source>ICO 图标尺寸必须在 1～256 像素之间。</source><translation>ICO dimensions must be between 1 and 256 pixels.</translation></message>
+    <message><source>请框选完整主体，并在选区外留出部分背景。</source><translation>Select the entire subject and leave some background outside the rectangle.</translation></message>
+    <message><source>未识别到主体，请重新选择主体区域。</source><translation>No foreground was detected. Select the subject again.</translation></message>
+    <message><source>图片处理参数无效。</source><translation>Invalid image processing parameters.</translation></message>
+</context>
   <context>
     <name>ImageBrowser::ImageEditorPanel</name>
     <message><source>图片编辑</source><translation>Image editing</translation></message>
@@ -2119,7 +2123,7 @@ Copied to clipboard</translation>
     <message><source>高度（像素）</source><translation>Height (pixels)</translation></message>
     <message><source>锁定宽高比</source><translation>Keep aspect ratio</translation></message>
     <message><source>应用尺寸</source><translation>Apply size</translation></message>
-    <message><source>图片尺寸超过 1 亿像素的编辑上限。</source><translation>Image size exceeds the 100 megapixel editing limit.</translation></message>
+    <message><source>图片尺寸超过 7200 万像素的编辑上限。</source><translation>Image size exceeds the 72 megapixel editing limit.</translation></message>
     <message><source>选择形状和样式，再在图片上拖动绘制区域。</source><translation>Choose a shape and style, then drag an area on the image.</translation></message>
     <message><source>矩形</source><translation>Rectangle</translation></message>
     <message><source>椭圆</source><translation>Ellipse</translation></message>
@@ -2162,7 +2166,45 @@ Copied to clipboard</translation>
     <message><source>重新选择区域</source><translation>Reselect area</translation></message>
     <message><source>选择区域</source><translation>Select area</translation></message>
     <message><source>应用</source><translation>Apply</translation></message>
-  </context>
+      <message><source>选择图形后直接拖动绘制，松开完成；文字点击放置，Esc 取消当前绘制。</source><translation>Choose a shape and drag to draw; release to finish. Click to place text. Esc cancels the current stroke.</translation></message>
+    <message><source>选择常用水印布局，或自定义放置区域。</source><translation>Choose a watermark preset or select a custom area.</translation></message>
+    <message><source>自定义区域</source><translation>Custom area</translation></message>
+    <message><source>右下角</source><translation>Bottom right</translation></message>
+    <message><source>左下角</source><translation>Bottom left</translation></message>
+    <message><source>右上角</source><translation>Top right</translation></message>
+    <message><source>左上角</source><translation>Top left</translation></message>
+    <message><source>居中</source><translation>Center</translation></message>
+    <message><source>平铺</source><translation>Tile</translation></message>
+    <message><source>布局</source><translation>Layout</translation></message>
+    <message><source>不透明度（%）</source><translation>Opacity (%)</translation></message>
+    <message><source>边距（像素）</source><translation>Margin (px)</translation></message>
+    <message><source>色温</source><translation>Temperature</translation></message>
+    <message><source>色调</source><translation>Tint</translation></message>
+    <message><source>不透明度</source><translation>Opacity</translation></message>
+    <message><source>抠图</source><translation>Remove background</translation></message>
+    <message><source>高斯模糊</source><translation>Gaussian blur</translation></message>
+    <message><source>中值降噪</source><translation>Median denoise</translation></message>
+    <message><source>锐化</source><translation>Sharpen</translation></message>
+    <message><source>边缘检测</source><translation>Edge detection</translation></message>
+    <message><source>自动二值化</source><translation>Automatic binarization</translation></message>
+    <message><source>自动对比度</source><translation>Automatic contrast</translation></message>
+    <message><source>强度</source><translation>Strength</translation></message>
+    <message><source>边缘阈值</source><translation>Edge threshold</translation></message>
+    <message><source>半径（像素）</source><translation>Radius (px)</translation></message>
+    <message><source>细化次数</source><translation>Refinement iterations</translation></message>
+    <message><source>边缘羽化（像素）</source><translation>Edge feather (px)</translation></message>
+    <message><source>转为灰度，保留透明度。</source><translation>Convert to grayscale while preserving alpha.</translation></message>
+    <message><source>使用复古色彩效果。</source><translation>Apply a sepia color effect.</translation></message>
+    <message><source>反转颜色，保留透明度。</source><translation>Invert colors while preserving alpha.</translation></message>
+    <message><source>平滑图像，半径越大越模糊。</source><translation>Smooth the image. A larger radius produces more blur.</translation></message>
+    <message><source>去除椒盐噪点，适合少量孤立杂点。</source><translation>Remove salt-and-pepper noise and isolated specks.</translation></message>
+    <message><source>增强边缘细节，强度过高可能出现光晕。</source><translation>Enhance edge detail. Excessive strength may create halos.</translation></message>
+    <message><source>输出黑底白色轮廓，阈值越高保留的边缘越少。</source><translation>Show white edges on black. Higher thresholds retain fewer edges.</translation></message>
+    <message><source>自动计算阈值，输出黑白图像。</source><translation>Calculate a threshold automatically and produce a binary image.</translation></message>
+    <message><source>拉伸明暗范围，改善偏灰图像。</source><translation>Stretch the tonal range to improve low-contrast images.</translation></message>
+    <message><source>框选完整主体，选区外保留背景，再应用选区去除背景。适合主体与背景较清晰的图片；复杂发丝和透明物体可能需要重新选区。</source><translation>Select the entire subject, leaving background outside the rectangle, then apply. Best for distinct subjects and backgrounds. Complex hair and transparent objects may need another selection.</translation></message>
+    <message><source>保留原图尺寸和透明度，建议另存为 PNG。增加细化次数会延长处理时间。</source><translation>Preserve dimensions and alpha. Save as PNG. More iterations take longer.</translation></message>
+</context>
   <context>
     <name>SystemBackground</name>
     <message><source>没有可用的背景图片。</source><translation>No background image is available.</translation></message>
@@ -2195,6 +2237,8 @@ Copied to clipboard</translation>
     <message><source> 毫米</source><translation> mm</translation></message>
     <message><source>页边距</source><translation>Margins</translation></message>
     <message><source>PDF 导出为单页，图片等比缩放居中；透明区域以白色显示。</source><translation>PDF exports one page with the image centered and scaled proportionally. Transparent areas appear white.</translation></message>
-    <message><source>输出尺寸不能超过 1 亿像素。</source><translation>Output dimensions must not exceed 100 million pixels.</translation></message>
+    <message><source>输出尺寸不能超过 7200 万像素。</source><translation>Output dimensions must not exceed 72 million pixels.</translation></message>
+    <message><source>图标尺寸（像素）</source><translation>Icon size (px)</translation></message>
+    <message><source>等比缩放并居中，空白区域补透明；导出单尺寸 ICO 图标。</source><translation>Scale proportionally and center with transparent padding. Export a single-size ICO icon.</translation></message>
 </context>
 </TS>
