@@ -6,6 +6,7 @@ const sharp = require('sharp');
 const icons = {
   folder: 'folder-open', home: 'house', refresh: 'refresh-cw', sidebar: 'panel-left',
   previous: 'chevron-left', next: 'chevron-right', fit: 'expand', actual: 'scan',
+  'zoom-in': 'zoom-in', 'zoom-out': 'zoom-out',
   crop: 'crop', 'rotate-left': 'rotate-ccw-square', 'rotate-right': 'rotate-cw-square',
   'flip-horizontal': 'flip-horizontal', 'flip-vertical': 'flip-vertical',
   resize: 'scaling', undo: 'undo-2', redo: 'redo-2', reset: 'history', play: 'play', pause: 'pause', frame: 'film',

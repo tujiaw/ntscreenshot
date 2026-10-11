@@ -14,6 +14,7 @@ class QListView;
 class QMovie;
 class QSplitter;
 class QToolBar;
+class QToolButton;
 class SettingModel;
 
 namespace ImageBrowser {
@@ -57,6 +58,15 @@ private:
     void screenshotDirectory();
     void updateStatus();
     void toggleFullscreen();
+    void showStatus(const QString& message, int timeout = 0);
+    void styleToolButtons();
+    void positionTitle();
+    void positionOverlays();
+    void updateOverlays();
+    void syncControlButtons();
+    void layoutControlBar();
+    QToolButton* controlButton(QAction* action);
+    void setZoomStep(double factor);
 
 private slots:
     void applyDpi(double scale = 0);
@@ -71,16 +81,37 @@ private:
     QSplitter* splitter_;
     QToolBar* toolbar_;
     QLabel* details_ = nullptr;
+    QLabel* titleLabel_ = nullptr;
+    QLabel* counterLabel_ = nullptr;
+    QLabel* statusLabel_ = nullptr;
+    QWidget* controlBar_ = nullptr;
+    QWidget* controlLeft_ = nullptr;
+    QWidget* controlRight_ = nullptr;
+    QWidget* controlCopySave_ = nullptr;
+    QWidget* toolPill_ = nullptr;
+    QToolButton* zoomButton_ = nullptr;
+    QToolButton* overlayPrevious_ = nullptr;
+    QToolButton* overlayNext_ = nullptr;
+    QToolButton* sidebarButton_ = nullptr;
+    QList<QToolButton*> controlButtons_;
+    QString titleText_;
+    QString statusText_;
+    QAction* spacerAction_ = nullptr;
     QMovie* movie_ = nullptr;
     QFileSystemWatcher directoryWatcher_;
     QTimer refreshTimer_;
     QTimer thumbnailsTimer_;
+    QTimer statusTimer_;
     QString directory_;
     QString pendingSelection_;
     ImageDocument document_;
     QSize displayedSize_;
     quint64 imageVersion_ = 0;
     std::shared_ptr<std::atomic<quint64>> loadGeneration_ = std::make_shared<std::atomic<quint64>>(0);
+    double scaleFactor_ = 1;
+    int controlLevel_ = -1;
+    bool hasDetails_ = false;
+    bool canvasHovered_ = false;
     bool busy_ = false;
     bool loading_ = false;
     bool scanning_ = false;
@@ -89,6 +120,13 @@ private:
     bool restoreMaximized_ = false;
     QAction* fullscreenAction_ = nullptr;
     QAction* exitFullscreenAction_ = nullptr;
+    QAction* sidebarAction_ = nullptr;
+    QAction* previousAction_ = nullptr;
+    QAction* nextAction_ = nullptr;
+    QAction* fitAction_ = nullptr;
+    QAction* actualAction_ = nullptr;
+    QAction* zoomInAction_ = nullptr;
+    QAction* zoomOutAction_ = nullptr;
     QAction* saveAction_;
     QAction* overwriteAction_;
     QAction* copyAction_;

@@ -40,6 +40,8 @@
         <file>images/browser-next.png</file>
         <file>images/browser-fit.png</file>
         <file>images/browser-actual.png</file>
+        <file>images/browser-zoom-in.png</file>
+        <file>images/browser-zoom-out.png</file>
         <file>images/browser-crop.png</file>
         <file>images/browser-rotate-left.png</file>
         <file>images/browser-rotate-right.png</file>

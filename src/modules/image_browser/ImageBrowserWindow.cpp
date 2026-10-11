@@ -6,6 +6,7 @@
 #include "core/settings/SettingModel.h"
 #include "core/theme/ThemeIcon.h"
 #include "core/theme/ThemeManager.h"
+#include "core/theme/UiStyler.h"
 
 #include <QAction>
 #include <QApplication>
@@ -19,6 +20,8 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QFormLayout>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QImageReader>
 #include <QImageWriter>
 #include <QLabel>
@@ -44,6 +47,7 @@
 #include <QVBoxLayout>
 #include <QWindow>
 #include <functional>
+#include <utility>
 
 namespace ImageBrowser {
 namespace {
@@ -108,6 +112,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     setAcceptDrops(true);
     setWindowTitle(tr("图片浏览"));
     toolbar_ = addToolBar(tr("图片工具"));
+    toolbar_->setObjectName(QStringLiteral("ImageBrowserToolBar"));
     auto* toolbarStyle = new ToolbarStyle;
     toolbarStyle->setParent(toolbar_);
     toolbar_->setStyle(toolbarStyle);
@@ -124,6 +129,25 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         connect(a, &QAction::triggered, this, std::move(callback));
         return a;
     };
+    // 顶栏按钮可以是「图标 + 文字」，文字优先取 browserText（QAction 的 text 要留给测试和快捷键）。
+    auto barButton = [this](QAction* a, const QString& text, bool primary = false) {
+        auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a));
+        if (!button) return;
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        if (!text.isEmpty()) {
+            button->setProperty("browserText", text);
+            button->setText(text);
+        }
+        if (primary) UiStyler::setRole(button, UiRole::PrimaryButton);
+    };
+    // 顶栏只保留文件级操作，编辑工具全部移到下方控制栏的中间胶囊里。
+    cropAction_ = action(tr("裁剪"), "browser-crop.png", {}, [this] {
+        canvas_->setCropping(cropAction_->isChecked()); updateActions();
+    });
+    cropAction_->setCheckable(true);
+    editActions_ << cropAction_;
+    barButton(cropAction_, tr("编辑"), true);
+    toolbar_->addSeparator();
     navigationActions_ << action(tr("选择目录"), "browser-folder.png", QKeySequence("Ctrl+O"), [this] {
         const QString directory = QFileDialog::getExistingDirectory(this, tr("选择目录"), directory_);
         if (!directory.isEmpty() && discardOrSave()) openDirectory(directory);
@@ -132,90 +156,15 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         if (discardOrSave()) screenshotDirectory();
     });
     navigationActions_ << action(tr("刷新"), "browser-refresh.png", QKeySequence("Ctrl+R"), [this] { refresh(); });
-    auto* sidebar = action(tr("缩略图"), "browser-sidebar.png", {}, [] {});
-    sidebar->setCheckable(true);
-    sidebar->setChecked(true);
-    connect(sidebar, &QAction::toggled, this, [this](bool checked) { list_->setVisible(checked); });
+    for (auto* a : std::as_const(navigationActions_)) barButton(a, a->text());
+    // 弹性空档把右侧操作推到工具栏远端，它的几何区域同时就是居中文件名可用的横向区间。
+    spacerAction_ = toolbar_->addWidget(new QWidget(toolbar_));
+    spacerAction_->setProperty("browserSpacer", true);
+    if (auto* spacer = toolbar_->widgetForAction(spacerAction_))
+        spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolbar_->addSeparator();
-    navigationActions_ << action(tr("上一张"), "browser-previous.png", QKeySequence("Alt+Left"), [this] {
-        selectRow(model_->indexOf(document_.path) - 1);
-    });
-    navigationActions_ << action(tr("下一张"), "browser-next.png", QKeySequence("Alt+Right"), [this] {
-        selectRow(model_->indexOf(document_.path) + 1);
-    });
-    action(tr("适应窗口"), "browser-fit.png", QKeySequence("Ctrl+0"), [this] { canvas_->fit(); });
-    auto* actual = action(tr("实际尺寸"), "browser-actual.png", QKeySequence("Ctrl+1"), [this] { canvas_->actualSize(); });
-    if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(actual))) {
-        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-        button->setText(QStringLiteral("1:1"));
-    }
-    fullscreenAction_ = action(tr("全屏"), "browser-actual.png", QKeySequence("F11"), [this] { toggleFullscreen(); });
-    fullscreenAction_->setCheckable(true);
-    exitFullscreenAction_ = new QAction(this);
-    exitFullscreenAction_->setShortcut(QKeySequence(Qt::Key_Escape));
-    exitFullscreenAction_->setEnabled(false);
-    addAction(exitFullscreenAction_);
-    connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
-        if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
-        else if (isFullScreen()) toggleFullscreen();
-    });
-    toolbar_->addSeparator();
-    cropAction_ = action(tr("裁剪"), "browser-crop.png", {}, [this] {
-        canvas_->setCropping(cropAction_->isChecked()); updateActions();
-    });
-    cropAction_->setCheckable(true);
-    editActions_ << cropAction_;
-    applyCropAction_ = action(tr("应用裁剪"), "browser-apply.png", {}, [this] {
-        if (!canvas_->cropRect().isEmpty()) edit({EditOperation::Crop, canvas_->cropRect(), {}});
-    });
-    cancelCropAction_ = action(tr("取消裁剪"), "browser-cancel.png", {}, [this] {
-        canvas_->setCropping(false); updateActions();
-    });
-    editActions_ << action(tr("向左旋转"), "browser-rotate-left.png", {}, [this] { edit({EditOperation::RotateLeft, {}, {}}); });
-    editActions_ << action(tr("向右旋转"), "browser-rotate-right.png", {}, [this] { edit({EditOperation::RotateRight, {}, {}}); });
-    editActions_ << action(tr("水平翻转"), "browser-flip-horizontal.png", {}, [this] { edit({EditOperation::FlipHorizontal, {}, {}}); });
-    editActions_ << action(tr("垂直翻转"), "browser-flip-vertical.png", {}, [this] { edit({EditOperation::FlipVertical, {}, {}}); });
-    editActions_ << action(tr("调整图片尺寸"), "browser-resize.png", {}, [this] { resizeImage(); });
-    toolbar_->addSeparator();
-    undoAction_ = action(tr("撤销"), "browser-undo.png", QKeySequence::Undo, [this] {
-        auto candidate = document_; --candidate.position; renderDocument(candidate);
-    });
-    redoAction_ = action(tr("重做"), "browser-redo.png", QKeySequence::Redo, [this] {
-        auto candidate = document_; ++candidate.position; renderDocument(candidate);
-    });
-    resetAction_ = action(tr("恢复原图"), "browser-reset.png", {}, [this] {
-        auto candidate = document_; candidate.position = 0; renderDocument(candidate);
-    });
-    toolbar_->addSeparator();
-    playAction_ = action(tr("播放／暂停"), "browser-play.png", QKeySequence("Space"), [this] {
-        if (!movie_) return;
-        movie_->setPaused(movie_->state() == QMovie::Running);
-        updateActions();
-    });
-    frameAction_ = action(tr("编辑当前帧"), "browser-frame.png", {}, [this] { freezeFrame(); });
-    copyAction_ = action(tr("复制图片"), "browser-copy.png", QKeySequence::Copy, [this] {
-        if (movie_) {
-            const int frame = movie_->currentFrameNumber();
-            const QString path = document_.path;
-            busy_ = true;
-            updateActions();
-            loader_->run(this, [path, frame] { return ImageDocument::readFrame(path, frame); },
-                         [this](const ImageResult& result) {
-                busy_ = false;
-                if (!result.error.isEmpty()) statusBar()->showMessage(result.error);
-                else {
-                    QApplication::clipboard()->setImage(result.image);
-                    statusBar()->showMessage(tr("图片已复制"), 3000);
-                }
-                updateActions();
-            });
-        } else {
-            QApplication::clipboard()->setImage(document_.current);
-            statusBar()->showMessage(tr("图片已复制"), 3000);
-        }
-    });
-    saveAction_ = action(tr("另存为"), "browser-save.png", QKeySequence::Save, [this] { save(); });
     convertAction_ = action(tr("格式转换"), "browser-convert.png", {}, [this] { convertFormat(); });
+    barButton(convertAction_, convertAction_->text());
     auto* more = action(tr("更多"), "browser-more.png", {}, [] {});
     auto* menu = new QMenu(this);
     overwriteAction_ = menu->addAction(tr("覆盖原图"), this, [this] { save(true); });
@@ -224,6 +173,19 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     });
     more->setMenu(menu);
     if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(more))) button->setPopupMode(QToolButton::InstantPopup);
+    titleLabel_ = new QLabel(toolbar_);
+    titleLabel_->setObjectName(QStringLiteral("browserTitleLabel"));
+    titleLabel_->setTextFormat(Qt::PlainText);
+    titleLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    toolbar_->installEventFilter(this);
+    exitFullscreenAction_ = new QAction(this);
+    exitFullscreenAction_->setShortcut(QKeySequence(Qt::Key_Escape));
+    exitFullscreenAction_->setEnabled(false);
+    addAction(exitFullscreenAction_);
+    connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
+        if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
+        else if (isFullScreen()) toggleFullscreen();
+    });
 
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
@@ -238,17 +200,208 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     list_->viewport()->installEventFilter(this);
     canvas_ = new ImageCanvas(splitter_);
+    canvas_->installEventFilter(this);
     splitter_->setStretchFactor(0, 0);
     splitter_->setStretchFactor(1, 1);
     layout->addWidget(splitter_, 1);
     setCentralWidget(central);
-    details_ = new QLabel(this);
+
+    // 翻页箭头挂在画布上，默认隐藏，鼠标进入画布才浮出来，不常驻遮挡图片。
+    overlayPrevious_ = new QToolButton(canvas_);
+    overlayNext_ = new QToolButton(canvas_);
+    for (QToolButton* button : {overlayPrevious_, overlayNext_}) {
+        button->setObjectName(QStringLiteral("browserOverlayButton"));
+        // 箭头铺在半透明黑色底衬上，底衬深/浅主题都不变，所以固定用白色图标而不是主题色。
+        button->setIcon(ThemeIcon::icon(button == overlayPrevious_ ? "browser-previous.png" : "browser-next.png",
+                                        IconTone::OnAccent));
+        button->setToolTip(button == overlayPrevious_ ? tr("上一张") : tr("下一张"));
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::ArrowCursor);
+        button->installEventFilter(this);
+        button->hide();
+    }
+    connect(overlayPrevious_, &QToolButton::clicked, this, [this] { selectRow(model_->indexOf(document_.path) - 1); });
+    connect(overlayNext_, &QToolButton::clicked, this, [this] { selectRow(model_->indexOf(document_.path) + 1); });
+
+    // ---- 底部控制栏。三段等分：左组、胶囊、右组各占 1/3 拉伸，胶囊自然落在窗口正中。
+    auto panelAction = [this](const QString& title, const QString& icon, const QKeySequence& key,
+                              std::function<void()> callback) {
+        QIcon image = ThemeIcon::icon(icon);
+        if (image.isNull()) image = style()->standardIcon(QStyle::SP_FileIcon);
+        auto* a = new QAction(image, title, this);
+        a->setProperty("browserIcon", icon);
+        a->setShortcut(key);
+        a->setToolTip(key.isEmpty() ? title : title + QStringLiteral(" (%1)").arg(key.toString(QKeySequence::NativeText)));
+        connect(a, &QAction::triggered, this, std::move(callback));
+        addAction(a);
+        return a;
+    };
+
+    statusBar()->setSizeGripEnabled(false);
+    controlBar_ = new QWidget(this);
+    controlBar_->installEventFilter(this);
+    auto* controlRow = new QHBoxLayout(controlBar_);
+    controlRow->setContentsMargins(0, 0, 0, 0);
+    controlRow->setSpacing(0);
+    controlLeft_ = new QWidget(controlBar_);
+    controlLeft_->setObjectName(QStringLiteral("browserControlLeft"));
+    controlRight_ = new QWidget(controlBar_);
+    controlRight_->setObjectName(QStringLiteral("browserControlRight"));
+    auto* leftRow = new QHBoxLayout(controlLeft_);
+    auto* rightRow = new QHBoxLayout(controlRight_);
+    for (QHBoxLayout* row : {leftRow, rightRow}) { row->setContentsMargins(0, 0, 0, 0); row->setSpacing(0); }
+
+    sidebarAction_ = panelAction(tr("缩略图"), "browser-sidebar.png", {}, [this] {
+        if (list_) list_->setVisible(sidebarAction_->isChecked());
+    });
+    sidebarAction_->setCheckable(true);
+    sidebarAction_->setChecked(true);
+    sidebarButton_ = controlButton(sidebarAction_);
+    previousAction_ = panelAction(tr("上一张"), "browser-previous.png", QKeySequence("Alt+Left"), [this] {
+        selectRow(model_->indexOf(document_.path) - 1);
+    });
+    nextAction_ = panelAction(tr("下一张"), "browser-next.png", QKeySequence("Alt+Right"), [this] {
+        selectRow(model_->indexOf(document_.path) + 1);
+    });
+    counterLabel_ = new QLabel(controlLeft_);
+    counterLabel_->setObjectName(QStringLiteral("browserImageCounter"));
+    counterLabel_->setTextFormat(Qt::PlainText);
+    counterLabel_->setAlignment(Qt::AlignCenter);
+    controlCopySave_ = new QWidget(controlLeft_);
+    auto* copySaveRow = new QHBoxLayout(controlCopySave_);
+    copySaveRow->setContentsMargins(0, 0, 0, 0);
+    copySaveRow->setSpacing(0);
+    copyAction_ = panelAction(tr("复制图片"), "browser-copy.png", QKeySequence::Copy, [this] {
+        if (movie_) {
+            const int frame = movie_->currentFrameNumber();
+            const QString path = document_.path;
+            busy_ = true;
+            updateActions();
+            loader_->run(this, [path, frame] { return ImageDocument::readFrame(path, frame); },
+                         [this](const ImageResult& result) {
+                busy_ = false;
+                if (!result.error.isEmpty()) showStatus(result.error);
+                else {
+                    QApplication::clipboard()->setImage(result.image);
+                    showStatus(tr("图片已复制"), 3000);
+                }
+                updateActions();
+            });
+        } else {
+            QApplication::clipboard()->setImage(document_.current);
+            showStatus(tr("图片已复制"), 3000);
+        }
+    });
+    saveAction_ = panelAction(tr("另存为"), "browser-save.png", QKeySequence::Save, [this] { save(); });
+    details_ = new QLabel(controlLeft_);
     details_->setObjectName(QStringLiteral("browserImageDetails"));
     details_->setTextFormat(Qt::PlainText);
-    details_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    details_->setMinimumWidth(0);
-    statusBar()->addWidget(details_, 1);
+    // Preferred 而不是 Ignored：Ignored 会让布局把宽度压到 0，文件信息只剩 "1600... KiB"。
+    // 空间不够时由 layoutControlBar 整条隐藏，不靠这个标签自己缩。
+    details_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     details_->installEventFilter(this);
+    statusLabel_ = new QLabel(controlLeft_);
+    statusLabel_->setObjectName(QStringLiteral("browserStatusMessage"));
+    statusLabel_->setTextFormat(Qt::PlainText);
+    statusLabel_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    statusLabel_->installEventFilter(this);
+
+    leftRow->addWidget(sidebarButton_);
+    leftRow->addWidget(controlButton(previousAction_));
+    leftRow->addWidget(counterLabel_);
+    leftRow->addWidget(controlButton(nextAction_));
+    leftRow->addWidget(controlCopySave_);
+    copySaveRow->addWidget(controlButton(copyAction_));
+    copySaveRow->addWidget(controlButton(saveAction_));
+    leftRow->addWidget(details_);
+    leftRow->addWidget(statusLabel_);
+
+    toolPill_ = new QFrame(controlBar_);
+    toolPill_->setObjectName(QStringLiteral("browserToolPill"));
+    auto* pillRow = new QHBoxLayout(toolPill_);
+    pillRow->setContentsMargins(0, 0, 0, 0);
+    pillRow->setSpacing(0);
+    auto pillSeparator = [this] {
+        auto* line = new QFrame(toolPill_);
+        line->setObjectName(QStringLiteral("browserToolPillSeparator"));
+        line->setFrameShape(QFrame::VLine);
+        return line;
+    };
+    applyCropAction_ = panelAction(tr("应用裁剪"), "browser-apply.png", {}, [this] {
+        if (!canvas_->cropRect().isEmpty()) edit({EditOperation::Crop, canvas_->cropRect(), {}});
+    });
+    cancelCropAction_ = panelAction(tr("取消裁剪"), "browser-cancel.png", {}, [this] {
+        canvas_->setCropping(false); updateActions();
+    });
+    editActions_ << panelAction(tr("向左旋转"), "browser-rotate-left.png", {}, [this] { edit({EditOperation::RotateLeft, {}, {}}); });
+    editActions_ << panelAction(tr("向右旋转"), "browser-rotate-right.png", {}, [this] { edit({EditOperation::RotateRight, {}, {}}); });
+    editActions_ << panelAction(tr("水平翻转"), "browser-flip-horizontal.png", {}, [this] { edit({EditOperation::FlipHorizontal, {}, {}}); });
+    editActions_ << panelAction(tr("垂直翻转"), "browser-flip-vertical.png", {}, [this] { edit({EditOperation::FlipVertical, {}, {}}); });
+    editActions_ << panelAction(tr("调整图片尺寸"), "browser-resize.png", {}, [this] { resizeImage(); });
+    undoAction_ = panelAction(tr("撤销"), "browser-undo.png", QKeySequence::Undo, [this] {
+        auto candidate = document_; --candidate.position; renderDocument(candidate);
+    });
+    redoAction_ = panelAction(tr("重做"), "browser-redo.png", QKeySequence::Redo, [this] {
+        auto candidate = document_; ++candidate.position; renderDocument(candidate);
+    });
+    resetAction_ = panelAction(tr("恢复原图"), "browser-reset.png", {}, [this] {
+        auto candidate = document_; candidate.position = 0; renderDocument(candidate);
+    });
+    pillRow->addWidget(controlButton(applyCropAction_));
+    pillRow->addWidget(controlButton(cancelCropAction_));
+    for (QAction* action : std::as_const(editActions_)) {
+        if (action == editActions_.first()) pillRow->addWidget(pillSeparator());
+        pillRow->addWidget(controlButton(action));
+    }
+    pillRow->addWidget(pillSeparator());
+    for (QAction* action : {undoAction_, redoAction_, resetAction_}) pillRow->addWidget(controlButton(action));
+
+    playAction_ = panelAction(tr("播放／暂停"), "browser-play.png", QKeySequence("Space"), [this] {
+        if (!movie_) return;
+        movie_->setPaused(movie_->state() == QMovie::Running);
+        updateActions();
+    });
+    frameAction_ = panelAction(tr("编辑当前帧"), "browser-frame.png", {}, [this] { freezeFrame(); });
+    // 缩放档位必须是 QToolButton + QMenu：QComboBox 内部含 QListView，会抢在缩略图列表前面被测试找到。
+    zoomButton_ = new QToolButton(controlRight_);
+    zoomButton_->setObjectName(QStringLiteral("browserZoomButton"));
+    zoomButton_->setAutoRaise(true);
+    zoomButton_->setFocusPolicy(Qt::NoFocus);
+    zoomButton_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    zoomButton_->setPopupMode(QToolButton::InstantPopup);
+    zoomButton_->setToolTip(tr("缩放"));
+    auto* zoomMenu = new QMenu(zoomButton_);
+    fitAction_ = panelAction(tr("适应窗口"), "browser-fit.png", QKeySequence("Ctrl+0"), [this] { canvas_->fit(); });
+    actualAction_ = panelAction(tr("实际尺寸"), "browser-actual.png", QKeySequence("Ctrl+1"), [this] { canvas_->actualSize(); });
+    zoomMenu->addAction(fitAction_);
+    zoomMenu->addSeparator();
+    for (int percent : {50, 100, 200, 400}) {
+        QAction* preset = zoomMenu->addAction(QStringLiteral("%1%").arg(percent));
+        connect(preset, &QAction::triggered, this, [this, percent] { canvas_->setZoom(percent / 100.0); });
+    }
+    zoomMenu->addSeparator();
+    zoomMenu->addAction(actualAction_);
+    zoomButton_->setMenu(zoomMenu);
+    zoomOutAction_ = panelAction(tr("缩小"), "browser-zoom-out.png", QKeySequence::ZoomOut, [this] { setZoomStep(1 / 1.15); });
+    zoomInAction_ = panelAction(tr("放大"), "browser-zoom-in.png", QKeySequence::ZoomIn, [this] { setZoomStep(1.15); });
+    fullscreenAction_ = panelAction(tr("全屏"), "browser-fit.png", QKeySequence("F11"), [this] { toggleFullscreen(); });
+    fullscreenAction_->setCheckable(true);
+
+    rightRow->addWidget(controlButton(playAction_));
+    rightRow->addWidget(controlButton(frameAction_));
+    rightRow->addWidget(zoomButton_);
+    rightRow->addWidget(controlButton(zoomOutAction_));
+    rightRow->addWidget(controlButton(zoomInAction_));
+    rightRow->addWidget(controlButton(fullscreenAction_));
+    rightRow->insertStretch(0, 1);
+
+    controlRow->addWidget(controlLeft_, 1);
+    controlRow->addWidget(toolPill_);
+    controlRow->addWidget(controlRight_, 1);
+    statusBar()->addWidget(controlBar_, 1);
+    statusTimer_.setSingleShot(true);
+    connect(&statusTimer_, &QTimer::timeout, this, [this] { statusText_.clear(); layoutControlBar(); updateStatus(); });
     for (QWidget* surface : {static_cast<QWidget*>(canvas_), list_->viewport(), static_cast<QWidget*>(toolbar_)}) {
         surface->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(surface, &QWidget::customContextMenuRequested, this, [this, surface](const QPoint& point) {
@@ -289,24 +442,65 @@ ImageBrowserWindow::~ImageBrowserWindow() { loadGeneration_->store(++imageVersio
 
 void ImageBrowserWindow::applyDpi(double scale) {
     if (scale <= 0) scale = Util::getScreenScaleFactor(frameGeometry().center());
+    scaleFactor_ = scale;
     toolbar_->setProperty("browserExtensionExtent", qRound(22 * scale) + 1);
-    setStyleSheet(QStringLiteral("#ImageBrowserWindow, #ImageBrowserWindow QWidget { font-size: %1px; }").arg(qRound(13 * scale)));
-    toolbar_->setStyleSheet(QStringLiteral(
-        "QToolBar { spacing: 0; border: 0; padding: 0; } "
-        "QToolBar QToolButton { min-width: 0; min-height: 0; padding: %1px; border: 0; border-radius: 0; background: transparent; } "
-        "QToolBar QToolButton:hover, QToolBar QToolButton:pressed { border: 0; background: rgba(128,128,128,28); } "
-        "QToolBar QToolButton:checked { border: 0; background: rgba(70,130,210,45); } "
-        "QToolBar QToolButton::menu-indicator { image: none; width: 0; }")
-        .arg(qRound(2 * scale)));
+    // 窗口级样式表是「祖先规则」，会盖掉全局 qss 里任何同属性的声明（不论特异性）。所以 caption
+    // 的 12px 只能写在这里，用同级的 #browser* 选择器把它从上面那条 QWidget 规则里抢回来。
+    setStyleSheet(QStringLiteral(
+        "#ImageBrowserWindow, #ImageBrowserWindow QWidget { font-size: %1px; }"
+        "#ImageBrowserWindow QLabel#browserTitleLabel,"
+        "#ImageBrowserWindow QLabel#browserImageCounter,"
+        "#ImageBrowserWindow QLabel#browserImageDetails,"
+        "#ImageBrowserWindow QLabel#browserStatusMessage { font-size: %2px; }")
+        .arg(qRound(13 * scale)).arg(qRound(12 * scale)));
+    styleToolButtons();
     toolbar_->setIconSize(QSize(qRound(20 * scale), qRound(20 * scale)));
+    const int barHeight = qRound(32 * scale);
     for (auto* a : toolbar_->actions()) {
-        if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a)))
-            button->setFixedSize(qRound(28 * scale), qRound(30 * scale));
+        auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a));
+        if (!button) continue;
+        if (button->toolButtonStyle() == Qt::ToolButtonIconOnly) {
+            button->setFixedSize(qRound(30 * scale), barHeight);
+        } else {
+            // 图标 + 文字的按钮宽度交给 sizeHint（中文文案长度不定），只锁高度，否则文字会被裁掉。
+            button->setMinimumWidth(0);
+            button->setFixedHeight(barHeight);
+            button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        }
     }
     if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button"))) {
-        extension->setFixedSize(qRound(22 * scale), qRound(30 * scale));
+        extension->setFixedSize(qRound(22 * scale), barHeight);
         extension->setStyleSheet(QStringLiteral("padding: 1px; min-width: 0; min-height: 0; border: 0;"));
         extension->setIcon(ThemeIcon::icon("browser-more.png"));
+    }
+    const int controlSide = qRound(28 * scale);
+    for (auto* button : std::as_const(controlButtons_)) button->setFixedSize(controlSide, controlSide);
+    zoomButton_->setFixedHeight(controlSide);
+    zoomButton_->setMinimumWidth(qRound(48 * scale));
+    zoomButton_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    toolPill_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    if (auto* row = qobject_cast<QHBoxLayout*>(toolPill_->layout())) {
+        row->setSpacing(qRound(4 * scale));
+        row->setContentsMargins(qRound(6 * scale), qRound(4 * scale), qRound(6 * scale), qRound(4 * scale));
+    }
+    for (auto* line : toolPill_->findChildren<QFrame*>(QStringLiteral("browserToolPillSeparator")))
+        line->setFixedSize(qRound(1 * scale), qRound(16 * scale));
+    details_->setMaximumWidth(qRound(220 * scale));
+    statusLabel_->setMaximumWidth(qRound(280 * scale));
+    for (QHBoxLayout* row : {qobject_cast<QHBoxLayout*>(controlLeft_->layout()), qobject_cast<QHBoxLayout*>(controlRight_->layout())})
+        if (row) row->setSpacing(qRound(2 * scale));
+    if (auto* row = qobject_cast<QHBoxLayout*>(controlBar_->layout())) {
+        row->setContentsMargins(qRound(8 * scale), 0, qRound(8 * scale), 0);
+        // 左右两组各占一半宽度，内容贴各自的外侧；留出间隔，文件信息才不会顶到胶囊上。
+        row->setSpacing(qRound(12 * scale));
+    }
+    // 高度必须固定：底栏内容一变就会顶动状态栏高度，中央部件跟着 resize，
+    // 又反过来触发 updateStatus()，形成无限重排。
+    controlBar_->setFixedHeight(qRound(38 * scale));
+    const int overlay = qRound(38 * scale);
+    for (QToolButton* button : {overlayPrevious_, overlayNext_}) {
+        button->setIconSize(QSize(qRound(24 * scale), qRound(24 * scale)));
+        button->setFixedSize(overlay, overlay);
     }
     static_cast<ThumbnailDelegate*>(list_->itemDelegate())->scale = scale;
     QFont scaledFont = font();
@@ -323,10 +517,132 @@ void ImageBrowserWindow::applyDpi(double scale) {
         splitter_->setSizes({qRound(144 * scale), qRound(956 * scale)});
     }
     setMinimumSize(qRound(540 * scale), qRound(380 * scale));
+    positionOverlays();
+    layoutControlBar();
+    positionTitle();
     QTimer::singleShot(0, this, [this, scale] {
         splitter_->setSizes({qRound(144 * scale), qMax(1, splitter_->width() - qRound(144 * scale))});
+        layoutControlBar();
+        positionTitle();
     });
     thumbnailsTimer_.start();
+}
+
+void ImageBrowserWindow::styleToolButtons() {
+    // 工具栏自己的样式表只能匹配 QToolBar：一旦写成 "QToolBar QToolButton"，它就成了子按钮的
+    // 祖先规则，无论全局 qss 的特异性多高都压不过它，主按钮的蓝色底永远不会出现。
+    toolbar_->setStyleSheet(QStringLiteral(
+        "QToolBar { spacing: 0; border: 0; border-bottom: 1px solid %1; padding: %2px %3px; }")
+        .arg(ThemeManager::tokens().border.name(QColor::HexRgb))
+        .arg(qRound(3 * scaleFactor_)).arg(qRound(6 * scaleFactor_)));
+    // 按钮文案会被 action 的 text 覆盖回去（action 的 icon 一变就重置），所以每次都要重贴。
+    for (auto* button : findChildren<QToolButton*>()) {
+        const QString text = button->property("browserText").toString();
+        if (!text.isEmpty()) button->setText(text);
+    }
+}
+
+void ImageBrowserWindow::showStatus(const QString& message, int timeout) {
+    statusText_ = message;
+    statusTimer_.stop();
+    if (timeout > 0 && !message.isEmpty()) statusTimer_.start(timeout);
+    // 提示的出现/消失会改变左组宽度，必须重排。这条调用不能放进 updateStatus()：
+    // updateStatus 也会被标签的 Resize 回调触发，两边互相触发就是死循环。
+    layoutControlBar();
+    updateStatus();
+}
+
+QToolButton* ImageBrowserWindow::controlButton(QAction* action) {
+    auto* button = new QToolButton(this);
+    button->setAutoRaise(true);
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    button->setDefaultAction(action);
+    controlButtons_ << button;
+    return button;
+}
+
+void ImageBrowserWindow::syncControlButtons() {
+    // setDefaultAction 会同步 enabled / checked / icon / text，但不会跟随 action 的可见性，
+    // 应用裁剪、取消裁剪、播放这几个条件按钮要靠这里才真的出现和消失。
+    for (auto* button : std::as_const(controlButtons_)) {
+        if (auto* action = button->defaultAction()) button->setVisible(action->isVisible());
+    }
+}
+
+void ImageBrowserWindow::setZoomStep(double factor) {
+    if (document_.current.isNull()) return;
+    canvas_->setZoom(canvas_->zoom() * factor);
+}
+
+void ImageBrowserWindow::positionTitle() {
+    if (!titleLabel_ || !toolbar_) return;
+    if (titleText_.isEmpty()) { titleLabel_->hide(); return; }
+    titleLabel_->show();
+    // 可用区间就是弹性空档占据的那一段：它左边是左侧按钮组，右边是右侧按钮组。
+    QRect band = toolbar_->rect();
+    if (auto* spacer = spacerAction_ ? toolbar_->widgetForAction(spacerAction_) : nullptr;
+        spacer && spacer->isVisible() && spacer->geometry().width() > 0) {
+        band = spacer->geometry();
+    }
+    const int margin = qRound(8 * scaleFactor_);
+    const QFontMetrics metrics = titleLabel_->fontMetrics();
+    const int available = qMax(0, band.width() - 2 * margin);
+    const int width = qMin(available, metrics.horizontalAdvance(titleText_) + 2);
+    if (width < qRound(60 * scaleFactor_)) { titleLabel_->hide(); return; }
+    const int x = qBound(band.left() + margin, (toolbar_->width() - width) / 2, band.right() - margin - width);
+    titleLabel_->setGeometry(x, 0, width, toolbar_->height());
+    titleLabel_->setText(metrics.elidedText(titleText_, Qt::ElideMiddle, width));
+    titleLabel_->raise();
+}
+
+void ImageBrowserWindow::positionOverlays() {
+    if (!canvas_ || !overlayPrevious_) return;
+    const int size = overlayPrevious_->width();
+    const int margin = qRound(12 * scaleFactor_);
+    const int y = (canvas_->height() - size) / 2;
+    overlayPrevious_->move(margin, y);
+    overlayNext_->move(qMax(margin, canvas_->width() - margin - size), y);
+}
+
+void ImageBrowserWindow::updateOverlays() {
+    if (!canvas_ || !overlayPrevious_) return;
+    const int row = model_->indexOf(document_.path);
+    // underMouse() 也算上箭头自己：鼠标从画布移到箭头上时画布会先收到 Leave，
+    // 只看画布的话箭头会在指针刚碰到它的一瞬间闪掉。
+    const bool hovered = canvas_->underMouse() || overlayPrevious_->underMouse() || overlayNext_->underMouse();
+    const bool visible = hovered && !canvas_->cropping() && !busy_ && !loading_ && !document_.current.isNull();
+    overlayPrevious_->setVisible(visible && row > 0);
+    overlayNext_->setVisible(visible && row >= 0 && row + 1 < model_->rowCount());
+    if (overlayPrevious_->isVisible() || overlayNext_->isVisible()) positionOverlays();
+}
+
+void ImageBrowserWindow::layoutControlBar() {
+    if (!controlBar_ || controlBar_->width() <= 0) return;
+    // 逐档收起：文件信息 → 工具胶囊 → 复制/保存。窄到 560px 时仍保住翻页、缩放、全屏。
+    auto apply = [this](int level) {
+        details_->setVisible(level < 1 && hasDetails_);
+        toolPill_->setVisible(level < 2);
+        // 状态提示只是短时 toast，窄窗口里先让位；它不进 measure()，否则每来一条提示都会挤动胶囊。
+        statusLabel_->setVisible(level < 2 && !statusText_.isEmpty());
+        controlCopySave_->setVisible(level < 3);
+    };
+    // 用「候选档位」而不是控件的 isVisible() 来量宽度：任何祖先隐藏时 isVisible() 都是 false，
+    // 会让底栏的取舍跟着窗口显隐变化，进而在重排回调里来回抖动。
+    auto measure = [this](int level) {
+        int width = qRound(48 * scaleFactor_);
+        width += controlLeft_->sizeHint().width();
+        if (level < 2) width += toolPill_->sizeHint().width();
+        width += controlRight_->sizeHint().width();
+        return width;
+    };
+    int level = 3;
+    for (int candidate = 0; candidate <= 3; ++candidate) {
+        apply(candidate);
+        if (measure(candidate) <= controlBar_->width()) { level = candidate; break; }
+    }
+    apply(level);
+    controlLevel_ = level;
 }
 
 void ImageBrowserWindow::screenshotDirectory() {
@@ -378,8 +694,8 @@ void ImageBrowserWindow::listingReady(const QString& error) {
         list_->scrollTo(model_->index(row));
         const QString path = model_->pathAt(row);
         if (document_.path != path || (!loading_ && !document_.dirty() && !document_.sourceUnchanged())) loadImage(path);
-        else if (!document_.sourceUnchanged()) statusBar()->showMessage(tr("原文件已被外部修改，请将编辑结果另存为新文件。"));
-    } else if (!document_.current.isNull()) statusBar()->showMessage(tr("原文件已不在当前目录中，仍可另存图片副本。"));
+        else if (!document_.sourceUnchanged()) showStatus(tr("原文件已被外部修改，请将编辑结果另存为新文件。"));
+    } else if (!document_.current.isNull()) showStatus(tr("原文件已不在当前目录中，仍可另存图片副本。"));
     thumbnailsTimer_.start();
     updateActions();
 }
@@ -411,7 +727,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
     displayedSize_ = {};
     canvas_->setImage({}, true);
     canvas_->setMessage(tr("正在加载图片…"));
-    statusBar()->clearMessage();
+    showStatus(QString());
     updateActions();
     const auto files = directoryWatcher_.files();
     if (!files.isEmpty()) directoryWatcher_.removePaths(files);
@@ -427,7 +743,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
         animationSource_ = result.animated;
         canvas_->setImage(result.image, true);
         if (!result.error.isEmpty()) canvas_->setMessage(tr("无法打开图片：%1").arg(result.error));
-        if (result.limited) statusBar()->showMessage(tr("受限预览：超过 4000 万像素的图片不支持编辑或复制。"));
+        if (result.limited) showStatus(tr("受限预览：超过 4000 万像素的图片不支持编辑或复制。"));
         if (result.animated && result.animationSupported && !result.limited) {
             QSize playbackSize = result.image.size();
             if (playbackSize.width() > 1600 || playbackSize.height() > 1600)
@@ -441,14 +757,14 @@ void ImageBrowserWindow::loadImage(const QString& path) {
                 if (movie_) canvas_->setImage(movie_->currentImage());
             });
             connect(movie_, &QMovie::error, this, [this] {
-                statusBar()->showMessage(tr("无法播放动图，当前显示静态帧。"));
+                showStatus(tr("无法播放动图，当前显示静态帧。"));
                 stopMovie(); updateActions();
             });
             if (isVisible()) movie_->start();
             else resumeMovie_ = true;
         } else if ((QFileInfo(path).suffix().compare("gif", Qt::CaseInsensitive) == 0 ||
                     QFileInfo(path).suffix().compare("webp", Qt::CaseInsensitive) == 0) && !result.animationSupported) {
-            statusBar()->showMessage(tr("当前图片插件不支持动图播放。"));
+            showStatus(tr("当前图片插件不支持动图播放。"));
         }
         updateActions();
     });
@@ -467,7 +783,7 @@ void ImageBrowserWindow::freezeFrame(std::function<void()> after) {
     loader_->run(this, [path, frameNumber] { return ImageDocument::readFrame(path, frameNumber); },
                  [this, after](const ImageResult& result) {
         busy_ = false;
-        if (!result.error.isEmpty()) statusBar()->showMessage(result.error);
+        if (!result.error.isEmpty()) showStatus(result.error);
         else {
             stopMovie();
             document_.original = document_.current = result.image;
@@ -476,7 +792,7 @@ void ImageBrowserWindow::freezeFrame(std::function<void()> after) {
             document_.frozenFrame = true;
             displayedSize_ = result.image.size();
             canvas_->setImage(result.image, true);
-            statusBar()->showMessage(tr("正在编辑静态帧，请另存为 PNG 或 JPEG 图片。"));
+            showStatus(tr("正在编辑静态帧，请另存为 PNG 或 JPEG 图片。"));
         }
         updateActions();
         if (result.error.isEmpty() && after) after();
@@ -495,11 +811,21 @@ void ImageBrowserWindow::updateStatus() {
     const int row = model_->indexOf(document_.path);
     const QString name = QFileInfo(document_.path).fileName();
     const QString fileSize = document_.fileSize >= 0 ? QLocale().formattedDataSize(document_.fileSize) : QStringLiteral("-");
-    const QString text = name.isEmpty() ? QString() : QStringLiteral("%1 x %2   %3   %4 / %5   %6%")
-        .arg(qMax(0, displayedSize_.width())).arg(qMax(0, displayedSize_.height())).arg(fileSize)
-        .arg(row + 1).arg(model_->rowCount()).arg(qRound(canvas_->zoom() * 100));
-    details_->setText(details_->fontMetrics().elidedText(text, Qt::ElideMiddle, qMax(0, details_->contentsRect().width())));
-    details_->setToolTip(text);
+    // tooltip 必须是「尺寸 + 文件大小」，既不能带文件名也不能带目录路径（测试按这个断言）。
+    const QString caption = name.isEmpty() ? QString()
+        : QStringLiteral("%1 x %2   %3").arg(qMax(0, displayedSize_.width())).arg(qMax(0, displayedSize_.height())).arg(fileSize);
+    details_->setToolTip(caption);
+    // 按 maximumWidth 截断，不按当前宽度：标签是 Preferred 策略，用「已经截短的文本」再去算
+    // sizeHint 会越缩越短，同一段文字在深浅两套主题下能截出不同的长度。
+    details_->setText(details_->fontMetrics().elidedText(caption, Qt::ElideMiddle, details_->maximumWidth()));
+    // 显隐统一由 layoutControlBar 决定：这里再 setVisible 一次会和它互相打架，导致无限重排。
+    hasDetails_ = !caption.isEmpty();
+    counterLabel_->setText(row < 0 || name.isEmpty() ? QString() : QStringLiteral("%1 / %2").arg(row + 1).arg(model_->rowCount()));
+    statusLabel_->setText(statusLabel_->fontMetrics().elidedText(statusText_, Qt::ElideRight, statusLabel_->maximumWidth()));
+    statusLabel_->setToolTip(statusText_);
+    zoomButton_->setText(QStringLiteral("%1%").arg(qRound(canvas_->zoom() * 100)));
+    titleText_ = name;
+    positionTitle();
     setWindowTitle(name.isEmpty() ? tr("图片浏览") : name + (document_.dirty() ? " * - " : " - ") + tr("图片浏览"));
 }
 void ImageBrowserWindow::toggleFullscreen() {
@@ -516,18 +842,19 @@ void ImageBrowserWindow::toggleFullscreen() {
 void ImageBrowserWindow::updateActions() {
     if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button")))
         extension->setIcon(ThemeIcon::icon("browser-more.png"));
-    for (auto* a : toolbar_->actions()) {
+    // 主题切换后所有图标都要按新配色重新着色：工具栏、控制栏、菜单里的 action 一起过一遍。
+    for (auto* a : findChildren<QAction*>()) {
         const QString icon = a->property("browserIcon").toString();
         if (!icon.isEmpty()) a->setIcon(ThemeIcon::icon(icon));
-        if (icon == QStringLiteral("browser-actual.png")) {
-            if (auto* button = qobject_cast<QToolButton*>(toolbar_->widgetForAction(a)); button && button->toolButtonStyle() == Qt::ToolButtonTextOnly)
-                button->setText(QStringLiteral("1:1"));
-        }
     }
+    styleToolButtons();
     const bool available = !document_.current.isNull() && !loading_ && !busy_;
     const bool editable = available && !document_.limited && !movie_;
     for (auto* action : editActions_) action->setEnabled(editable);
     for (auto* action : navigationActions_) action->setEnabled(!busy_);
+    const int row = model_->indexOf(document_.path);
+    previousAction_->setEnabled(!busy_ && row > 0);
+    nextAction_->setEnabled(!busy_ && row >= 0 && row + 1 < model_->rowCount());
     saveAction_->setEnabled(available && !document_.limited && !movie_);
     copyAction_->setEnabled(available && !document_.limited);
     convertAction_->setEnabled(available && !document_.limited);
@@ -541,12 +868,19 @@ void ImageBrowserWindow::updateActions() {
     playAction_->setIcon(ThemeIcon::icon(movie_ && movie_->state() == QMovie::Running ? "browser-pause.png" : "browser-play.png"));
     frameAction_->setVisible(movie_ != nullptr);
     frameAction_->setEnabled(movie_ && available);
+    zoomInAction_->setEnabled(available);
+    zoomOutAction_->setEnabled(available);
+    fullscreenAction_->setChecked(isFullScreen());
     cropAction_->setChecked(canvas_->cropping());
     applyCropAction_->setVisible(canvas_->cropping());
     cancelCropAction_->setVisible(canvas_->cropping());
     applyCropAction_->setEnabled(editable);
     cancelCropAction_->setEnabled(!busy_);
     list_->setEnabled(!busy_ && !scanning_);
+    syncControlButtons();
+    // 条件按钮（应用裁剪 / 播放）刚显隐会改变两端的尺寸，重排一次再定位标题。
+    layoutControlBar();
+    updateOverlays();
     updateStatus();
 }
 bool ImageBrowserWindow::discardOrSave() {
@@ -625,7 +959,7 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
     document_.load(path, saved);
     animationSource_ = false;
     displayedSize_ = image.size();
-    statusBar()->showMessage(tr("图片已保存"), 3000);
+    showStatus(tr("图片已保存"), 3000);
     if (refreshListing) {
         if (QFileInfo(path).absolutePath() != directory_) openDirectory(QFileInfo(path).absolutePath(), path);
         else { loadImage(path); refresh(); }
@@ -660,12 +994,18 @@ void ImageBrowserWindow::showContextMenu(const QPoint& globalPosition) {
     updateActions();
     QMenu menu(this);
     for (auto* action : toolbar_->actions()) {
+        if (action == spacerAction_) continue;   // 弹性空档只是布局占位，不是菜单项
         if (action->isSeparator()) menu.addSeparator();
         else if (action->menu()) {
             menu.addSeparator();
             menu.addActions(action->menu()->actions());
         } else if (action->isVisible()) menu.addAction(action);
     }
+    // 编辑工具已经搬到底部胶囊里，右键菜单要把它们补回来。
+    menu.addSeparator();
+    for (auto* action : std::as_const(editActions_)) if (action->isVisible()) menu.addAction(action);
+    for (auto* action : {undoAction_, redoAction_, resetAction_, copyAction_, saveAction_})
+        if (action->isVisible()) menu.addAction(action);
     menu.exec(globalPosition);
 }
 void ImageBrowserWindow::contextMenuEvent(QContextMenuEvent* event) {
@@ -684,19 +1024,19 @@ void ImageBrowserWindow::renderDocument(ImageDocument candidate) {
     canvas_->setCropping(false);
     const quint64 version = ++imageVersion_;
     updateActions();
-    statusBar()->showMessage(tr("正在处理图片…"));
+    showStatus(tr("正在处理图片…"));
     loader_->run(this, [base = candidate.original, operations = candidate.operations, count = candidate.position] {
         return ImageDocument::render(base, operations, count);
     }, [this, candidate, version](const ImageResult& result) mutable {
         if (version != imageVersion_) return;
         busy_ = false;
-        if (!result.error.isEmpty()) statusBar()->showMessage(result.error);
+        if (!result.error.isEmpty()) showStatus(result.error);
         else {
             candidate.current = result.image;
             document_ = candidate;
             displayedSize_ = result.image.size();
             canvas_->setImage(result.image, true);
-            statusBar()->clearMessage();
+            showStatus(QString());
         }
         updateActions();
     });
@@ -757,10 +1097,10 @@ void ImageBrowserWindow::dropEvent(QDropEvent* event) {
             directory = info.absolutePath(); selection = info.absoluteFilePath(); break;
         }
     }
-    if (directory.isEmpty()) { statusBar()->showMessage(tr("请拖入本地图片或目录。"), 4000); return; }
+    if (directory.isEmpty()) { showStatus(tr("请拖入本地图片或目录。"), 4000); return; }
     if (!discardOrSave()) return;
     openDirectory(directory, selection);
-    if (urls.size() > 1) statusBar()->showMessage(tr("已打开第一个有效项目，忽略了 %1 项。").arg(urls.size() - 1), 6000);
+    if (urls.size() > 1) showStatus(tr("已打开第一个有效项目，忽略了 %1 项。").arg(urls.size() - 1), 6000);
     event->acceptProposedAction();
 }
 void ImageBrowserWindow::hideEvent(QHideEvent* event) {
@@ -791,11 +1131,18 @@ void ImageBrowserWindow::changeEvent(QEvent* event) {
     if (event->type() == QEvent::PaletteChange && details_) { updateActions(); update(); list_->viewport()->update(); }
 }
 bool ImageBrowserWindow::eventFilter(QObject* watched, QEvent* event) {
-    if (watched == details_ && event->type() == QEvent::Resize)
-        QTimer::singleShot(0, this, &ImageBrowserWindow::updateStatus);
-    if (watched == list_->viewport() && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
-        thumbnailsTimer_.start(); updateStatus();
+    if (watched == list_->viewport() && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+        thumbnailsTimer_.start();
+    if (watched == canvas_ && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+        positionOverlays(); updateOverlays();
     }
+    if (watched == controlBar_ && event->type() == QEvent::Resize) layoutControlBar();
+    if (watched == toolbar_ && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+        QTimer::singleShot(0, this, &ImageBrowserWindow::positionTitle);
+    // 悬停显形：Enter / Leave 都要判一次，且箭头自己也算「还在悬停」，否则指针碰到箭头会闪。
+    if ((watched == canvas_ || watched == overlayPrevious_ || watched == overlayNext_) &&
+        (event->type() == QEvent::Enter || event->type() == QEvent::Leave))
+        QTimer::singleShot(0, this, &ImageBrowserWindow::updateOverlays);
     return QMainWindow::eventFilter(watched, event);
 }
 } // namespace ImageBrowser

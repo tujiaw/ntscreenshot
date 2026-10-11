@@ -574,3 +574,56 @@ QPushButton#chatInputSendButton {
 QPushButton#chatInputSendButton:hover { background: @ACCENT_HOVER@; }
 QPushButton#chatInputSendButton:pressed { background: @ACCENT_PRESSED@; }
 QPushButton#chatInputSendButton:disabled { background: @SURFACE_SUBTLE@; }
+
+/* ===== 图片浏览窗口：上下两段式 ===== */
+/* 顶栏自己的样式表只作用在 QToolBar 本身（见 ImageBrowserWindow::styleToolButtons），
+   按钮一律在这里描述；主按钮要靠 [uiRole="primary"] 提高特异性才压得住下面那条 QToolButton。 */
+QToolBar#ImageBrowserToolBar QToolButton {
+    background: transparent; border: none; border-radius: 6px; padding: 0px 6px; color: @TEXT@;
+}
+QToolBar#ImageBrowserToolBar QToolButton:hover { background: @SURFACE_SUBTLE@; }
+QToolBar#ImageBrowserToolBar QToolButton:pressed { background: @BORDER@; }
+QToolBar#ImageBrowserToolBar QToolButton:checked { background: @ACCENT_SUBTLE@; color: @ACCENT@; }
+QToolBar#ImageBrowserToolBar QToolButton:disabled { color: @TEXT_DISABLED@; }
+QToolBar#ImageBrowserToolBar QToolButton[uiRole="primary"] { background: @ACCENT@; color: #FFFFFF; }
+QToolBar#ImageBrowserToolBar QToolButton[uiRole="primary"]:hover { background: @ACCENT_HOVER@; }
+QToolBar#ImageBrowserToolBar QToolButton[uiRole="primary"]:pressed { background: @ACCENT_PRESSED@; }
+QToolBar#ImageBrowserToolBar QToolButton[uiRole="primary"]:checked { background: @ACCENT_PRESSED@; }
+QToolBar#ImageBrowserToolBar QToolButton[uiRole="primary"]:disabled { background: @SURFACE_SUBTLE@; color: @TEXT_DISABLED@; }
+QToolBar#ImageBrowserToolBar QToolButton::menu-indicator { image: none; width: 0px; }
+QToolBar#ImageBrowserToolBar::separator { background: @BORDER@; width: 1px; margin: 7px 4px; }
+QLabel#browserTitleLabel { background: transparent; color: @TEXT@; }
+
+/* 底栏。字号由窗口级样式表统一给（applyDpi），这里只描述颜色，避免被那条祖先规则压掉。 */
+QStatusBar { background: @SURFACE@; border: none; border-top: 1px solid @BORDER@; }
+QStatusBar::item { border: none; }
+QWidget#ImageBrowserWindow QLabel#browserImageCounter,
+QWidget#ImageBrowserWindow QLabel#browserImageDetails,
+QWidget#ImageBrowserWindow QLabel#browserStatusMessage { background: transparent; color: @TEXT_SECONDARY@; }
+QWidget#browserControlLeft QToolButton,
+QWidget#browserControlRight QToolButton { background: transparent; border: none; border-radius: 6px; padding: 0px; color: @TEXT_SECONDARY@; }
+QWidget#browserControlLeft QToolButton:hover,
+QWidget#browserControlRight QToolButton:hover { background: @SURFACE_SUBTLE@; color: @TEXT@; }
+QWidget#browserControlLeft QToolButton:pressed,
+QWidget#browserControlRight QToolButton:pressed { background: @BORDER@; }
+QWidget#browserControlLeft QToolButton:checked,
+QWidget#browserControlRight QToolButton:checked { background: @ACCENT_SUBTLE@; }
+QWidget#browserControlLeft QToolButton:disabled,
+QWidget#browserControlRight QToolButton:disabled { background: transparent; }
+
+/* 中间工具胶囊 */
+QFrame#browserToolPill { background: @SURFACE_SUBTLE@; border: 1px solid @BORDER@; border-radius: 12px; }
+QFrame#browserToolPill QToolButton { background: transparent; border: none; border-radius: 6px; padding: 0px; color: @TEXT@; }
+QFrame#browserToolPill QToolButton:hover { background: @SURFACE_RAISED@; }
+QFrame#browserToolPill QToolButton:pressed { background: @BORDER@; }
+QFrame#browserToolPill QToolButton:checked { background: @ACCENT_SUBTLE@; }
+QFrame#browserToolPill QToolButton:disabled { background: transparent; }
+QFrame#browserToolPillSeparator { background: @BORDER@; border: none; }
+
+/* 画布上悬停才出现的翻页箭头，以及右下的缩放档位 */
+QToolButton#browserOverlayButton { background: rgba(0, 0, 0, 140); border: none; border-radius: 10px; }
+QToolButton#browserOverlayButton:hover { background: rgba(0, 0, 0, 205); }
+QToolButton#browserOverlayButton:pressed { background: rgba(0, 0, 0, 230); }
+QToolButton#browserZoomButton { background: @SURFACE_SUBTLE@; border: 1px solid @BORDER@; border-radius: 8px; padding: 0px 4px; color: @TEXT@; }
+QToolButton#browserZoomButton:hover { background: @SURFACE_RAISED@; }
+QToolButton#browserZoomButton::menu-indicator { image: url(:/darkstyle/chevron_down.png); subcontrol-position: right center; width: 10px; }

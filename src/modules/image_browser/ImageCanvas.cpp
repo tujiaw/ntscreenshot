@@ -43,6 +43,7 @@ void ImageCanvas::zoomAt(double scale, QPointF anchor) {
     update();
 }
 void ImageCanvas::actualSize() { zoomAt(1, rect().center()); }
+void ImageCanvas::setZoom(double scale) { zoomAt(scale, rect().center()); }
 void ImageCanvas::setCropping(bool enabled) {
     cropping_ = enabled && !image_.isNull();
     crop_ = {};

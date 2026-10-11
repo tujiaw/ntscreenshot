@@ -12,6 +12,7 @@ public:
     void setMessage(const QString& message);
     void fit(bool allowUpscale = true);
     void actualSize();
+    void setZoom(double scale);
     double zoom() const { return scale_; }
     void setCropping(bool enabled);
     bool cropping() const { return cropping_; }
