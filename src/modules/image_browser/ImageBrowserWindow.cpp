@@ -152,9 +152,17 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         const QString directory = QFileDialog::getExistingDirectory(this, tr("选择目录"), directory_);
         if (!directory.isEmpty() && discardOrSave()) openDirectory(directory);
     });
-    navigationActions_ << action(tr("截图目录"), "browser-home.png", {}, [this] {
+    // 「截图目录」不占顶栏位置，但功能保留：走窗口级 action，右键菜单里仍能进入。
+    screenshotDirectoryAction_ = new QAction(ThemeIcon::icon("browser-home.png"), tr("截图目录"), this);
+    if (screenshotDirectoryAction_->icon().isNull())
+        screenshotDirectoryAction_->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
+    screenshotDirectoryAction_->setProperty("browserIcon", "browser-home.png");
+    screenshotDirectoryAction_->setToolTip(tr("截图目录"));
+    connect(screenshotDirectoryAction_, &QAction::triggered, this, [this] {
         if (discardOrSave()) screenshotDirectory();
     });
+    addAction(screenshotDirectoryAction_);
+    navigationActions_ << screenshotDirectoryAction_;
     navigationActions_ << action(tr("刷新"), "browser-refresh.png", QKeySequence("Ctrl+R"), [this] { refresh(); });
     for (auto* a : std::as_const(navigationActions_)) barButton(a, a->text());
     // 弹性空档把右侧操作推到工具栏远端，它的几何区域同时就是居中文件名可用的横向区间。
@@ -1001,6 +1009,8 @@ void ImageBrowserWindow::showContextMenu(const QPoint& globalPosition) {
             menu.addActions(action->menu()->actions());
         } else if (action->isVisible()) menu.addAction(action);
     }
+    // 「截图目录」已从顶栏按钮移到窗口级 action，右键菜单要把这一条补回来。
+    menu.addAction(screenshotDirectoryAction_);
     // 编辑工具已经搬到底部胶囊里，右键菜单要把它们补回来。
     menu.addSeparator();
     for (auto* action : std::as_const(editActions_)) if (action->isVisible()) menu.addAction(action);

@@ -121,6 +121,7 @@ private:
     QAction* fullscreenAction_ = nullptr;
     QAction* exitFullscreenAction_ = nullptr;
     QAction* sidebarAction_ = nullptr;
+    QAction* screenshotDirectoryAction_ = nullptr;
     QAction* previousAction_ = nullptr;
     QAction* nextAction_ = nullptr;
     QAction* fitAction_ = nullptr;
