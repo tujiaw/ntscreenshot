@@ -10,6 +10,9 @@
 #include <QImageWriter>
 #include <QMovie>
 #include <QPainter>
+#include <QPdfWriter>
+#include <QPageSize>
+#include <QPageLayout>
 #include <QSaveFile>
 #include <QPainterPath>
 #include <cmath>
@@ -179,7 +182,7 @@ ImageResult ImageDocument::render(const QImage& original,
                 case EditOperation::FlipVertical: cv::flip(input, output, 0); break;
                 case EditOperation::Resize:
                     if (!operation.size.isValid() || pixels(operation.size) > MaxEditablePixels) {
-                        result.error = message("图片尺寸超过 4000 万像素的编辑上限。");
+                        result.error = message("图片尺寸超过 1 亿像素的编辑上限。");
                         return result;
                     }
                     // Premultiplication avoids dark/colored fringes around transparent pixels.
@@ -214,7 +217,7 @@ ImageResult ImageDocument::readFrame(const QString& path, int frame) {
         QImageReader reader(path);
         reader.setAutoTransform(true);
         if (pixels(reader.size()) > MaxEditablePixels) {
-            result.error = message("图片尺寸超过 4000 万像素的编辑上限。");
+            result.error = message("图片尺寸超过 1 亿像素的编辑上限。");
             return result;
         }
         if (reader.jumpToImage(frame)) result.image = reader.read();
@@ -233,28 +236,84 @@ ImageResult ImageDocument::readFrame(const QString& path, int frame) {
 }
 
 SaveResult ImageDocument::save(const QString& path, const QImage& image, const QByteArray& format,
-                             const QDateTime& expectedModified, qint64 expectedSize) {
+                             const QDateTime& expectedModified, qint64 expectedSize,
+                             const ImageConversionOptions& options) {
     SaveResult result;
     try {
         if (image.isNull()) { result.error = message("没有可保存的图片。"); return result; }
-        if (format != "png" && format != "jpeg" && format != "jpg" && format != "bmp" && format != "webp") {
+        if (format != "png" && format != "jpeg" && format != "jpg" && format != "bmp" && format != "webp" && format != "pdf") {
             result.error = message("图片保存失败或内存不足。");
             return result;
         }
         QImage output = image;
+        if (options.outputSize != QSize()) {
+            if (options.outputSize.isEmpty() || pixels(options.outputSize) > MaxEditablePixels) {
+                result.error = message("输出尺寸不能超过 1 亿像素。"); return result;
+            }
+            output = image.scaled(options.outputSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            if (output.isNull()) throw std::bad_alloc();
+        }
+        if (options.grayscale) {
+            output = output.convertToFormat(QImage::Format_ARGB32);
+            if (output.isNull()) throw std::bad_alloc();
+            for (int y = 0; y < output.height(); ++y) {
+                auto* row = reinterpret_cast<QRgb*>(output.scanLine(y));
+                for (int x = 0; x < output.width(); ++x) {
+                    const int gray = qGray(row[x]);
+                    row[x] = qRgba(gray, gray, gray, qAlpha(row[x]));
+                }
+            }
+        }
         if (format == "jpeg" || format == "jpg" || format == "bmp") {
-            output = QImage(image.size(), QImage::Format_RGB32);
+            const QImage transparent = output;
+            output = QImage(transparent.size(), QImage::Format_RGB32);
             if (output.isNull()) throw std::bad_alloc();
             output.fill(Qt::white);
             QPainter painter(&output);
-            painter.drawImage(0, 0, image);
+            painter.drawImage(0, 0, transparent);
         }
         QSaveFile file(path);
         file.setDirectWriteFallback(false);
         if (!file.open(QIODevice::WriteOnly)) { result.error = file.errorString(); return result; }
-        QImageWriter writer(&file, format);
-        if (format == "jpeg" || format == "jpg" || format == "webp") writer.setQuality(95);
-        if (!writer.write(output)) { result.error = writer.errorString(); return result; }
+        if (format == "pdf") {
+            QPdfWriter writer(&file);
+            writer.setResolution(96);
+            writer.setCreator(QStringLiteral("ntscreenshot"));
+            writer.setTitle(QFileInfo(path).completeBaseName());
+            QPageSize paper(QPageSize::A4);
+            auto orientation = QPageLayout::Portrait;
+            QMarginsF margins;
+            if (options.pdfA4) {
+                if (options.pdfMarginMm < 0 || options.pdfMarginMm > 50) {
+                    result.error = message("PDF 页面设置无效。"); return result;
+                }
+                const int margin = options.pdfMarginMm;
+                margins = QMarginsF(margin, margin, margin, margin);
+                if (options.pdfOrientation == 2 || (options.pdfOrientation == 0 && output.width() > output.height()))
+                    orientation = QPageLayout::Landscape;
+            } else {
+                // Keep long screenshots within the standard PDF page-size limit.
+                const double scale = qMin(72.0 / 96.0, 14400.0 / qMax(output.width(), output.height()));
+                paper = QPageSize(QSizeF(qMax(1.0, output.width() * scale), qMax(1.0, output.height() * scale)),
+                    QPageSize::Point, QString(), QPageSize::ExactMatch);
+            }
+            if (!writer.setPageLayout(QPageLayout(paper, orientation, margins, QPageLayout::Millimeter))) {
+                result.error = message("PDF 页面设置无效。"); return result;
+            }
+            QPainter painter;
+            if (!painter.begin(&writer)) { result.error = message("PDF 保存失败。"); return result; }
+            const QRectF page(0, 0, writer.width(), writer.height());
+            const QSizeF size = QSizeF(output.size()).scaled(page.size(), Qt::KeepAspectRatio);
+            const QRectF target(QPointF((page.width() - size.width()) / 2, (page.height() - size.height()) / 2), size);
+            painter.fillRect(page, Qt::white);
+            painter.drawImage(target, output);
+            if (!painter.end()) { result.error = message("PDF 保存失败。"); return result; }
+        } else {
+            QImageWriter writer(&file, format);
+            if (format == "jpeg" || format == "jpg" || format == "webp") writer.setQuality(qBound(1, options.quality, 100));
+            if (format == "png") writer.setCompression(qBound(0, options.pngCompression, 100));
+            if (!writer.write(output)) { result.error = writer.errorString(); return result; }
+        }
         if (expectedModified.isValid()) {
             const QFileInfo source(path);
             if (!source.exists() || source.lastModified() != expectedModified || source.size() != expectedSize) {
@@ -263,6 +322,7 @@ SaveResult ImageDocument::save(const QString& path, const QImage& image, const Q
             }
         }
         result.success = file.commit();
+        if (result.success && format != "pdf") result.image = output;
         if (!result.success) result.error = file.errorString();
     } catch (const std::exception&) {
         result.error = message("图片保存失败或内存不足。");

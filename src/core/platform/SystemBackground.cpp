@@ -10,6 +10,7 @@
 #endif
 
 #include "SystemBackground.h"
+#include "core/imaging/ImageLimits.h"
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QColorSpace>
@@ -82,7 +83,7 @@ Result checkAvailability(Target target) {
 
 Result prepare(const QImage& image, const QString& cacheDirectory) {
     Result result;
-    if (image.isNull() || qint64(image.width()) * image.height() > 40000000) {
+    if (image.isNull() || qint64(image.width()) * image.height() > ImageLimits::MaxEditablePixels) {
         result.error = message("没有可用的背景图片。"); return result;
     }
     QImage opaque(image.size(), QImage::Format_RGB32);

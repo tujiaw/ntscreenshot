@@ -1,6 +1,7 @@
 #include "ImageBrowserWindow.h"
 #include "ImageCanvas.h"
 #include "ImageEditorPanel.h"
+#include "ImageConversionDialog.h"
 #include "ImageDirectoryModel.h"
 #include "ImageLoader.h"
 #include "core/platform/Util.h"
@@ -824,7 +825,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
         animationSource_ = result.animated;
         canvas_->setImage(result.image, true);
         if (!result.error.isEmpty()) canvas_->setMessage(tr("无法打开图片：%1").arg(result.error));
-        if (result.limited) showStatus(tr("受限预览：超过 4000 万像素的图片不支持编辑或复制。"));
+        if (result.limited) showStatus(tr("受限预览：超过 1 亿像素的图片不支持编辑或复制。"));
         if (result.animated && result.animationSupported && !result.limited) {
             QSize playbackSize = result.image.size();
             if (playbackSize.width() > 1600 || playbackSize.height() > 1600)
@@ -984,7 +985,8 @@ bool ImageBrowserWindow::discardOrSave() {
     if (dialog.clickedButton() == saveButton) return save(false, false);
     return dialog.clickedButton() == discardButton;
 }
-bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteArray& requestedFormat) {
+bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteArray& requestedFormat,
+                              const ImageConversionOptions& options) {
     if (busy_ || loading_ || document_.current.isNull() || document_.limited || movie_) return false;
     QString path = document_.path;
     QByteArray format = requestedFormat.isEmpty() ? QByteArray("png") : requestedFormat;
@@ -1031,8 +1033,8 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
     const QImage image = document_.current;
     const QDateTime expectedModified = overwrite ? document_.modified : QDateTime();
     const qint64 expectedSize = document_.fileSize;
-    loader_->run(&progress, [path, image, format, expectedModified, expectedSize] {
-        return ImageDocument::save(path, image, format, expectedModified, expectedSize);
+    loader_->run(&progress, [path, image, format, expectedModified, expectedSize, options] {
+        return ImageDocument::save(path, image, format, expectedModified, expectedSize, options);
     },
                  [&progress, result](const SaveResult& saved) { *result = saved; progress.accept(); });
     progress.exec();
@@ -1042,13 +1044,19 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
         updateActions();
         return false;
     }
+    if (format == "pdf") {
+        // PDF is an export: retain the source image, selection and undo history.
+        showStatus(tr("PDF 已保存"), 3000);
+        updateActions();
+        return true;
+    }
     ImageResult saved;
-    saved.image = image;
+    saved.image = result->image;
     saved.modified = QFileInfo(path).lastModified();
     saved.fileSize = QFileInfo(path).size();
     document_.load(path, saved);
     animationSource_ = false;
-    displayedSize_ = image.size();
+    displayedSize_ = saved.image.size();
     showStatus(tr("图片已保存"), 3000);
     if (refreshListing) {
         if (QFileInfo(path).absolutePath() != directory_) openDirectory(QFileInfo(path).absolutePath(), path);
@@ -1080,20 +1088,8 @@ void ImageBrowserWindow::convertFormat() {
         freezeFrame([this] { convertFormat(); });
         return;
     }
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("格式转换"));
-    auto* form = new QFormLayout(&dialog);
-    auto* formats = new QComboBox(&dialog);
-    const auto supported = QImageWriter::supportedImageFormats();
-    for (const QByteArray& format : {QByteArray("png"), QByteArray("jpeg"), QByteArray("bmp"), QByteArray("webp")}) {
-        if (supported.contains(format)) formats->addItem(QString::fromLatin1(format).toUpper(), format);
-    }
-    form->addRow(tr("目标格式"), formats);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    form->addRow(buttons);
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    if (dialog.exec() && formats->currentIndex() >= 0) save(false, true, formats->currentData().toByteArray());
+    ImageConversionDialog dialog(document_.current.size(), this);
+    if (dialog.exec() == QDialog::Accepted) save(false, true, dialog.format(), dialog.options());
 }
 void ImageBrowserWindow::showContextMenu(const QPoint& globalPosition) {
     updateActions();
@@ -1154,18 +1150,18 @@ void ImageBrowserWindow::resizeImage() {
     auto* form = new QFormLayout(&dialog);
     auto* width = new QSpinBox(&dialog);
     auto* height = new QSpinBox(&dialog);
-    width->setRange(1, 40000000);
-    height->setRange(1, 40000000);
+    width->setRange(1, int(MaxEditablePixels));
+    height->setRange(1, int(MaxEditablePixels));
     width->setValue(document_.current.width());
     height->setValue(document_.current.height());
     auto* lock = new QCheckBox(tr("锁定宽高比"), &dialog);
     lock->setChecked(true);
     const double ratio = double(document_.current.width()) / document_.current.height();
     connect(width, &QSpinBox::valueChanged, &dialog, [height, lock, ratio](int value) {
-        if (lock->isChecked()) { const QSignalBlocker blocker(height); height->setValue(qRound(qBound(1.0, value / ratio, 40000000.0))); }
+        if (lock->isChecked()) { const QSignalBlocker blocker(height); height->setValue(qRound(qBound(1.0, value / ratio, double(MaxEditablePixels)))); }
     });
     connect(height, &QSpinBox::valueChanged, &dialog, [width, lock, ratio](int value) {
-        if (lock->isChecked()) { const QSignalBlocker blocker(width); width->setValue(qRound(qBound(1.0, value * ratio, 40000000.0))); }
+        if (lock->isChecked()) { const QSignalBlocker blocker(width); width->setValue(qRound(qBound(1.0, value * ratio, double(MaxEditablePixels)))); }
     });
     form->addRow(tr("宽度（像素）"), width);
     form->addRow(tr("高度（像素）"), height);

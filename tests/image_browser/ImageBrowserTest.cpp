@@ -4,6 +4,7 @@
 #include "modules/image_browser/ImageCanvas.h"
 #include "modules/image_browser/ImageBrowserWindow.h"
 #include "modules/image_browser/ImageBrowserModule.h"
+#include "modules/image_browser/ImageConversionDialog.h"
 #include "core/platform/Util.h"
 #include "core/platform/SystemBackground.h"
 #include "core/settings/SettingModel.h"
@@ -13,6 +14,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDir>
 #include <QDebug>
@@ -189,7 +191,7 @@ int runImageBrowserTest(QApplication& app) {
     result = ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(160, 90)}}, 1);
     check(result.image.size() == QSize(160, 90) && result.image.hasAlphaChannel() && qAlpha(result.image.pixel(0, 0)) == 128, "resize preserves alpha");
     check(!ImageDocument::render(source, {{EditOperation::Crop, QRect(-1, 0, 2, 2), {}}}, 1).error.isEmpty(), "reject out of bounds crop");
-    check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(10000, 10000)}}, 1).error.isEmpty(), "resize pixel budget");
+    check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(10000, 10001)}}, 1).error.isEmpty(), "resize pixel budget");
     EditOperation filter; filter.kind = EditOperation::Filter;
     const auto gray = ImageDocument::render(source, {filter}, 1).image;
     check(qRed(gray.pixel(0, 0)) == qGreen(gray.pixel(0, 0)) && qAlpha(gray.pixel(0, 0)) == 128, "grayscale preserves alpha");
@@ -237,6 +239,98 @@ int runImageBrowserTest(QApplication& app) {
     check(ImageDocument::save(bitmap, transparent, "bmp").success, "BMP format conversion");
     check(ImageDocument::read(bitmap).image.pixelColor(10, 10) == QColor(Qt::white), "BMP white alpha background");
     check(ImageDocument::suggestedPath(path, "jpeg").endsWith("-edited.jpg"), "conversion suggests matching extension");
+
+    {
+        // 72 MP crosses both the previous pixel cap and Qt's usual 256 MiB
+        // decoder budget. Release the fixture before decoding to bound test memory.
+        const QString largePath = directory.filePath("nested/72mp.png");
+        QImage large(9000, 8000, QImage::Format_RGB32);
+        check(!large.isNull(), "large image fixture allocation");
+        large.fill(Qt::blue);
+        check(large.save(largePath), "save 72 megapixel fixture");
+        large = {};
+        const auto decoded = ImageDocument::read(largePath);
+        check(!decoded.limited && decoded.error.isEmpty() && decoded.image.size() == QSize(9000, 8000),
+            "72 megapixel image decodes at full resolution");
+        EditOperation smallCrop; smallCrop.kind = EditOperation::Crop; smallCrop.rect = QRect(0, 0, 32, 32);
+        const auto cropped = ImageDocument::render(decoded.image, {smallCrop}, 1);
+        check(cropped.error.isEmpty() && cropped.image.size() == QSize(32, 32) && cropped.image.pixelColor(10, 10) == QColor(Qt::blue),
+            "image above previous limit can be edited");
+    }
+    {
+        // A one-bit fixture exercises the upper boundary without allocating a
+        // full 400 MiB RGBA source just to test the restricted-preview branch.
+        const QString oversizedPath = directory.filePath("nested/over100mp.png");
+        QImage oversized(10000, 10001, QImage::Format_Mono);
+        oversized.setColorTable({qRgb(255, 255, 255), qRgb(0, 0, 0)}); oversized.fill(0);
+        check(oversized.save(oversizedPath), "save image above new pixel cap");
+        oversized = {};
+        const auto preview = ImageDocument::read(oversizedPath);
+        check(preview.limited && !preview.image.isNull() && preview.image.width() <= 2048 && preview.image.height() <= 2048,
+            "images above 100 megapixels retain bounded preview");
+    }
+
+    auto contents = [](const QString& fileName) { QFile file(fileName); file.open(QIODevice::ReadOnly); return file.readAll(); };
+    ImageConversionOptions outputOptions;
+    outputOptions.outputSize = QSize(160, 90); outputOptions.grayscale = true;
+    const QString grayPath = directory.filePath("nested/grayscale.png");
+    check(ImageDocument::save(grayPath, source, "png", {}, -1, outputOptions).success, "resize and grayscale conversion");
+    const QImage grayImage(grayPath);
+    const QColor grayPixel = grayImage.pixelColor(10, 10);
+    check(grayImage.size() == outputOptions.outputSize && grayPixel.red() == grayPixel.green() &&
+        grayPixel.green() == grayPixel.blue() && grayPixel.alpha() == 128, "conversion size, grayscale and alpha preserved");
+    outputOptions = {}; outputOptions.pngCompression = 0;
+    const QString fastPng = directory.filePath("nested/fast.png");
+    const QString smallPng = directory.filePath("nested/small.png");
+    check(ImageDocument::save(fastPng, source, "png", {}, -1, outputOptions).success, "uncompressed PNG conversion");
+    outputOptions.pngCompression = 100;
+    check(ImageDocument::save(smallPng, source, "png", {}, -1, outputOptions).success &&
+        QFileInfo(smallPng).size() < QFileInfo(fastPng).size() && QImage(smallPng) == source, "PNG compression changes size without losing pixels");
+    const QString lowJpeg = directory.filePath("nested/low.jpg");
+    const QString highJpeg = directory.filePath("nested/high.jpg");
+    outputOptions = {}; outputOptions.quality = 10;
+    check(ImageDocument::save(lowJpeg, source, "jpeg", {}, -1, outputOptions).success, "low JPEG quality conversion");
+    outputOptions.quality = 100;
+    check(ImageDocument::save(highJpeg, source, "jpeg", {}, -1, outputOptions).success &&
+        QFileInfo(highJpeg).size() > QFileInfo(lowJpeg).size(), "JPEG quality changes encoded output");
+    const QString pdfPath = directory.filePath("nested/image.pdf");
+    const QString a4Path = directory.filePath("nested/a4.pdf");
+    check(ImageDocument::save(pdfPath, source, "pdf").success, "atomic PDF export");
+    const QByteArray pdfData = contents(pdfPath);
+    check(pdfData.startsWith("%PDF-") && pdfData.trimmed().endsWith("%%EOF") && pdfData.contains("/MediaBox"), "PDF has header, page and completed trailer");
+    outputOptions = {}; outputOptions.pdfA4 = true; outputOptions.pdfOrientation = 2; outputOptions.pdfMarginMm = 12;
+    check(ImageDocument::save(a4Path, source, "pdf", {}, -1, outputOptions).success, "landscape A4 PDF with margins");
+    outputOptions.pdfMarginMm = 51;
+    check(!ImageDocument::save(pdfPath, source, "pdf", {}, -1, outputOptions).success && contents(pdfPath) == pdfData,
+        "failed PDF export preserves existing file");
+    outputOptions = {}; outputOptions.outputSize = QSize(int(MaxEditablePixels), 2);
+    check(!ImageDocument::save(grayPath, source, "png", {}, -1, outputOptions).success && QImage(grayPath) == grayImage,
+        "oversized conversion rejected before replacing file");
+    ImageConversionDialog conversionDialog(source.size());
+    check(MaxEditablePixels == 100000000 && conversionDialog.findChild<QSpinBox*>("conversionWidth")->maximum() == MaxEditablePixels,
+        "conversion and editing share the 100 megapixel limit");
+    auto* conversionFormat = conversionDialog.findChild<QComboBox*>("conversionFormat");
+    conversionFormat->setCurrentIndex(conversionFormat->findData(QByteArray("pdf")));
+    check(!conversionDialog.findChild<QSpinBox*>("conversionQuality")->isVisibleTo(&conversionDialog) &&
+        conversionDialog.findChild<QComboBox*>("conversionPaper")->isVisibleTo(&conversionDialog), "PDF exposes page settings instead of image quality");
+    conversionDialog.findChild<QComboBox*>("conversionPaper")->setCurrentIndex(1);
+    conversionDialog.findChild<QComboBox*>("conversionOrientation")->setCurrentIndex(2);
+    conversionDialog.findChild<QSpinBox*>("conversionMargin")->setValue(12);
+    conversionDialog.findChild<QCheckBox*>("conversionResize")->setChecked(true);
+    conversionDialog.findChild<QSpinBox*>("conversionWidth")->setValue(160);
+    check(conversionDialog.options().outputSize == QSize(160, 90) && conversionDialog.options().pdfA4 &&
+        conversionDialog.options().pdfOrientation == 2 && conversionDialog.options().pdfMarginMm == 12,
+        "conversion dialog collects settings and locks aspect ratio");
+    const QString conversionQa = qEnvironmentVariable("NTSCREENSHOT_CONVERSION_QA_DIR");
+    if (!conversionQa.isEmpty()) {
+        QDir().mkpath(conversionQa);
+        QFile::copy(pdfPath, QDir(conversionQa).filePath("image.pdf"));
+        QFile::copy(a4Path, QDir(conversionQa).filePath("a4.pdf"));
+        source.save(QDir(conversionQa).filePath("source.png"));
+        conversionDialog.show(); QCoreApplication::processEvents();
+        conversionDialog.grab().save(QDir(conversionQa).filePath("conversion-pdf.png"));
+        conversionDialog.hide();
+    }
 
     // Two-frame GIF with red and blue pixels, no additional codec dependencies.
     const QString gif = directory.filePath("animation.gif");
@@ -461,7 +555,7 @@ int runImageBrowserTest(QApplication& app) {
     QTimer::singleShot(0, [] {
         if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
             auto* formats = dialog->findChild<QComboBox*>();
-            check(formats && formats->findData(QByteArray("png")) >= 0 && formats->findData(QByteArray("bmp")) >= 0,
+            check(formats && formats->findData(QByteArray("png")) >= 0 && formats->findData(QByteArray("bmp")) >= 0 && formats->findData(QByteArray("pdf")) >= 0,
                   "converter offers installed output formats");
             dialog->reject();
         }
@@ -490,6 +584,24 @@ int runImageBrowserTest(QApplication& app) {
     check(waitUntil([&] { return !window->windowTitle().contains('*'); }), "undo returns to clean image");
     trigger(window, QStringLiteral("重做"));
     check(waitUntil([&] { return window->windowTitle().contains('*') && action(window, QStringLiteral("另存为"))->isEnabled(); }), "redo restores edit");
+    const QString uiPdf = directory.filePath("nested/ui-edited.pdf");
+    const QString titleBeforePdf = window->windowTitle();
+    QTimer pdfSteps;
+    pdfSteps.setInterval(10);
+    QObject::connect(&pdfSteps, &QTimer::timeout, &app, [&] {
+        auto* modal = QApplication::activeModalWidget();
+        if (auto* fileDialog = qobject_cast<QFileDialog*>(modal)) {
+            check(fileDialog->defaultSuffix() == "pdf" && fileDialog->nameFilters().first().contains("*.pdf"), "PDF save dialog suffix and filter");
+            fileDialog->selectFile(uiPdf); QMetaObject::invokeMethod(fileDialog, "accept", Qt::QueuedConnection);
+        } else if (auto* dialog = qobject_cast<ImageConversionDialog*>(modal)) {
+            auto* formats = dialog->findChild<QComboBox*>("conversionFormat");
+            formats->setCurrentIndex(formats->findData(QByteArray("pdf"))); dialog->accept();
+        }
+    });
+    pdfSteps.start(); trigger(window, QStringLiteral("格式转换")); pdfSteps.stop();
+    check(contents(uiPdf).startsWith("%PDF-") && window->windowTitle() == titleBeforePdf &&
+        action(window, QStringLiteral("撤销"))->isEnabled(), "PDF conversion exports edited image without losing source or undo history");
+    if (!conversionQa.isEmpty()) QFile::copy(uiPdf, QDir(conversionQa).filePath("ui-edited.pdf"));
     QTimer::singleShot(0, [] {
         if (auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget())) dialog->reject();
     });
@@ -656,7 +768,7 @@ int runImageBrowserTest(QApplication& app) {
         check(heartbeats > 0, "directory scan keeps event loop responsive");
         largeWindow->close(); waitUntil([&] { return largeWindow.isNull(); });
         {
-            QImage huge(8000, 5001, QImage::Format_RGB32); huge.fill(Qt::white);
+            QImage huge(10000, 10001, QImage::Format_RGB32); huge.fill(Qt::white);
             const QString hugePath = directory.filePath("huge.png"); huge.save(hugePath);
             huge = {};
             const auto preview = ImageDocument::read(hugePath);

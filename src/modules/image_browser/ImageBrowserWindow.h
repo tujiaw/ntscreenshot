@@ -48,7 +48,8 @@ private:
     void updateActions();
     void requestThumbnails();
     bool discardOrSave();
-    bool save(bool overwrite = false, bool refreshListing = true, const QByteArray& format = {});
+    bool save(bool overwrite = false, bool refreshListing = true, const QByteArray& format = {},
+              const ImageConversionOptions& options = {});
     void convertFormat();
     void setSystemBackground(bool lockScreen);
     void showContextMenu(const QPoint& globalPosition);

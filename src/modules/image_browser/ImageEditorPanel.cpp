@@ -146,7 +146,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     connect(resize, &QPushButton::clicked, this, [this] {
         const QSize size(resizeWidth_->value(), resizeHeight_->value());
         if (qint64(size.width()) * size.height() > MaxEditablePixels) {
-            showMessage(tr("图片尺寸超过 4000 万像素的编辑上限。")); return;
+            showMessage(tr("图片尺寸超过 1 亿像素的编辑上限。")); return;
         }
         if (size == imageSize_) return;
         EditOperation operation; operation.kind = EditOperation::Resize; operation.size = size;

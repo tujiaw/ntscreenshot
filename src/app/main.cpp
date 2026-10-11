@@ -14,9 +14,11 @@
 #include "core/runtime/RunGuard.h"
 #include "core/platform/Util.h"
 #include "core/runtime/LogHandler.h"
+#include "core/imaging/ImageLimits.h"
 #include "app/crash/MiniDump.h"
 
 #include <QIcon>
+#include <QImageReader>
 #include <QTimer>
 #include <QTranslator>
 #include <QSettings>
@@ -71,6 +73,10 @@ int main(int argc, char *argv[])
 
     qInfo() << "main: constructing QApplication...";
 	MyApplication a(argc, argv);
+    // Configure once on the main thread before any image-loading workers start.
+    // Preserve an explicit user override, including Qt's zero (unlimited) setting.
+    if (!qEnvironmentVariableIsSet("QT_IMAGEIO_MAXALLOC"))
+        QImageReader::setAllocationLimit(qMax(QImageReader::allocationLimit(), ImageLimits::DecodeAllocationMiB));
 #ifdef NT_BUILD_IMAGE_BROWSER_TEST
     if (imageBrowserTest) {
         qInstallMessageHandler(nullptr);

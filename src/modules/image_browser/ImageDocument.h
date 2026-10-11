@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ImageConversionOptions.h"
+#include "core/imaging/ImageLimits.h"
+
 #include <QDateTime>
 #include <QImage>
 #include <QRect>
@@ -10,7 +13,7 @@
 
 namespace ImageBrowser {
 
-constexpr qint64 MaxEditablePixels = 40000000;
+constexpr qint64 MaxEditablePixels = ImageLimits::MaxEditablePixels;
 
 struct EditOperation {
     enum Kind { Crop, RotateLeft, RotateRight, FlipHorizontal, FlipVertical, Resize,
@@ -43,6 +46,7 @@ struct ImageResult {
 struct SaveResult {
     bool success = false;
     QString error;
+    QImage image;
 };
 
 class ImageDocument {
@@ -67,7 +71,8 @@ public:
     static ImageResult render(const QImage& original,
                               const QVector<EditOperation>& operations, int count);
     static SaveResult save(const QString& path, const QImage& image, const QByteArray& format,
-                           const QDateTime& expectedModified = {}, qint64 expectedSize = -1);
+                           const QDateTime& expectedModified = {}, qint64 expectedSize = -1,
+                           const ImageConversionOptions& options = {});
     static QString suggestedPath(const QString& source, const QByteArray& format = "png");
     bool sourceUnchanged() const;
 };

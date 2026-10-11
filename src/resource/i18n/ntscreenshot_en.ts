@@ -2014,7 +2014,7 @@ Copied to clipboard</translation>
     <message><source>原文件已不在当前目录中，仍可另存图片副本。</source><translation>Source is no longer in this directory. You can still save a copy.</translation></message>
     <message><source>正在加载图片…</source><translation>Loading image...</translation></message>
     <message><source>无法打开图片：%1</source><translation>Cannot open image: %1</translation></message>
-    <message><source>受限预览：超过 4000 万像素的图片不支持编辑或复制。</source><translation>Preview only: images above 40 megapixels cannot be edited or copied.</translation></message>
+    <message><source>受限预览：超过 1 亿像素的图片不支持编辑或复制。</source><translation>Preview only: images above 100 megapixels cannot be edited or copied.</translation></message>
     <message><source>无法播放动图，当前显示静态帧。</source><translation>Animation playback unavailable. Showing a static frame.</translation></message>
     <message><source>当前图片插件不支持动图播放。</source><translation>Animation playback is not supported by the installed image plugin.</translation></message>
     <message><source>正在编辑静态帧，请另存为 PNG 或 JPEG 图片。</source><translation>Editing a static frame. Save as PNG or JPEG.</translation></message>
@@ -2031,6 +2031,7 @@ Copied to clipboard</translation>
     <message><source>JPEG 会将透明区域替换为白色，是否继续？</source><translation>JPEG replaces transparent areas with white. Continue?</translation></message>
     <message><source>保存失败</source><translation>Save failed</translation></message>
     <message><source>图片已保存</source><translation>Image saved</translation></message>
+    <message><source>PDF 已保存</source><translation>PDF saved</translation></message>
     <message><source>正在处理图片…</source><translation>Processing image...</translation></message>
     <message><source>锁定宽高比</source><translation>Keep aspect ratio</translation></message>
     <message><source>宽度（像素）</source><translation>Width (pixels)</translation></message>
@@ -2089,10 +2090,13 @@ Copied to clipboard</translation>
     <message><source>原文件已被外部修改，请将编辑结果另存为新文件。</source><translation>Source changed externally. Save your edits to a new file.</translation></message>
     <message><source>图片解码失败或内存不足。</source><translation>Image decoding failed or insufficient memory.</translation></message>
     <message><source>裁剪区域无效。</source><translation>Invalid crop area.</translation></message>
-    <message><source>图片尺寸超过 4000 万像素的编辑上限。</source><translation>Image size exceeds the 40 megapixel editing limit.</translation></message>
+    <message><source>图片尺寸超过 1 亿像素的编辑上限。</source><translation>Image size exceeds the 100 megapixel editing limit.</translation></message>
     <message><source>图片处理失败或内存不足。</source><translation>Image processing failed or insufficient memory.</translation></message>
     <message><source>没有可保存的图片。</source><translation>No image to save.</translation></message>
     <message><source>图片保存失败或内存不足。</source><translation>Image saving failed or insufficient memory.</translation></message>
+    <message><source>输出尺寸不能超过 1 亿像素。</source><translation>Output dimensions must not exceed 100 million pixels.</translation></message>
+    <message><source>PDF 页面设置无效。</source><translation>Invalid PDF page settings.</translation></message>
+    <message><source>PDF 保存失败。</source><translation>Failed to save PDF.</translation></message>
   </context>
   <context>
     <name>ImageBrowser::ImageEditorPanel</name>
@@ -2115,7 +2119,7 @@ Copied to clipboard</translation>
     <message><source>高度（像素）</source><translation>Height (pixels)</translation></message>
     <message><source>锁定宽高比</source><translation>Keep aspect ratio</translation></message>
     <message><source>应用尺寸</source><translation>Apply size</translation></message>
-    <message><source>图片尺寸超过 4000 万像素的编辑上限。</source><translation>Image size exceeds the 40 megapixel editing limit.</translation></message>
+    <message><source>图片尺寸超过 1 亿像素的编辑上限。</source><translation>Image size exceeds the 100 megapixel editing limit.</translation></message>
     <message><source>选择形状和样式，再在图片上拖动绘制区域。</source><translation>Choose a shape and style, then drag an area on the image.</translation></message>
     <message><source>矩形</source><translation>Rectangle</translation></message>
     <message><source>椭圆</source><translation>Ellipse</translation></message>
@@ -2167,4 +2171,30 @@ Copied to clipboard</translation>
     <message><source>当前系统不支持设置背景。</source><translation>Setting backgrounds is not supported on this system.</translation></message>
     <message><source>系统未能设置背景：%1（错误码 %2）。</source><translation>The system could not set the background: %1 (error %2).</translation></message>
   </context>
+<context>
+    <name>ImageBrowser::ImageConversionDialog</name>
+    <message><source>格式转换</source><translation>Convert format</translation></message>
+    <message><source>目标格式</source><translation>Output format</translation></message>
+    <message><source>调整输出尺寸</source><translation>Resize output</translation></message>
+    <message><source> 像素</source><translation> px</translation></message>
+    <message><source>宽度</source><translation>Width</translation></message>
+    <message><source>高度</source><translation>Height</translation></message>
+    <message><source>锁定宽高比</source><translation>Lock aspect ratio</translation></message>
+    <message><source>彩色</source><translation>Color</translation></message>
+    <message><source>灰度</source><translation>Grayscale</translation></message>
+    <message><source>色彩</source><translation>Color mode</translation></message>
+    <message><source>图片质量</source><translation>Image quality</translation></message>
+    <message><source>PNG 压缩程度</source><translation>PNG compression</translation></message>
+    <message><source>数值越大，文件通常越小，保存越慢；不会损失画质。</source><translation>Higher values generally produce smaller files and take longer to save, without losing image quality.</translation></message>
+    <message><source>按图片尺寸</source><translation>Image size</translation></message>
+    <message><source>PDF 页面</source><translation>PDF page</translation></message>
+    <message><source>自动</source><translation>Automatic</translation></message>
+    <message><source>纵向</source><translation>Portrait</translation></message>
+    <message><source>横向</source><translation>Landscape</translation></message>
+    <message><source>页面方向</source><translation>Orientation</translation></message>
+    <message><source> 毫米</source><translation> mm</translation></message>
+    <message><source>页边距</source><translation>Margins</translation></message>
+    <message><source>PDF 导出为单页，图片等比缩放居中；透明区域以白色显示。</source><translation>PDF exports one page with the image centered and scaled proportionally. Transparent areas appear white.</translation></message>
+    <message><source>输出尺寸不能超过 1 亿像素。</source><translation>Output dimensions must not exceed 100 million pixels.</translation></message>
+</context>
 </TS>
