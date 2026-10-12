@@ -4,9 +4,23 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
 ### Added
 
 - Added a tray image browser with asynchronous thumbnails, directory watching, drag and drop, GIF playback, and basic crop/rotate/flip/resize editing. Edits support undo/redo and atomic PNG/JPEG export, with source conflict checks before overwriting. All actions are available in the context menu. Images open at actual size or shrink to fit with margins; format conversion supports installed PNG/JPEG/BMP/WebP writers.
+- Added an inline image editing panel with direct annotations, three mosaic brush styles with effect previews, watermark presets, perspective correction, stickers, live color adjustment, OpenCV filters and GrabCut background removal.
+- Added configurable PDF and ICO conversion, desktop and lock-screen background actions, and fixed tray shortcuts for the image browser and Settings.
+
+### Changed
+
+- Image editing supports up to 72 million pixels. Mosaic brush size uses screen pixels with a default diameter of 24, consistent across image sizes and zoom levels.
+- Color changes apply automatically with throttling and share one undo step. Image processing preserves unrelated toolbar icons, styles and enabled states.
+
+### Fixed
+
+- Corrected Windows background integration and localized MSVC header dependency tracking to prevent incompatible incremental builds.
+- Improved editing controls and stabilized layout baselines in image browser regression tests.
 
 ## [0.1.4] - 2026-10-08
 
