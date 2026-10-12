@@ -1,5 +1,6 @@
 #include "ImageEditorPanel.h"
 #include "EditorValueSpinBox.h"
+#include "ImageMosaic.h"
 #include "core/theme/ThemeManager.h"
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -25,6 +26,31 @@
 
 namespace ImageBrowser {
 namespace {
+QIcon mosaicStyleIcon(int style, const QColor& color) {
+    // Use the actual mosaic renderer on a common sample, so the choices show
+    // their effect instead of three unrelated symbolic icons.
+    QImage sample(160, 96, QImage::Format_ARGB32);
+    {
+        QPainter p(&sample);
+        QLinearGradient sky(0, 0, 0, 96); sky.setColorAt(0, QColor("#74b9df")); sky.setColorAt(1, QColor("#f6d8ad"));
+        p.fillRect(sample.rect(), sky); p.setPen(Qt::NoPen);
+        p.setBrush(QColor("#ffe1a1")); p.drawEllipse(QPointF(125, 23), 13, 13);
+        p.setBrush(QColor("#467c83")); p.drawPolygon(QPolygonF{QPointF(0, 80), QPointF(52, 20), QPointF(100, 80)});
+        p.setBrush(QColor("#316269")); p.drawPolygon(QPolygonF{QPointF(60, 96), QPointF(112, 36), QPointF(160, 96)});
+        p.fillRect(0, 76, 160, 20, QColor("#c78161"));
+        for (int x = 9; x < 160; x += 12) {
+            p.fillRect(x, 58, 5, 20, QColor("#f6e5cc"));
+            p.fillRect(x+4, 67, 5, 18, QColor("#87475c"));
+        }
+    }
+    QImage preview = sample;
+    EditOperation effect; effect.kind = EditOperation::Mosaic; effect.variant = style;
+    effect.directDrawing = true; effect.brushDiameter = 76; effect.brushPoints = {QPointF(80, 48)};
+    effect.strength = style == 1 ? 9 : 14; effect.color = color.isValid() ? color : QColor(Qt::black);
+    QPainter painter(&preview); paintMosaic(painter, sample, effect); painter.end();
+    return QIcon(QPixmap::fromImage(preview));
+}
+
 QIcon editorToolIcon(int tool, const QColor& color) {
     QPixmap pixmap(64, 64); pixmap.fill(Qt::transparent);
     QPainter p(&pixmap); p.scale(2, 2); p.setRenderHint(QPainter::Antialiasing);
@@ -226,8 +252,29 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         }
         qobject_cast<QFormLayout*>(perspective->layout())->addRow(cornerNames[i], row);
     }
-    auto* mosaic = createPage(names[3], tr("选中需要遮挡的区域，块越大，马赛克越明显。"));
+    auto* mosaic = createPage(names[3], tr("直接在图片上拖动圆形画笔涂抹，松开完成；每笔可单独撤销，Esc 取消当前笔画。"));
+    mosaicStyle_ = new QButtonGroup(this); mosaicStyle_->setExclusive(true);
+    auto* mosaicChoices = new QWidget(mosaic);
+    auto* mosaicChoicesLayout = new QHBoxLayout(mosaicChoices);
+    mosaicChoicesLayout->setContentsMargins(0, 0, 0, 0); mosaicChoicesLayout->setSpacing(6);
+    const QStringList mosaicNames{tr("像素块"), tr("高斯模糊"), tr("纯色遮盖")};
+    for (int style = 0; style < mosaicNames.size(); ++style) {
+        auto* button = new QToolButton(mosaicChoices); button->setText(mosaicNames[style]);
+        button->setObjectName(QStringLiteral("editorMosaicStyle%1").arg(style));
+        button->setProperty("mosaicStyle", true); button->setCheckable(true);
+        button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        button->setIcon(mosaicStyleIcon(style, Qt::black));
+        button->setToolTip(mosaicNames[style]); button->setAccessibleName(mosaicNames[style]);
+        mosaicStyle_->addButton(button, style); mosaicChoicesLayout->addWidget(button);
+    }
+    mosaicStyle_->button(0)->setChecked(true);
+    qobject_cast<QFormLayout*>(mosaic->layout())->addRow(new QLabel(tr("样式"), mosaic));
+    qobject_cast<QFormLayout*>(mosaic->layout())->addRow(mosaicChoices);
+    mosaicBrush_ = addSpin(mosaic, tr("画笔直径（屏幕像素）"), "editorMosaicBrush", 8, 500, 24);
+    mosaicBrush_->setToolTip(tr("画笔显示大小保持一致，不随图片尺寸或缩放变化。"));
     mosaicBlock_ = addSpin(mosaic, tr("块大小（像素）"), "editorMosaicBlock", 2, 100, 12);
+    mosaicColor_ = addColor(mosaic, "editorMosaicColor");
+    mosaicColor_->setText("#000000");
     auto* watermark = createPage(names[4], tr("选择常用水印布局，或自定义放置区域。"));
     watermarkText_ = new QLineEdit(watermark); watermarkText_->setObjectName("editorWatermarkText");
     watermarkText_->setPlaceholderText(tr("输入水印文字"));
@@ -273,7 +320,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         filterHint->setText(hints[mode]); pages_->updateGeometry();
     };
     connect(filter_, &QComboBox::currentIndexChanged, this, updateFilter); updateFilter();
-    auto* color = createPage(names[7], tr("调整参数后点击应用，可使用撤销恢复。"));
+    auto* color = createPage(names[7], tr("参数改变后自动生效，可使用撤销恢复。"));
     auto colorControl = [this, color](const QString& label, const QString& name, const QString& gradient, bool alpha = false) {
         auto* row = new QWidget(color); auto* layout = new QVBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0); layout->setSpacing(2);
         auto* header = new QHBoxLayout;
@@ -325,6 +372,25 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     for (auto* field : {annotationColor_, annotationText_})
         connect(field, &QLineEdit::textChanged, this, &ImageEditorPanel::drawingStyleChanged);
     connect(annotationShape_, &QButtonGroup::idClicked, this, &ImageEditorPanel::drawingStyleChanged);
+    for (auto* field : {mosaicBrush_, mosaicBlock_})
+        connect(field, &QSpinBox::valueChanged, this, &ImageEditorPanel::drawingStyleChanged);
+    connect(mosaicColor_, &QLineEdit::textChanged, this, [this] {
+        qobject_cast<QToolButton*>(mosaicStyle_->button(2))->setIcon(mosaicStyleIcon(2, QColor(mosaicColor_->text())));
+        emit drawingStyleChanged();
+    });
+    connect(mosaicStyle_, &QButtonGroup::idClicked, this, [this, mosaic](int style) {
+        auto* form = qobject_cast<QFormLayout*>(mosaic->layout());
+        qobject_cast<QLabel*>(form->labelForField(mosaicBlock_))->setText(style == 1 ? tr("模糊半径（像素）") : tr("块大小（像素）"));
+        mosaicBlock_->setMaximum(style == 1 ? 30 : 100);
+        form->setRowVisible(mosaicBlock_, style != 2);
+        form->setRowVisible(mosaicColor_->parentWidget(), style == 2);
+        emit drawingStyleChanged();
+    });
+    qobject_cast<QFormLayout*>(mosaic->layout())->setRowVisible(mosaicColor_->parentWidget(), false);
+    for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_, opacity_})
+        connect(field, &QSpinBox::valueChanged, this, [this] {
+            if (currentTool_ == 7 && editable_) emit colorChanged(currentOperation());
+        });
     connect(watermarkMode_, &QComboBox::currentIndexChanged, this, [this] {
         if (selecting_) emit cancelSelectionRequested();
         syncButtons();
@@ -386,7 +452,8 @@ EditOperation ImageEditorPanel::currentOperation() const {
         operation.size = QSize(qRound(qMax(QLineF(p[0], p[1]).length(), QLineF(p[3], p[2]).length())) + 1,
                                qRound(qMax(QLineF(p[0], p[3]).length(), QLineF(p[1], p[2]).length())) + 1); break;
     }
-    case 3: operation.strength = mosaicBlock_->value(); break;
+    case 3: operation.strength = mosaicBlock_->value(); operation.variant = qMax(0, mosaicStyle_->checkedId());
+        operation.brushDiameter = mosaicBrush_->value(); operation.color = QColor(mosaicColor_->text()); break;
     case 4:
         operation.text = watermarkText_->text(); operation.color = QColor(watermarkColor_->text());
         operation.strength = watermarkFont_->value(); operation.variant = watermarkMode_->currentIndex();
@@ -401,6 +468,7 @@ EditOperation ImageEditorPanel::currentOperation() const {
 }
 
 void ImageEditorPanel::submit() {
+    if (currentTool_ == 7 || currentTool_ == 3) return;
     if (!editable_) return;
     const auto operation = currentOperation();
     if (!validateOperation(operation)) return;
@@ -418,8 +486,9 @@ bool ImageEditorPanel::validateOperation(const EditOperation& operation) {
     return true;
 }
 
-void ImageEditorPanel::setDocumentContext(const QString& path, QSize size, bool editable) {
+void ImageEditorPanel::setDocumentContext(const QString& path, QSize size, bool editable, bool colorBusy) {
     editable_ = editable;
+    processing_ = colorBusy;
     toolGrid_->setEnabled(editable); pages_->setEnabled(editable);
     if (imageSize_ != size || imagePath_ != path) {
         imageSize_ = size; imagePath_ = path;
@@ -447,10 +516,16 @@ void ImageEditorPanel::setSelectionState(bool selecting, const QRect& rect) {
 void ImageEditorPanel::syncButtons() {
     const bool region = currentTool_ == 0 || currentTool_ == 3 || (currentTool_ == 4 && watermarkMode_->currentIndex() == 0) || currentTool_ == 5 || currentTool_ == 8;
     submit_->setText(region ? (selecting_ ? tr("重新选择区域") : tr("选择区域")) : tr("应用"));
-    submit_->setVisible(currentTool_ != 1);
-    submit_->setEnabled(editable_ && !busy_);
+    submit_->setVisible(currentTool_ != 1 && currentTool_ != 3 && currentTool_ != 7);
+    submit_->setEnabled(editable_ && !busy_ && !processing_);
     applySelection_->setVisible(selecting_); cancelSelection_->setVisible(selecting_);
-    applySelection_->setEnabled(editable_ && validSelection_ && !busy_); cancelSelection_->setEnabled(editable_ && !busy_);
+    applySelection_->setEnabled(editable_ && validSelection_ && !busy_ && !processing_); cancelSelection_->setEnabled(editable_ && !busy_ && !processing_);
+}
+
+void ImageEditorPanel::resetColorParameters() {
+    const QSignalBlocker blocker(this);
+    for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_}) field->setValue(0);
+    opacity_->setValue(100);
 }
 
 void ImageEditorPanel::setBusy(bool busy) {
@@ -473,6 +548,8 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
         "#browserEditorPanel QScrollArea, #browserEditorPanel QStackedWidget, #browserEditorPanel QScrollArea QWidget { background: %1; }"
         "#browserEditorPanel QToolButton { background: %3; color: %4; border: 0; border-radius: 6px; padding: 4px; }"
         "#browserEditorPanel QToolButton:hover, #browserEditorPanel QToolButton:checked { background: %5; }"
+        "#browserEditorPanel QToolButton[mosaicStyle=\"true\"] { border: 2px solid %2; padding: 4px; }"
+        "#browserEditorPanel QToolButton[mosaicStyle=\"true\"]:checked, #browserEditorPanel QToolButton[mosaicStyle=\"true\"]:focus { border-color: %6; background: %5; }"
         "#browserEditorPanel QPushButton#editorSubmit { background: %6; color: white; border-radius: 6px; padding: %7px; }")
         .arg(theme.surface.name(), theme.border.name(), theme.surfaceRaised.name(), theme.textPrimary.name(),
              theme.accentSubtle.name(), theme.accent.name()).arg(qRound(6*scale)));
@@ -494,6 +571,11 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
         button->setFixedSize(QSize(qRound(36*scale), qRound(32*scale)));
         button->setIconSize(QSize(qRound(22*scale), qRound(22*scale)));
         button->setIcon(annotationShapeIcon(annotationShape_->id(button), theme.textPrimary));
+    }
+    for (auto* abstract : mosaicStyle_->buttons()) {
+        auto* button = qobject_cast<QToolButton*>(abstract);
+        button->setFixedSize(qRound(92*scale), qRound(78*scale));
+        button->setIconSize(QSize(qRound(80*scale), qRound(48*scale)));
     }
     for (auto* field : findChildren<QSpinBox*>())
         if (auto* spin = dynamic_cast<EditorValueSpinBox*>(field)) spin->setControlScale(scale);

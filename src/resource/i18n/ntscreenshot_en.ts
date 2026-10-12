@@ -2138,7 +2138,12 @@ Copied to clipboard</translation>
     <message><source>右上</source><translation>Top right</translation></message>
     <message><source>右下</source><translation>Bottom right</translation></message>
     <message><source>左下</source><translation>Bottom left</translation></message>
-    <message><source>选中需要遮挡的区域，块越大，马赛克越明显。</source><translation>Select the area to obscure. Larger blocks produce stronger pixelation.</translation></message>
+    <message><source>直接在图片上拖动圆形画笔涂抹，松开完成；每笔可单独撤销，Esc 取消当前笔画。</source><translation>Drag the circular brush over the image and release to finish. Undo each stroke separately; Esc cancels the current stroke.</translation></message>
+    <message><source>像素块</source><translation>Pixel blocks</translation></message>
+    <message><source>纯色遮盖</source><translation>Solid cover</translation></message>
+    <message><source>画笔直径（屏幕像素）</source><translation>Brush diameter (screen pixels)</translation></message>
+    <message><source>画笔显示大小保持一致，不随图片尺寸或缩放变化。</source><translation>The brush keeps the same visible size across image sizes and zoom levels.</translation></message>
+    <message><source>模糊半径（像素）</source><translation>Blur radius (pixels)</translation></message>
     <message><source>块大小（像素）</source><translation>Block size (pixels)</translation></message>
     <message><source>输入水印文字，再选择放置区域。</source><translation>Enter watermark text, then select its placement area.</translation></message>
     <message><source>输入水印文字</source><translation>Enter watermark text</translation></message>
@@ -2150,7 +2155,7 @@ Copied to clipboard</translation>
     <message><source>黑白</source><translation>Grayscale</translation></message>
     <message><source>复古</source><translation>Sepia</translation></message>
     <message><source>反色</source><translation>Invert</translation></message>
-    <message><source>调整参数后点击应用，可使用撤销恢复。</source><translation>Adjust values and click Apply. Use Undo to restore the image.</translation></message>
+    <message><source>参数改变后自动生效，可使用撤销恢复。</source><translation>Changes apply automatically. Use Undo to restore the image.</translation></message>
     <message><source>亮度</source><translation>Brightness</translation></message>
     <message><source>对比度</source><translation>Contrast</translation></message>
     <message><source>饱和度</source><translation>Saturation</translation></message>
@@ -2240,5 +2245,9 @@ Copied to clipboard</translation>
     <message><source>输出尺寸不能超过 7200 万像素。</source><translation>Output dimensions must not exceed 72 million pixels.</translation></message>
     <message><source>图标尺寸（像素）</source><translation>Icon size (px)</translation></message>
     <message><source>等比缩放并居中，空白区域补透明；导出单尺寸 ICO 图标。</source><translation>Scale proportionally and center with transparent padding. Export a single-size ICO icon.</translation></message>
+</context>
+<context>
+    <name>ImageBrowser::ImageCanvas</name>
+    <message><source>图片处理失败或内存不足。</source><translation>Image processing failed or insufficient memory.</translation></message>
 </context>
 </TS>

@@ -5,7 +5,8 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     set(nt_dependency_probe "${CMAKE_BINARY_DIR}/CMakeFiles/nt-dependency-probe.cpp")
     file(WRITE "${nt_dependency_probe}" "#include <stddef.h>\n")
     execute_process(
-        COMMAND "${CMAKE_CXX_COMPILER}" /nologo /showIncludes /EP "${nt_dependency_probe}"
+        COMMAND "${CMAKE_COMMAND}" -E env VSLANG=1033
+            "${CMAKE_CXX_COMPILER}" /nologo /showIncludes /EP "${nt_dependency_probe}"
         OUTPUT_VARIABLE nt_dependency_output
         ERROR_VARIABLE nt_dependency_error
         RESULT_VARIABLE nt_dependency_result
@@ -20,6 +21,9 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # Subdirectories may reload CMakeCXXCompiler.cmake when enabling languages.
     # Keep the language-specific value in sync so it cannot restore raw bytes.
     set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "${CMAKE_CL_SHOWINCLUDES_PREFIX}")
+    # Use the same deterministic diagnostic language for every Ninja invocation,
+    # including IDE builds whose console code page differs from configuration.
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CMAKE_COMMAND};-E;env;VSLANG=1033")
     unset(nt_dependency_probe)
     unset(nt_dependency_output)
     unset(nt_dependency_error)

@@ -39,6 +39,9 @@ struct EditOperation {
     int margin = 24;
     QPointF start, end;
     bool directDrawing = false;
+    // Stored in image coordinates for replay. Canvas converts from screen pixels.
+    qreal brushDiameter = 24;
+    QPolygonF brushPoints;
 };
 
 struct ImageResult {

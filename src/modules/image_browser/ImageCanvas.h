@@ -42,9 +42,16 @@ protected:
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
+    void leaveEvent(QEvent*) override;
 
 private:
     void zoomAt(double scale, QPointF anchor);
+    void previewMosaic(const QPolygonF& points);
+    void updateDrawingCursor();
+    QImage mosaicPreview_;
+    QImage mosaicSource_;
+    QPointF hoverPoint_;
+    bool hovering_ = false;
     EditOperation annotation_, stroke_;
     bool annotating_ = false;
     bool drawing_ = false;

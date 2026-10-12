@@ -1,4 +1,5 @@
 #include "ImageBrowserWindow.h"
+#include <QPointer>
 #include "ImageCanvas.h"
 #include "ImageEditorPanel.h"
 #include "ImageConversionDialog.h"
@@ -131,7 +132,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         a->setProperty("browserIcon", icon);
         a->setShortcut(key);
         a->setToolTip(key.isEmpty() ? title : title + QStringLiteral(" (%1)").arg(key.toString(QKeySequence::NativeText)));
-        connect(a, &QAction::triggered, this, std::move(callback));
+        connect(a, &QAction::triggered, this, [this, callback = std::move(callback)] { dispatchAction(callback); });
         return a;
     };
     // 顶栏按钮可以是「图标 + 文字」，文字优先取 browserText（QAction 的 text 要留给测试和快捷键）。
@@ -157,13 +158,13 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     cropAction_ = new QAction(ThemeIcon::icon("browser-crop.png"), tr("裁剪"), this);
     cropAction_->setProperty("browserIcon", "browser-crop.png");
     addAction(cropAction_);
-    connect(cropAction_, &QAction::triggered, this, [this] {
+    connect(cropAction_, &QAction::triggered, this, [this] { dispatchAction([this] {
         regionOperation_ = {};
         regionFromPanel_ = false;
         canvas_->setCropping(cropAction_->isChecked());
         if (canvas_->cropping()) showStatus(tr("拖动选择区域，按 Enter 应用，Esc 取消。"));
         updateActions();
-    });
+    }); });
     cropAction_->setCheckable(true);
     editActions_ << cropAction_;
     toolbar_->addSeparator();
@@ -178,7 +179,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     screenshotDirectoryAction_->setProperty("browserIcon", "browser-home.png");
     screenshotDirectoryAction_->setToolTip(tr("截图目录"));
     connect(screenshotDirectoryAction_, &QAction::triggered, this, [this] {
-        if (discardOrSave()) screenshotDirectory();
+        dispatchAction([this] { if (discardOrSave()) screenshotDirectory(); });
     });
     addAction(screenshotDirectoryAction_);
     navigationActions_ << screenshotDirectoryAction_;
@@ -194,10 +195,10 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     barButton(convertAction_, convertAction_->text());
     auto* more = action(tr("更多"), "browser-more.png", {}, [] {});
     auto* menu = new QMenu(this);
-    wallpaperAction_ = menu->addAction(tr("设为桌面背景"), this, [this] { setSystemBackground(false); });
-    lockScreenAction_ = menu->addAction(tr("设为锁屏背景"), this, [this] { setSystemBackground(true); });
+    wallpaperAction_ = menu->addAction(tr("设为桌面背景"), this, [this] { dispatchAction([this] { setSystemBackground(false); }); });
+    lockScreenAction_ = menu->addAction(tr("设为锁屏背景"), this, [this] { dispatchAction([this] { setSystemBackground(true); }); });
     menu->addSeparator();
-    overwriteAction_ = menu->addAction(tr("覆盖原图"), this, [this] { save(true); });
+    overwriteAction_ = menu->addAction(tr("覆盖原图"), this, [this] { dispatchAction([this] { save(true); }); });
     menu->addAction(tr("在资源管理器中定位"), this, [this] {
         if (!document_.path.isEmpty()) Util::locateFile(document_.path);
     });
@@ -215,7 +216,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     connect(exitFullscreenAction_, &QAction::triggered, this, [this] {
         if (canvas_->cancelDrawing()) return;
         if (canvas_->cropping()) { canvas_->setCropping(false); updateActions(); }
-        else if (editorPanel_->isVisible()) { editorPanel_->hide(); editorAction_->setChecked(false); updateActions(); }
+        else if (editorPanel_->isVisible()) { editorPanel_->hide(); editorAction_->setChecked(false); positionEditorPanel(); updateActions(); }
         else if (isFullScreen()) toggleFullscreen();
     });
 
@@ -265,7 +266,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         a->setProperty("browserIcon", icon);
         a->setShortcut(key);
         a->setToolTip(key.isEmpty() ? title : title + QStringLiteral(" (%1)").arg(key.toString(QKeySequence::NativeText)));
-        connect(a, &QAction::triggered, this, std::move(callback));
+        connect(a, &QAction::triggered, this, [this, callback = std::move(callback)] { dispatchAction(callback); });
         addAction(a);
         return a;
     };
@@ -494,14 +495,22 @@ void ImageBrowserWindow::createEditorPanel() {
     editorPanel_ = new ImageEditorPanel(this);
     connect(editorPanel_, &ImageEditorPanel::closeRequested, this, [this] {
         editorPanel_->hide(); editorAction_->setChecked(false);
+        positionEditorPanel();
         canvas_->setCropping(false); showStatus({}); updateActions();
     });
     connect(editorPanel_, &ImageEditorPanel::toolChanged, this, [this] {
-        canvas_->setCropping(false); regionFromPanel_ = false; showStatus({}); updateActions();
+        dispatchAction([this] {
+            colorSession_ = false; colorBase_ = {}; editorPanel_->resetColorParameters();
+            canvas_->setCropping(false); regionFromPanel_ = false; showStatus({}); positionEditorPanel(); updateActions();
+        });
     });
+    colorTimer_.setSingleShot(true);
+    colorTimer_.setInterval(100);
+    connect(&colorTimer_, &QTimer::timeout, this, &ImageBrowserWindow::renderColor);
+    connect(editorPanel_, &ImageEditorPanel::colorChanged, this, &ImageBrowserWindow::queueColor);
     connect(editorPanel_, &ImageEditorPanel::drawingStyleChanged, this, [this] {
         canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
-            editorPanel_->isVisible() && editorPanel_->drawingActive());
+            !busy_ && editorPanel_->isVisible() && editorPanel_->drawingActive());
     });
     connect(canvas_, &ImageCanvas::annotationAccepted, this, [this](const EditOperation& operation) {
         if (editorPanel_->isVisible() && editorPanel_->drawingActive() && editorPanel_->validateOperation(operation)) edit(operation);
@@ -561,7 +570,7 @@ void ImageBrowserWindow::applyDpi(double scale) {
         "#ImageBrowserWindow QLabel#browserImageDetails,"
         "#ImageBrowserWindow QLabel#browserStatusMessage { font-size: %2px; }")
         .arg(qRound(13 * scale)).arg(qRound(12 * scale)));
-    styleToolButtons();
+    refreshVisualStyle();
     toolbar_->setIconSize(QSize(qRound(20 * scale), qRound(20 * scale)));
     positionEditorPanel();
     const int barHeight = qRound(32 * scale);
@@ -656,14 +665,30 @@ void ImageBrowserWindow::setBusy(bool busy, const QString& message) {
     busyMessage_ = message;
     if (busy) busyCursorTimer_.start(1000);
     else {
+        rendering_ = false;
+        setProperty("imageProcessing", false);
         busyCursorTimer_.stop();
         if (busyHintShown_) { QApplication::restoreOverrideCursor(); busyHintShown_ = false; }
         if (editorPanel_) editorPanel_->setBusy(false);
     }
     updateActions();
+    if (!busy_) {
+        while (!deferredActions_.isEmpty() && !busy_ && !loading_) {
+            auto callback = deferredActions_.takeFirst();
+            QPointer<ImageBrowserWindow> guard(this);
+            callback();
+            if (!guard) return;
+        }
+    }
+}
+
+void ImageBrowserWindow::dispatchAction(std::function<void()> action) {
+    if (rendering_ || colorPending_ || colorRendering_) deferredActions_.append(std::move(action));
+    else if (!busy_) action();
 }
 
 void ImageBrowserWindow::showStatus(const QString& message, int timeout) {
+    if (statusText_ == message && timeout == 0) return;
     statusText_ = message;
     statusTimer_.stop();
     if (timeout > 0 && !message.isEmpty()) statusTimer_.start(timeout);
@@ -751,15 +776,30 @@ void ImageBrowserWindow::layoutControlBar() {
     // 用「候选档位」而不是控件的 isVisible() 来量宽度：任何祖先隐藏时 isVisible() 都是 false，
     // 会让底栏的取舍跟着窗口显隐变化，进而在重排回调里来回抖动。
     auto measure = [this](int level) {
+        auto groupWidth = [this, level](QWidget* group) {
+            auto* row = qobject_cast<QHBoxLayout*>(group->layout());
+            const auto margins = row->contentsMargins();
+            int width = margins.left()+margins.right(), count = 0;
+            for (int i = 0; i < row->count(); ++i) {
+                auto* widget = row->itemAt(i)->widget();
+                if (!widget || widget == statusLabel_) continue;
+                if (widget == details_ && (level >= 1 || !hasDetails_)) continue;
+                if (widget == controlCopySave_ && level >= 3) continue;
+                if (auto* button = qobject_cast<QToolButton*>(widget))
+                    if (button->defaultAction() && !button->defaultAction()->isVisible()) continue;
+                width += qBound(widget->minimumWidth(), widget->sizeHint().width(), widget->maximumWidth());
+                ++count;
+            }
+            return width + qMax(0, count-1)*row->spacing();
+        };
         int width = qRound(48 * scaleFactor_);
-        width += controlLeft_->sizeHint().width();
+        width += groupWidth(controlLeft_);
         if (level < 2) width += toolPill_->sizeHint().width();
-        width += controlRight_->sizeHint().width();
+        width += groupWidth(controlRight_);
         return width;
     };
     int level = 3;
     for (int candidate = 0; candidate <= 3; ++candidate) {
-        apply(candidate);
         if (measure(candidate) <= controlBar_->width()) { level = candidate; break; }
     }
     apply(level);
@@ -821,6 +861,9 @@ void ImageBrowserWindow::listingReady(const QString& error) {
     updateActions();
 }
 void ImageBrowserWindow::selectRow(int row) {
+    if (rendering_ || colorPending_ || colorRendering_) {
+        dispatchAction([this, row] { selectRow(row); }); return;
+    }
     if (busy_ || scanning_ || row < 0 || row >= model_->rowCount()) return;
     const QString path = model_->pathAt(row);
     if (path == document_.path) return;
@@ -838,6 +881,8 @@ void ImageBrowserWindow::selectRow(int row) {
     loadImage(path);
 }
 void ImageBrowserWindow::loadImage(const QString& path) {
+    deferredActions_.clear();
+    colorSession_ = false; colorBase_ = {}; editorPanel_->resetColorParameters();
     stopMovie();
     // 切换图片时画布上闪一下“正在加载图片”比空白更烦，只有画布本来就空着（首次打开、
     // 上一张打不开）才提示。
@@ -963,24 +1008,16 @@ void ImageBrowserWindow::toggleFullscreen() {
     exitFullscreenAction_->setEnabled(isFullScreen());
 }
 void ImageBrowserWindow::updateActions() {
-    if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button")))
-        extension->setIcon(ThemeIcon::icon("browser-more.png"));
-    // 主题切换后所有图标都要按新配色重新着色：工具栏、控制栏、菜单里的 action 一起过一遍。
-    for (auto* a : findChildren<QAction*>()) {
-        const QString icon = a->property("browserIcon").toString();
-        if (!icon.isEmpty()) a->setIcon(ThemeIcon::icon(icon));
+    if (rendering_ || colorPending_ || colorRendering_) {
+        updateEditorState();
+        return;
     }
-    styleToolButtons();
     const bool available = !document_.current.isNull() && !loading_ && !busy_;
     const bool editable = available && !document_.limited && !movie_;
     wallpaperAction_->setEnabled(editable && SystemBackground::supported());
     lockScreenAction_->setEnabled(editable && SystemBackground::supported());
     editorAction_->setEnabled(editable);
-    editorPanel_->setDocumentContext(document_.path, document_.current.size(), editable);
-    editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
-    canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
-            editorPanel_->isVisible() && editorPanel_->drawingActive());
-    positionEditorPanel();
+    updateEditorState();
     for (auto* action : editActions_) action->setEnabled(editable);
     for (auto* action : navigationActions_) action->setEnabled(!busy_);
     const int row = model_->indexOf(document_.path);
@@ -997,7 +1034,11 @@ void ImageBrowserWindow::updateActions() {
     resetAction_->setEnabled(editable && document_.canUndo());
     playAction_->setVisible(movie_ != nullptr);
     playAction_->setEnabled(movie_ && !busy_);
-    playAction_->setIcon(ThemeIcon::icon(movie_ && movie_->state() == QMovie::Running ? "browser-pause.png" : "browser-play.png"));
+    const QString playIcon = movie_ && movie_->state() == QMovie::Running ? "browser-pause.png" : "browser-play.png";
+    if (playAction_->property("browserIcon").toString() != playIcon) {
+        playAction_->setProperty("browserIcon", playIcon);
+        playAction_->setIcon(ThemeIcon::icon(playIcon));
+    }
     frameAction_->setVisible(movie_ != nullptr);
     frameAction_->setEnabled(movie_ && available);
     zoomInAction_->setEnabled(available);
@@ -1014,9 +1055,32 @@ void ImageBrowserWindow::updateActions() {
     list_->setEnabled(!busy_ && !scanning_);
     syncControlButtons();
     // 条件按钮（应用裁剪 / 播放）刚显隐会改变两端的尺寸，重排一次再定位标题。
+    updateStatus();
     layoutControlBar();
     updateOverlays();
-    updateStatus();
+}
+
+void ImageBrowserWindow::updateEditorState() {
+    const bool processing = rendering_ || colorPending_ || colorRendering_;
+    const bool editable = !document_.current.isNull() && !loading_ && !document_.limited && !movie_ && (!busy_ || processing);
+    editorPanel_->setDocumentContext(document_.path, document_.current.size(), editable, processing);
+    editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
+    canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
+        !busy_ && editorPanel_->isVisible() && editorPanel_->drawingActive());
+}
+
+void ImageBrowserWindow::refreshVisualStyle() {
+    const auto& theme = ThemeManager::tokens();
+    const QString key = theme.border.name() + theme.textPrimary.name() + theme.accent.name() + QString::number(scaleFactor_);
+    if (visualStyleKey_ == key) return;
+    visualStyleKey_ = key;
+    for (auto* action : findChildren<QAction*>()) {
+        const QString icon = action->property("browserIcon").toString();
+        if (!icon.isEmpty()) action->setIcon(ThemeIcon::icon(icon));
+    }
+    if (auto* extension = toolbar_->findChild<QToolButton*>(QStringLiteral("qt_toolbar_ext_button")))
+        extension->setIcon(ThemeIcon::icon("browser-more.png"));
+    styleToolButtons();
 }
 bool ImageBrowserWindow::discardOrSave() {
     if (!document_.dirty()) return true;
@@ -1098,6 +1162,7 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
     saved.modified = QFileInfo(path).lastModified();
     saved.fileSize = QFileInfo(path).size();
     document_.load(path, saved);
+    colorSession_ = false; colorBase_ = {}; editorPanel_->resetColorParameters();
     animationSource_ = false;
     displayedSize_ = saved.image.size();
     showStatus(tr("图片已保存"), 3000);
@@ -1195,19 +1260,59 @@ void ImageBrowserWindow::edit(const EditOperation& operation) {
     if (busy_ || loading_ || document_.limited || movie_ || document_.current.isNull()) return;
     auto candidate = document_;
     candidate.append(operation);
-    renderDocument(candidate);
+    renderDocument(candidate, false, true);
 }
-void ImageBrowserWindow::renderDocument(ImageDocument candidate) {
-    if (busy_) return;
+void ImageBrowserWindow::queueColor(const EditOperation& operation) {
+    if (loading_ || document_.limited || movie_ || document_.current.isNull() ||
+        (busy_ && !colorRendering_ && !colorPending_)) return;
+    if (!colorSession_) {
+        colorBase_ = document_;
+        colorSession_ = true;
+    }
+    pendingColor_ = operation;
+    colorPending_ = true;
+    setProperty("imageProcessing", true);
+    if (!colorRendering_ && !colorTimer_.isActive()) colorTimer_.start();
+    setBusy(true, tr("正在处理图片…"));
+}
+
+void ImageBrowserWindow::renderColor() {
+    if (!colorPending_ || colorRendering_) return;
+    auto candidate = colorBase_;
+    const auto& op = pendingColor_;
+    if (op.brightness || op.contrast || op.saturation || op.temperature || op.tint || op.opacity != 100)
+        candidate.append(op);
+    colorPending_ = false;
+    colorRendering_ = true;
+    renderDocument(candidate, true);
+}
+
+void ImageBrowserWindow::renderDocument(ImageDocument candidate, bool liveColor, bool incremental) {
+    if (busy_ && !liveColor) return;
+    if (!liveColor) {
+        colorSession_ = false; colorBase_ = {}; editorPanel_->resetColorParameters();
+    }
     canvas_->setCropping(false);
+    rendering_ = true;
+    setProperty("imageProcessing", true);
     const quint64 version = ++imageVersion_;
     setBusy(true, tr("正在处理图片…"));
-    loader_->run(this, [base = candidate.original, operations = candidate.operations, count = candidate.position] {
+    // Each preview starts at the session's unadjusted image. Never stack slider
+    // values on the previous preview or replay unrelated expensive operations.
+    const QImage base = liveColor ? colorBase_.current : incremental ? document_.current : candidate.original;
+    const QVector<EditOperation> operations = liveColor
+        ? (candidate.position > colorBase_.position ? QVector<EditOperation>{pendingColor_} : QVector<EditOperation>{})
+        : incremental ? QVector<EditOperation>{candidate.operations[candidate.position-1]} : candidate.operations;
+    const int count = liveColor || incremental ? operations.size() : candidate.position;
+    loader_->run(this, [base, operations, count] {
         return ImageDocument::render(base, operations, count);
-    }, [this, candidate, version](const ImageResult& result) mutable {
+    }, [this, candidate, version, liveColor](const ImageResult& result) mutable {
         if (version != imageVersion_) return;
-        setBusy(false);
-        if (!result.error.isEmpty()) showStatus(result.error);
+        if (liveColor) colorRendering_ = false;
+        if (!result.error.isEmpty()) {
+            canvas_->setImage(document_.current);
+            showStatus(result.error);
+        }
         else {
             const bool sizeChanged = result.image.size() != document_.current.size();
             candidate.current = result.image;
@@ -1217,7 +1322,10 @@ void ImageBrowserWindow::renderDocument(ImageDocument candidate) {
             canvas_->setImage(result.image, sizeChanged);
             showStatus(QString());
         }
-        updateActions();
+        if (liveColor && colorPending_) {
+            colorTimer_.start();
+            updateActions();
+        } else setBusy(false);
     });
 }
 void ImageBrowserWindow::resizeImage() {
@@ -1307,7 +1415,7 @@ void ImageBrowserWindow::changeEvent(QEvent* event) {
         else if (!isMinimized() && resumeMovie_) { resumeMovie_ = false; movie_->setPaused(false); }
     }
     if (event->type() == QEvent::ScreenChangeInternal) applyDpi();
-    if (event->type() == QEvent::PaletteChange && details_) { updateActions(); update(); list_->viewport()->update(); }
+    if (event->type() == QEvent::PaletteChange && details_) { refreshVisualStyle(); updateActions(); update(); list_->viewport()->update(); }
 }
 bool ImageBrowserWindow::eventFilter(QObject* watched, QEvent* event) {
     if (watched == list_->viewport() && (event->type() == QEvent::Resize || event->type() == QEvent::Show))

@@ -24,18 +24,20 @@ public:
     explicit ImageEditorPanel(QWidget* parent = nullptr);
     static QIcon editIcon();
     void setMetrics(double scale, int availableHeight);
-    void setDocumentContext(const QString& path, QSize size, bool editable);
+    void setDocumentContext(const QString& path, QSize size, bool editable, bool colorBusy = false);
     void setSelectionState(bool selecting, const QRect& rect);
     // 后台图像处理期间在面板内提示并锁住按钮，否则用户会以为点击没有生效。
     void setBusy(bool busy);
     EditOperation currentOperation() const;
-    bool drawingActive() const { return currentTool_ == 1 && editable_; }
+    bool drawingActive() const { return (currentTool_ == 1 || currentTool_ == 3) && editable_; }
     bool validateOperation(const EditOperation& operation);
+    void resetColorParameters();
 
 signals:
     void closeRequested();
     void toolChanged();
     void drawingStyleChanged();
+    void colorChanged(const ImageBrowser::EditOperation& operation);
     void editRequested(const ImageBrowser::EditOperation& operation, bool selectRegion);
     void applySelectionRequested();
     void cancelSelectionRequested();
@@ -61,6 +63,9 @@ private:
     QButtonGroup* annotationShape_;
     QComboBox* filter_;
     QComboBox* watermarkMode_;
+    QButtonGroup* mosaicStyle_;
+    QSpinBox* mosaicBrush_;
+    QLineEdit* mosaicColor_;
     QSpinBox *filterStrength_, *cutoutIterations_, *cutoutFeather_;
     QSpinBox *watermarkOpacity_, *watermarkMargin_, *temperature_, *tint_, *opacity_;
     QLineEdit *annotationText_, *watermarkText_, *annotationColor_, *watermarkColor_, *assetPath_;
@@ -73,6 +78,7 @@ private:
     int currentTool_ = 0;
     bool editable_ = false;
     bool busy_ = false;
+    bool processing_ = false;
     bool selecting_ = false;
     bool validSelection_ = false;
     double lastScale_ = -1;

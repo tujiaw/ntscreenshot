@@ -1,4 +1,5 @@
 #include "ImageDocument.h"
+#include "ImageMosaic.h"
 #include "ImageAnnotation.h"
 #include "ImageCvOperations.h"
 
@@ -104,14 +105,13 @@ ImageResult ImageDocument::render(const QImage& original,
                     if (!processed.error.isEmpty()) return processed;
                     image = processed.image;
                 } else if (operation.kind == EditOperation::Mosaic) {
-                    if (region.isEmpty()) { result.error = message("裁剪区域无效。"); return result; }
-                    const int block = qBound(2, operation.strength, 100);
-                    QImage tile = image.copy(region).scaled(qMax(1, region.width() / block),
-                        qMax(1, region.height() / block), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                        .scaled(region.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+                    if ((!operation.directDrawing && region.isEmpty()) || (operation.directDrawing && operation.brushPoints.isEmpty())) {
+                        result.error = message("裁剪区域无效。"); return result;
+                    }
+                    const QImage source = image;
                     QPainter painter(&image);
-                    painter.setCompositionMode(QPainter::CompositionMode_Source);
-                    painter.drawImage(region.topLeft(), tile);
+                    if (!painter.isActive()) throw std::bad_alloc();
+                    paintMosaic(painter, source, operation);
                 } else if (operation.kind == EditOperation::Perspective) {
                     if (operation.corners.size() != 4) { result.error = message("裁剪区域无效。"); return result; }
                     std::vector<cv::Point2f> from;

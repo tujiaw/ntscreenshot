@@ -47,6 +47,9 @@ private:
     void selectRow(int row);
     void loadImage(const QString& path);
     void updateActions();
+    void updateEditorState();
+    void refreshVisualStyle();
+    void dispatchAction(std::function<void()> action);
     void requestThumbnails();
     bool discardOrSave();
     bool save(bool overwrite = false, bool refreshListing = true, const QByteArray& format = {},
@@ -56,7 +59,9 @@ private:
     void setSystemBackground(bool lockScreen);
     void showContextMenu(const QPoint& globalPosition);
     void edit(const EditOperation& operation);
-    void renderDocument(ImageDocument candidate);
+    void renderDocument(ImageDocument candidate, bool liveColor = false, bool incremental = false);
+    void queueColor(const EditOperation& operation);
+    void renderColor();
     void resizeImage();
     void freezeFrame(std::function<void()> after = {});
     void stopMovie();
@@ -122,6 +127,15 @@ private:
     QString directory_;
     QString pendingSelection_;
     ImageDocument document_;
+    ImageDocument colorBase_;
+    EditOperation pendingColor_;
+    QTimer colorTimer_;
+    bool colorSession_ = false;
+    bool colorPending_ = false;
+    bool colorRendering_ = false;
+    bool rendering_ = false;
+    QList<std::function<void()>> deferredActions_;
+    QString visualStyleKey_;
     QSize displayedSize_;
     quint64 imageVersion_ = 0;
     std::shared_ptr<std::atomic<quint64>> loadGeneration_ = std::make_shared<std::atomic<quint64>>(0);

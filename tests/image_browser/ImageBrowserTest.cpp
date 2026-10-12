@@ -1,4 +1,6 @@
 #include "modules/image_browser/ImageDocument.h"
+#include "modules/image_browser/ImageMosaic.h"
+#include "modules/image_browser/ImageEditorPanel.h"
 #include "core/imaging/CvBridge.h"
 #include "modules/image_browser/ImageDirectoryModel.h"
 #include "modules/image_browser/ImageLoader.h"
@@ -65,13 +67,19 @@ void check(bool value, const char* name) {
     if (!value) { ++failures; qCritical() << "FAIL:" << name; }
 }
 bool waitUntil(const std::function<bool()>& condition, int timeout = 10000) {
+    auto ready = [&] {
+        if (!condition()) return false;
+        for (auto* widget : QApplication::topLevelWidgets())
+            if (widget->property("imageProcessing").toBool()) return false;
+        return true;
+    };
     QElapsedTimer timer;
     timer.start();
-    while (!condition() && timer.elapsed() < timeout) {
+    while (!ready() && timer.elapsed() < timeout) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
         QThread::msleep(5);
     }
-    return condition();
+    return ready();
 }
 QAction* action(QWidget* window, const QString& text) {
     for (auto* a : window->findChildren<QAction*>()) if (a->text() == text) return a;
@@ -81,7 +89,39 @@ void trigger(QWidget* window, const QString& text) {
     auto* a = action(window, text);
     check(a && a->isEnabled(), qPrintable(text));
     if (a && a->isEnabled()) a->trigger();
+    check(waitUntil([] { return true; }), "image processing completes before checking action result");
 }
+class SurfaceStabilityProbe final : public QObject {
+public:
+    explicit SurfaceStabilityProbe(QWidget* window) {
+        const QStringList names{QStringLiteral("编辑"), QStringLiteral("格式转换"), QStringLiteral("刷新"),
+            QStringLiteral("复制图片"), QStringLiteral("另存为"), QStringLiteral("适应窗口"), QStringLiteral("实际大小"), QStringLiteral("全屏")};
+        for (auto* a : window->findChildren<QAction*>()) if (names.contains(a->text())) {
+            icons.append({a, a->icon().cacheKey()});
+            connect(a, &QAction::changed, this, [this] { ++actionChanges; });
+        }
+        for (auto* button : window->findChildren<QToolButton*>()) if (button->defaultAction() && names.contains(button->defaultAction()->text())) {
+            surfaces.append({button, button->geometry()}); button->installEventFilter(this);
+        }
+        for (auto* toolbar : window->findChildren<QToolBar*>()) toolbar->installEventFilter(this);
+    }
+    bool stable() const {
+        if (actionChanges || surfaceEvents) return false;
+        for (const auto& entry : icons) if (!entry.first || entry.first->icon().cacheKey() != entry.second) return false;
+        for (const auto& entry : surfaces) if (!entry.first || entry.first->geometry() != entry.second) return false;
+        return true;
+    }
+    int actionChanges = 0, surfaceEvents = 0;
+protected:
+    bool eventFilter(QObject*, QEvent* event) override {
+        if (event->type() == QEvent::StyleChange || event->type() == QEvent::EnabledChange ||
+            event->type() == QEvent::Show || event->type() == QEvent::Hide) ++surfaceEvents;
+        return false;
+    }
+private:
+    QList<QPair<QPointer<QAction>, qint64>> icons;
+    QList<QPair<QPointer<QWidget>, QRect>> surfaces;
+};
 void mouse(QWidget* widget, QEvent::Type type, QPointF point) {
     QMouseEvent event(type, point, widget->mapToGlobal(point.toPoint()),
                       type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
@@ -194,6 +234,35 @@ int runImageBrowserTest(QApplication& app) {
     check(result.image.size() == QSize(160, 90) && result.image.hasAlphaChannel() && qAlpha(result.image.pixel(0, 0)) == 128, "resize preserves alpha");
     check(!ImageDocument::render(source, {{EditOperation::Crop, QRect(-1, 0, 2, 2), {}}}, 1).error.isEmpty(), "reject out of bounds crop");
     check(!ImageDocument::render(source, {{EditOperation::Resize, {}, QSize(9000, 8001)}}, 1).error.isEmpty(), "resize pixel budget");
+    QImage brushSource(512, 320, QImage::Format_ARGB32);
+    for (int y = 0; y < brushSource.height(); ++y) for (int x = 0; x < brushSource.width(); ++x)
+        brushSource.setPixel(x, y, qRgba(x%256, y%256, (x+y)%256, 128));
+    EditOperation brush; brush.kind = EditOperation::Mosaic; brush.directDrawing = true;
+    brush.brushDiameter = 30; brush.strength = 12;
+    brush.brushPoints = {QPointF(30, 70), QPointF(430, 70), QPointF(430, 210)};
+    for (int style = 0; style < 3; ++style) {
+        brush.variant = style; brush.color = QColor("#102030");
+        const auto brushed = ImageDocument::render(brushSource, {brush}, 1);
+        check(brushed.error.isEmpty() && brushed.image.size() == brushSource.size(), "all mosaic styles render at original size");
+        check(brushed.image.pixel(200, 100) == brushSource.pixel(200, 100) &&
+            brushed.image.pixel(15, 55) == brushSource.pixel(15, 55), "circular brush preserves pixels outside stroke");
+        check(style == 2 ? brushed.image.pixelColor(200, 70) == brush.color : qAlpha(brushed.image.pixel(200, 70)) == 128,
+            "mosaic preserves alpha while solid cover uses chosen color");
+        QImage incremental = brushSource;
+        for (int i = 0; i < brush.brushPoints.size(); ++i) {
+            EditOperation segment = brush;
+            segment.brushPoints = i ? QPolygonF{brush.brushPoints[i-1], brush.brushPoints[i]} : QPolygonF{brush.brushPoints[i]};
+            QPainter painter(&incremental); paintMosaic(painter, brushSource, segment);
+        }
+        check(incremental == brushed.image, "incremental brush preview matches committed path exactly");
+    }
+    brush.variant = 0;
+    const auto pixelBrush = ImageDocument::render(brushSource, {brush}, 1).image;
+    check(pixelBrush.pixel(200, 70) == brushSource.pixel(198, 66), "pixel brush uses stable image-aligned blocks");
+    brush.brushPoints = {QPointF(30, 70)}; brush.variant = 2;
+    check(ImageDocument::render(brushSource, {brush}, 1).image.pixelColor(30, 70) == brush.color, "single brush click paints circular dot");
+    brush.brushPoints.clear();
+    check(!ImageDocument::render(brushSource, {brush}, 1).error.isEmpty(), "empty brush stroke is rejected");
     EditOperation filter; filter.kind = EditOperation::Filter;
     const auto gray = ImageDocument::render(source, {filter}, 1).image;
     check(qRed(gray.pixel(0, 0)) == qGreen(gray.pixel(0, 0)) && qAlpha(gray.pixel(0, 0)) == 128, "grayscale preserves alpha");
@@ -258,7 +327,9 @@ int runImageBrowserTest(QApplication& app) {
     cutout.feather = 0;
     EditOperation mosaic; mosaic.kind = EditOperation::Mosaic; mosaic.rect = QRect(150, 80, 30, 30); mosaic.strength = 30;
     const auto pixelated = ImageDocument::render(source, {mosaic}, 1).image;
-    check(pixelated.pixel(150, 80) != source.pixel(150, 80) && pixelated.pixel(150, 80) == pixelated.pixel(179, 109) && pixelated.pixel(0, 0) == source.pixel(0, 0), "mosaic affects only selected region");
+    check(pixelated.pixel(150, 80) != source.pixel(150, 80) &&
+        (pixelated.pixel(150, 80) & 0x00ffffff) == (pixelated.pixel(179, 109) & 0x00ffffff) &&
+        qAlpha(pixelated.pixel(150, 80)) == 128 && pixelated.pixel(0, 0) == source.pixel(0, 0), "mosaic affects selected RGB while preserving original alpha");
     EditOperation annotation; annotation.kind = EditOperation::Annotate; annotation.rect = QRect(20, 20, 70, 50);
     check(ImageDocument::render(source, {annotation}, 1).image != source, "rectangle annotation rendered");
     annotation.variant = 1;
@@ -475,6 +546,41 @@ int runImageBrowserTest(QApplication& app) {
 
     // Coordinate mapping after zoom and pan, including crop movement and handles.
     ImageCanvas canvas;
+    {
+        ImageCanvas brushCanvas; brushCanvas.resize(640, 480); brushCanvas.show();
+        const QImage rgbSource = brushSource.convertToFormat(QImage::Format_RGB888);
+        brushCanvas.setImage(rgbSource, true);
+        EditOperation dot; dot.kind = EditOperation::Mosaic; dot.variant = 2;
+        dot.color = QColor("#102030"); dot.brushDiameter = 30;
+        brushCanvas.setAnnotation(dot, true);
+        int accepted = 0; EditOperation paintedStroke;
+        QObject::connect(&brushCanvas, &ImageCanvas::annotationAccepted, &brushCanvas,
+            [&](const EditOperation& op) { ++accepted; paintedStroke = op; });
+        mouse(&brushCanvas, QEvent::MouseButtonPress, brushCanvas.viewportPoint(QPointF(200, 70)));
+        mouse(&brushCanvas, QEvent::MouseMove, brushCanvas.viewportPoint(QPointF(300, 70)));
+        check(brushCanvas.cursor().shape() == Qt::BlankCursor, "mosaic uses drawn circular cursor on image");
+        const QImage preview = brushCanvas.grab().toImage();
+        check(preview.pixelColor(brushCanvas.viewportPoint(QPointF(250, 70)).toPoint()) == dot.color,
+            "brush paints actual pixels during drag before release, including RGB888 input");
+        mouse(&brushCanvas, QEvent::MouseButtonRelease, brushCanvas.viewportPoint(QPointF(300, 70)));
+        check(accepted == 1 && paintedStroke.brushPoints.size() == 2, "whole drag commits as one brush operation");
+        brushCanvas.setAnnotation(dot, false);
+        check(brushCanvas.grab().toImage().pixelColor(brushCanvas.viewportPoint(QPointF(250, 70)).toPoint()) == dot.color,
+            "painted preview remains visible while asynchronous commit disables brush");
+        brushCanvas.setImage(rgbSource); brushCanvas.setAnnotation(dot, true);
+        mouse(&brushCanvas, QEvent::MouseButtonPress, brushCanvas.viewportPoint(QPointF(200, 70)));
+        check(brushCanvas.cancelDrawing(), "brush preview can be cancelled");
+        mouse(&brushCanvas, QEvent::MouseButtonRelease, brushCanvas.viewportPoint(QPointF(300, 70)));
+        check(accepted == 1, "cancelled brush does not enter history");
+        for (const double zoom : {.25, .5, 1., 2., 4.}) {
+            brushCanvas.setImage(rgbSource, true); brushCanvas.setZoom(zoom); brushCanvas.setAnnotation(dot, true);
+            const QPointF center(rgbSource.width()/2., rgbSource.height()/2.);
+            mouse(&brushCanvas, QEvent::MouseButtonPress, brushCanvas.viewportPoint(center));
+            mouse(&brushCanvas, QEvent::MouseButtonRelease, brushCanvas.viewportPoint(center));
+            check(qAbs(paintedStroke.brushDiameter*zoom-dot.brushDiameter) < .001,
+                "mosaic brush diameter stays fixed in screen pixels across zoom levels");
+        }
+    }
     canvas.resize(640, 480); canvas.show(); canvas.setImage(source, true);
     check(canvas.zoom() == 1.0, "small images default to actual size");
     canvas.fit();
@@ -637,18 +743,49 @@ int runImageBrowserTest(QApplication& app) {
     trigger(window, QStringLiteral("撤销"));
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo OpenCV filter");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool7"))->click();
+    SurfaceStabilityProbe colorSurfaces(window);
     editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->setValue(50);
     editorPanel->findChild<QSpinBox*>(QStringLiteral("editorOpacity"))->setValue(50);
-    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "color changes need no apply button");
+    check(editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->isEnabled(), "color fields remain interactive during processing");
+    check(action(window, QStringLiteral("编辑"))->isEnabled() && action(window, QStringLiteral("格式转换"))->isEnabled() &&
+        action(window, QStringLiteral("复制图片"))->isEnabled(), "color processing keeps unrelated buttons visually available");
     check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "new color controls enter history");
     trigger(window, QStringLiteral("复制图片"));
     EditOperation uiColor; uiColor.kind = EditOperation::AdjustColor; uiColor.temperature = 50; uiColor.opacity = 50;
     check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiColor}, 1).image, "inline color controls change actual pixels");
+    const QString liveColorQa = qEnvironmentVariable("NTSCREENSHOT_LIVE_COLOR_QA_DIR");
+    if (!liveColorQa.isEmpty()) {
+        QDir().mkpath(liveColorQa);
+        window->grab().save(QDir(liveColorQa).filePath("live-color-editor.png"));
+    }
+    for (int value = 10; value <= 80; ++value) {
+        editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->setValue(value);
+        QCoreApplication::processEvents();
+    }
+    action(window, QStringLiteral("复制图片"))->trigger();
+    check(waitUntil([&] { return action(window, QStringLiteral("复制图片"))->isEnabled(); }), "latest color values finish automatically");
+    uiColor.temperature = 80;
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiColor}, 1).image, "color changes use original session pixels without cumulative adjustment");
+    check(colorSurfaces.stable(), "live color never restyles, reicons, disables, hides or moves unrelated buttons");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "one undo restores whole color session");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == source, "color slider updates are grouped into one undo step");
+    trigger(window, QStringLiteral("重做"));
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "redo restores live color result");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiColor}, 1).image, "redo keeps latest color parameters");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo color before testing reset");
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->setValue(25);
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "start another live color session");
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorColorReset"))->click();
     check(editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->value() == 0 &&
         editorPanel->findChild<QSpinBox*>(QStringLiteral("editorOpacity"))->value() == 100, "color reset includes new controls");
-    trigger(window, QStringLiteral("撤销"));
-    check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo new color controls");
+    check(waitUntil([&] { return action(window, QStringLiteral("复制图片"))->isEnabled(); }), "reset parameters updates image automatically");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == source && !window->windowTitle().contains('*'), "reset live color returns to unadjusted session image");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool1"))->click();
     check(browserCanvas->annotating() && !browserCanvas->cropping() && !editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "selecting annotation immediately arms direct drawing");
     browserCanvas->setZoom(1.5);
@@ -665,27 +802,61 @@ int runImageBrowserTest(QApplication& app) {
     trigger(window, QStringLiteral("复制图片"));
     check(QApplication::clipboard()->image() == source, "undo direct annotation restores original pixels");
     browserCanvas->fit(false);
-    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
+    editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool0"))->click();
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
-    check(browserCanvas->cropping() && editorPanel->isVisible(), "mosaic keeps details visible while selecting");
+    check(browserCanvas->cropping() && editorPanel->isVisible(), "crop keeps details visible while selecting");
     check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isEnabled(), "empty selection cannot be applied");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool6"))->click();
     check(!browserCanvas->cropping() && !window->windowTitle().contains('*'), "switching tools cancels uncommitted selection");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
-    editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
+    check(browserCanvas->annotating() && !browserCanvas->cropping() &&
+        !editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "selecting mosaic immediately arms brush without select-area button");
+    auto* pixelStyle = editorPanel->findChild<QToolButton*>(QStringLiteral("editorMosaicStyle0"));
+    auto* blurStyle = editorPanel->findChild<QToolButton*>(QStringLiteral("editorMosaicStyle1"));
+    auto* solidStyle = editorPanel->findChild<QToolButton*>(QStringLiteral("editorMosaicStyle2"));
+    check(pixelStyle && blurStyle && solidStyle && pixelStyle->isChecked() &&
+        !pixelStyle->icon().isNull() && !blurStyle->icon().isNull() && !solidStyle->icon().isNull(),
+        "mosaic offers three visible preview buttons with default selection");
+    check(pixelStyle->icon().pixmap(80, 48).toImage() != blurStyle->icon().pixmap(80, 48).toImage() &&
+        blurStyle->icon().pixmap(80, 48).toImage() != solidStyle->icon().pixmap(80, 48).toImage(), "style buttons show different actual effects");
+    blurStyle->click();
+    check(blurStyle->isChecked() && !pixelStyle->isChecked() && qobject_cast<ImageEditorPanel*>(editorPanel)->currentOperation().variant == 1,
+        "one click selects blur and updates brush directly");
+    solidStyle->click();
+    auto* coverColor = editorPanel->findChild<QLineEdit*>(QStringLiteral("editorMosaicColor"));
+    check(solidStyle->isChecked() && !blurStyle->isChecked() && coverColor->isVisible() &&
+        !editorPanel->findChild<QSpinBox*>(QStringLiteral("editorMosaicBlock"))->isVisible(), "solid cover shows only relevant settings");
+    const QImage oldCoverPreview = solidStyle->icon().pixmap(80, 48).toImage();
+    coverColor->setText("#ff0000");
+    check(oldCoverPreview != solidStyle->icon().pixmap(80, 48).toImage(), "cover thumbnail follows chosen color");
+    pixelStyle->click();
+    SurfaceStabilityProbe mosaicSurfaces(window);
+    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorMosaicBlock"))->setValue(20);
     check(browserCanvas->viewportPoint(QPointF(0, 0)).x() >= browserCanvas->mapFrom(window, editorPanel->geometry().topRight()).x(), "image stays clear of floating panel");
     mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(150, 80)));
     mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(180, 110)));
     mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(180, 110)));
-    check(editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isEnabled(), "valid selection enables inline apply");
-    editorPanel->findChild<QSpinBox*>(QStringLiteral("editorMosaicBlock"))->setValue(20);
-    editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->click();
+    check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isVisible(), "brush needs no selection confirmation");
     check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "mosaic enters history");
     trigger(window, QStringLiteral("复制图片"));
-    auto expectedMosaic = mosaic; expectedMosaic.strength = 20;
-    check(QApplication::clipboard()->image() == ImageDocument::render(source, {expectedMosaic}, 1).image, "mosaic UI applies selected pixels");
+    EditOperation expectedMosaic; expectedMosaic.kind = EditOperation::Mosaic; expectedMosaic.strength = 20;
+    expectedMosaic.directDrawing = true; expectedMosaic.brushPoints = {QPointF(150, 80), QPointF(180, 110)};
+    expectedMosaic.brushDiameter = 24/browserCanvas->zoom();
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {expectedMosaic}, 1).image, "mosaic drag commits the circular brush path");
+    check(mosaicSurfaces.stable(), "mosaic commit preserves unrelated button styles, icons, enabled states and geometry");
+    const QString mosaicQa = qEnvironmentVariable("NTSCREENSHOT_MOSAIC_QA_DIR");
+    if (!mosaicQa.isEmpty()) {
+        QDir().mkpath(mosaicQa); window->grab().save(QDir(mosaicQa).filePath("mosaic-editor.png"));
+    }
     trigger(window, QStringLiteral("撤销"));
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo mosaic");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == source, "one undo restores whole brush stroke");
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(150, 80)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(180, 110)));
+    check(browserCanvas->cancelDrawing(), "active mosaic brush can be cancelled");
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(180, 110)));
+    check(!window->windowTitle().contains('*'), "cancelled brush never commits pixels");
     drop(window, {QUrl::fromLocalFile(cutoutPath)});
     check(waitUntil([&] { return window->windowTitle().startsWith("cutout-source.png") && action(window, QStringLiteral("编辑"))->isEnabled(); }), "cutout subject loaded");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool8"))->click();
