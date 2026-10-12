@@ -94,6 +94,7 @@ void trigger(QWidget* window, const QString& text) {
 class SurfaceStabilityProbe final : public QObject {
 public:
     explicit SurfaceStabilityProbe(QWidget* window) {
+        window_ = window;
         // Switching tools posts layout requests and zero-delay positioning work.
         // Establish the baseline after that work, before starting image processing.
         for (int i = 0; i < 4; ++i) {
@@ -105,20 +106,25 @@ public:
         for (auto* a : window->findChildren<QAction*>()) if (names.contains(a->text())) {
             icons.append({a, a->icon().cacheKey()});
             connect(a, &QAction::changed, this, [this, a] {
+                if (!monitoring_) return;
                 ++actionChanges; qWarning() << "Unrelated action changed:" << a->text();
             });
         }
         for (auto* button : window->findChildren<QToolButton*>()) if (button->defaultAction() && names.contains(button->defaultAction()->text())) {
-            surfaces.append({button, button->geometry()}); button->installEventFilter(this);
+            surfaces.append({button, QRect(button->mapTo(window, QPoint()), button->size())}); button->installEventFilter(this);
         }
         for (auto* toolbar : window->findChildren<QToolBar*>()) toolbar->installEventFilter(this);
     }
-    bool stable() const {
+    bool stable() {
+        monitoring_ = false;
         if (actionChanges || surfaceEvents) return false;
         for (const auto& entry : icons) if (!entry.first || entry.first->icon().cacheKey() != entry.second) return false;
-        for (const auto& entry : surfaces) if (!entry.first || entry.first->geometry() != entry.second) {
+        // Parent layout groups may resize around transient status text. Compare
+        // visible positions in the window, not coordinates inside those groups.
+        for (const auto& entry : surfaces) if (!entry.first ||
+            QRect(entry.first->mapTo(window_, QPoint()), entry.first->size()) != entry.second) {
             qWarning() << "Unrelated button geometry changed:" << entry.first.data() << entry.second
-                       << (entry.first ? entry.first->geometry() : QRect());
+                       << (entry.first ? QRect(entry.first->mapTo(window_, QPoint()), entry.first->size()) : QRect());
             return false;
         }
         return true;
@@ -126,6 +132,7 @@ public:
     int actionChanges = 0, surfaceEvents = 0;
 protected:
     bool eventFilter(QObject* object, QEvent* event) override {
+        if (!monitoring_) return false;
         if (event->type() == QEvent::StyleChange || event->type() == QEvent::EnabledChange ||
             event->type() == QEvent::Show || event->type() == QEvent::Hide) {
             ++surfaceEvents; qWarning() << "Unrelated button surface changed:" << object << event->type();
@@ -133,6 +140,8 @@ protected:
         return false;
     }
 private:
+    QPointer<QWidget> window_;
+    bool monitoring_ = true;
     QList<QPair<QPointer<QAction>, qint64>> icons;
     QList<QPair<QPointer<QWidget>, QRect>> surfaces;
 };
@@ -757,6 +766,8 @@ int runImageBrowserTest(QApplication& app) {
     trigger(window, QStringLiteral("撤销"));
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "undo OpenCV filter");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool7"))->click();
+    const QSize editingWindowSize = window->size();
+    window->resize(560, 420);
     SurfaceStabilityProbe colorSurfaces(window);
     editorPanel->findChild<QSpinBox*>(QStringLiteral("editorTemperature"))->setValue(50);
     editorPanel->findChild<QSpinBox*>(QStringLiteral("editorOpacity"))->setValue(50);
@@ -782,6 +793,7 @@ int runImageBrowserTest(QApplication& app) {
     uiColor.temperature = 80;
     check(QApplication::clipboard()->image() == ImageDocument::render(source, {uiColor}, 1).image, "color changes use original session pixels without cumulative adjustment");
     check(colorSurfaces.stable(), "live color never restyles, reicons, disables, hides or moves unrelated buttons");
+    window->resize(editingWindowSize);
     trigger(window, QStringLiteral("撤销"));
     check(waitUntil([&] { return action(window, QStringLiteral("重做"))->isEnabled(); }), "one undo restores whole color session");
     trigger(window, QStringLiteral("复制图片"));
@@ -844,6 +856,7 @@ int runImageBrowserTest(QApplication& app) {
     coverColor->setText("#ff0000");
     check(oldCoverPreview != solidStyle->icon().pixmap(80, 48).toImage(), "cover thumbnail follows chosen color");
     pixelStyle->click();
+    window->resize(560, 420);
     SurfaceStabilityProbe mosaicSurfaces(window);
     editorPanel->findChild<QSpinBox*>(QStringLiteral("editorMosaicBlock"))->setValue(20);
     check(browserCanvas->viewportPoint(QPointF(0, 0)).x() >= browserCanvas->mapFrom(window, editorPanel->geometry().topRight()).x(), "image stays clear of floating panel");
@@ -858,6 +871,7 @@ int runImageBrowserTest(QApplication& app) {
     expectedMosaic.brushDiameter = 24/browserCanvas->zoom();
     check(QApplication::clipboard()->image() == ImageDocument::render(source, {expectedMosaic}, 1).image, "mosaic drag commits the circular brush path");
     check(mosaicSurfaces.stable(), "mosaic commit preserves unrelated button styles, icons, enabled states and geometry");
+    window->resize(editingWindowSize);
     const QString mosaicQa = qEnvironmentVariable("NTSCREENSHOT_MOSAIC_QA_DIR");
     if (!mosaicQa.isEmpty()) {
         QDir().mkpath(mosaicQa); window->grab().save(QDir(mosaicQa).filePath("mosaic-editor.png"));
