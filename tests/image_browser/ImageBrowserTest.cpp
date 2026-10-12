@@ -94,11 +94,19 @@ void trigger(QWidget* window, const QString& text) {
 class SurfaceStabilityProbe final : public QObject {
 public:
     explicit SurfaceStabilityProbe(QWidget* window) {
+        // Switching tools posts layout requests and zero-delay positioning work.
+        // Establish the baseline after that work, before starting image processing.
+        for (int i = 0; i < 4; ++i) {
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
+            QCoreApplication::processEvents(QEventLoop::AllEvents);
+        }
         const QStringList names{QStringLiteral("编辑"), QStringLiteral("格式转换"), QStringLiteral("刷新"),
             QStringLiteral("复制图片"), QStringLiteral("另存为"), QStringLiteral("适应窗口"), QStringLiteral("实际大小"), QStringLiteral("全屏")};
         for (auto* a : window->findChildren<QAction*>()) if (names.contains(a->text())) {
             icons.append({a, a->icon().cacheKey()});
-            connect(a, &QAction::changed, this, [this] { ++actionChanges; });
+            connect(a, &QAction::changed, this, [this, a] {
+                ++actionChanges; qWarning() << "Unrelated action changed:" << a->text();
+            });
         }
         for (auto* button : window->findChildren<QToolButton*>()) if (button->defaultAction() && names.contains(button->defaultAction()->text())) {
             surfaces.append({button, button->geometry()}); button->installEventFilter(this);
@@ -108,14 +116,20 @@ public:
     bool stable() const {
         if (actionChanges || surfaceEvents) return false;
         for (const auto& entry : icons) if (!entry.first || entry.first->icon().cacheKey() != entry.second) return false;
-        for (const auto& entry : surfaces) if (!entry.first || entry.first->geometry() != entry.second) return false;
+        for (const auto& entry : surfaces) if (!entry.first || entry.first->geometry() != entry.second) {
+            qWarning() << "Unrelated button geometry changed:" << entry.first.data() << entry.second
+                       << (entry.first ? entry.first->geometry() : QRect());
+            return false;
+        }
         return true;
     }
     int actionChanges = 0, surfaceEvents = 0;
 protected:
-    bool eventFilter(QObject*, QEvent* event) override {
+    bool eventFilter(QObject* object, QEvent* event) override {
         if (event->type() == QEvent::StyleChange || event->type() == QEvent::EnabledChange ||
-            event->type() == QEvent::Show || event->type() == QEvent::Hide) ++surfaceEvents;
+            event->type() == QEvent::Show || event->type() == QEvent::Hide) {
+            ++surfaceEvents; qWarning() << "Unrelated button surface changed:" << object << event->type();
+        }
         return false;
     }
 private:
