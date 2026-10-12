@@ -50,7 +50,7 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     add_test(NAME msvc_header_dependencies COMMAND ${CMAKE_COMMAND}
         "-DNT_NINJA=${CMAKE_MAKE_PROGRAM}"
         "-DNT_BUILD_DIR=${CMAKE_BINARY_DIR}"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/build/VerifyHeaderDependencies.cmake")
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyHeaderDependencies.cmake")
 endif()
 
 if(WIN32)
