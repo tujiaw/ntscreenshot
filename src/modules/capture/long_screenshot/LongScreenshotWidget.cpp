@@ -9,17 +9,12 @@
 #include <QScreen>
 #include <cmath>
 #include <algorithm>
-#include <cstring>
-#include <limits>
 #include "core/platform/Util.h"
 #include "core/theme/ThemeManager.h"
 #include "core/imaging/ImageMatcher.h"
 #include "shared/ui/TipsWidget.h"
 #include "modules/capture/pin/PinWidget.h"
 #include "app/WindowManager.h"
-
-// 优化相关常量
-static constexpr int MAX_STITCH_HEIGHT = 60000;   // 拼接图片最大高度安全限制
 
 LongScreenshotWidget::LongScreenshotWidget(WindowManager* windowManager, const QRect& captureRect, std::shared_ptr<QPixmap> originScreen, QWidget* parent)
     : QWidget(parent)
@@ -325,8 +320,8 @@ bool LongScreenshotWidget::shouldAppendFrame(const QImage& currentImage, const Q
         return false;
     }
 
-    int minShift = -10;
-    int maxShift = imageHeight * 3 / 4;
+    const int maxShift = imageHeight * 3 / 4;
+    const int minShift = -maxShift;
 
     auto [shift, score] = estimateScrollShift(prevImage, currentImage, minShift, maxShift);
 
@@ -342,59 +337,7 @@ bool LongScreenshotWidget::shouldAppendFrame(const QImage& currentImage, const Q
 
 QPixmap LongScreenshotWidget::stitchImages()
 {
-    if (capturedFrames_.isEmpty()) {
-        return QPixmap();
-    }
-    if (capturedFrames_.size() == 1) {
-        return QPixmap::fromImage(capturedFrames_.first().image);
-    }
-
-    // 1. 计算拼接后图片的总高度
-    int width = capturedFrames_.first().image.width();
-    int totalHeight = capturedFrames_.first().image.height();
-    for (int i = 1; i < capturedFrames_.size(); ++i) {
-        totalHeight += capturedFrames_[i].shiftFromPrev;
-    }
-
-    if (totalHeight > MAX_STITCH_HEIGHT) {
-        totalHeight = MAX_STITCH_HEIGHT; // 限制最大高度
-    }
-
-    QImage result(width, totalHeight, QImage::Format_RGB32);
-    result.fill(Qt::white);
-    const QImage first = capturedFrames_.first().image.convertToFormat(QImage::Format_RGB32);
-    int currentY = 0;
-    for (int row = 0; row < first.height() && row < totalHeight; ++row) {
-        std::memcpy(result.scanLine(row), first.constScanLine(row), width * sizeof(QRgb));
-    }
-    currentY += first.height();
-
-    for (int i = 1; i < capturedFrames_.size(); ++i) {
-        const auto& frame = capturedFrames_[i];
-        int shift = frame.shiftFromPrev;
-
-        if (shift <= 0) continue;
-        if (currentY + shift > totalHeight) break;
-
-        const QImage img = frame.image.convertToFormat(QImage::Format_RGB32);
-        if (img.width() != width || shift >= img.height()) continue;
-
-        // 计算当前帧新增内容的来源位置
-        // shift 表示当前帧底部“新增”了多少个像素的高度
-        int sourceY = img.height() - shift;
-
-        // Move the cut to the best-matching row in the overlap, avoiding text
-        // baselines. Copy pixels rather than alpha-blending two text renders.
-        const int seamRows = chooseSeamRows(result, img, currentY, sourceY);
-        for (int row = -seamRows; row < shift; ++row) {
-            std::memcpy(result.scanLine(currentY + row),
-                        img.constScanLine(sourceY + row), width * sizeof(QRgb));
-        }
-
-        currentY += shift;
-    }
-
-    return QPixmap::fromImage(result);
+    return QPixmap::fromImage(ScrollStitcher::stitch(capturedFrames_));
 }
 
 std::pair<int, double> LongScreenshotWidget::estimateScrollShift(const QImage& previous, const QImage& current, int minShift, int maxShift)
@@ -402,42 +345,18 @@ std::pair<int, double> LongScreenshotWidget::estimateScrollShift(const QImage& p
     return ImageMatcher::estimateScrollShift(previous, current, minShift, maxShift);
 }
 
-int LongScreenshotWidget::chooseSeamRows(const QImage& result, const QImage& source, int targetY, int sourceY)
-{
-    const int limit = std::min({24, sourceY, targetY});
-    int bestRows = 0;
-    double bestCost = std::numeric_limits<double>::max();
-    const int x0 = result.width() / 10;
-    const int x1 = result.width() * 9 / 10;
-    for (int rows = 1; rows <= limit; ++rows) {
-        const QRgb* oldLine = reinterpret_cast<const QRgb*>(result.constScanLine(targetY - rows));
-        const QRgb* newLine = reinterpret_cast<const QRgb*>(source.constScanLine(sourceY - rows));
-        double difference = 0;
-        int samples = 0;
-        for (int x = x0; x < x1; x += 3) {
-            difference += std::abs(qGray(oldLine[x]) - qGray(newLine[x]));
-            ++samples;
-        }
-        const double cost = samples ? difference / samples : 255.0;
-        if (cost < bestCost) {
-            bestCost = cost;
-            bestRows = rows;
-        }
-    }
-    return bestCost <= 12.0 ? bestRows : 0;
-}
-
 bool LongScreenshotWidget::isReliableShift(int shift, double score, int imageHeight)
 {
-    if (shift < MIN_APPEND_HEIGHT_PX) {
-        qDebug() << "[LongScr] isReliableShift=false: shift" << shift << "< MIN" << MIN_APPEND_HEIGHT_PX;
+    const int distance = std::abs(shift);
+    if (distance < MIN_APPEND_HEIGHT_PX) {
+        qDebug() << "[LongScr] isReliableShift=false: abs(shift)" << distance << "< MIN" << MIN_APPEND_HEIGHT_PX;
         return false;
     }
-    if (shift >= imageHeight - 10) {
-        qDebug() << "[LongScr] isReliableShift=false: shift" << shift << ">= imageHeight-10 =" << (imageHeight - 10);
+    if (distance >= imageHeight - 10) {
+        qDebug() << "[LongScr] isReliableShift=false: abs(shift)" << distance << ">= imageHeight-10 =" << (imageHeight - 10);
         return false;
     }
-    if (score >= 0.15) {
+    if (!std::isfinite(score) || score >= 0.15) {
         qDebug() << "[LongScr] isReliableShift=false: score" << score << ">= 0.15";
         return false;
     }

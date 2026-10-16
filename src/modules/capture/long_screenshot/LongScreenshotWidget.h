@@ -12,6 +12,7 @@
 #include <atomic>
 #include <memory>
 #include <utility>
+#include "core/imaging/ScrollStitcher.h"
 
 class LongScreenshotControlPanel;
 class WindowManager;
@@ -41,11 +42,6 @@ private slots:
 
 private:
     WindowManager* windowManager_ = nullptr;
-    struct CaptureFrame {
-        QImage image;
-        int shiftFromPrev;
-        double matchScore;
-    };
 
     void initUI();
     void startCapture();
@@ -56,7 +52,6 @@ private:
     static bool shouldAppendFrame(const QImage& currentImage, const QImage& prevImage, int* shiftFromPrev, double* matchScore);
     QPixmap stitchImages();
     static std::pair<int, double> estimateScrollShift(const QImage& previous, const QImage& current, int minShift, int maxShift);
-    static int chooseSeamRows(const QImage& result, const QImage& source, int targetY, int sourceY);
     static bool isReliableShift(int shift, double score, int imageHeight);
     void updateInfoLabel();
     void positionControlPanel();
@@ -64,7 +59,7 @@ private:
 private:
     QRect captureRect_;
     std::shared_ptr<QPixmap> originScreen_;
-    QVector<CaptureFrame> capturedFrames_;
+    QVector<ScrollCaptureFrame> capturedFrames_;
     QTimer* captureTimer_;
     QImage lastCapturedImage_;
     QQueue<QImage> pendingFrames_;

@@ -32,7 +32,8 @@ public:
      * @param current Current frame
      * @param minShift Minimum shift to consider (in pixels)
      * @param maxShift Maximum shift to consider (in pixels)
-     * @return Pair of (shift in pixels, match score where 0 = perfect match)
+     * @return Pair of (signed shift: down positive, up negative; error score where
+     *         0 = perfect match). An invalid match has the maximum double score.
      */
     static std::pair<int, double> estimateScrollShift(
         const QImage& previous,

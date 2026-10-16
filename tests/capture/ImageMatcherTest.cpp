@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <cstdio>
 #include "core/imaging/ImageMatcher.h"
+#include "core/imaging/ScrollStitcher.h"
 
 static QImage makePage(int salt)
 {
@@ -47,17 +48,70 @@ int main(int argc, char** argv)
     QCoreApplication app(argc, argv);
     const QImage page = makePage(0);
     const QImage first = frameAt(page, 0);
-    for (int shift : {80, 137}) {
-        auto [found, score] = ImageMatcher::estimateScrollShift(first, frameAt(page, shift), -10, 375);
+    for (int shift : {80, 137, -80, -137, -320, 320}) {
+        const int start = shift < 0 ? -shift : 0;
+        auto [found, score] = ImageMatcher::estimateScrollShift(
+            frameAt(page, start), frameAt(page, start + shift), -375, 375);
         if (std::abs(found - shift) > 2 || score >= 0.15) {
             std::fprintf(stderr, "Wrong scroll shift: expected=%d found=%d score=%f\n", shift, found, score);
             return 1;
         }
     }
-    auto [falseShift, falseScore] = ImageMatcher::estimateScrollShift(
-        first, frameAt(makePage(7), 80), -10, 375);
-    if (falseShift >= 10 && falseScore < 0.15) {
-        std::fprintf(stderr, "Accepted unrelated content: shift=%d score=%f\n", falseShift, falseScore);
+    for (bool reverse : {false, true}) {
+        const QImage unrelated = frameAt(makePage(7), 80);
+        auto [falseShift, falseScore] = ImageMatcher::estimateScrollShift(
+            reverse ? unrelated : first, reverse ? first : unrelated, -375, 375);
+        if (std::abs(falseShift) >= 10 && falseScore < 0.15) {
+            std::fprintf(stderr, "Accepted unrelated content: shift=%d score=%f\n", falseShift, falseScore);
+            return 1;
+        }
+    }
+    auto [stationaryShift, stationaryScore] = ImageMatcher::estimateScrollShift(first, first, -375, 375);
+    if (std::abs(stationaryShift) >= 10 && stationaryScore < 0.15) return 1;
+    for (int shift : {225, -225}) {
+        const int start = shift < 0 ? -shift : 0;
+        auto [found, score] = ImageMatcher::estimateScrollShift(
+            page.copy(0, start, page.width(), 300),
+            page.copy(0, start + shift, page.width(), 300), -225, 225);
+        if (found != shift || score >= 0.15) {
+            std::fprintf(stderr, "Small viewport scroll mismatch: expected=%d found=%d\n", shift, found);
+            return 1;
+        }
+    }
+
+    QImage sparse(360, 1000, QImage::Format_RGB32);
+    sparse.fill(Qt::white);
+    for (int y = 140; y < sparse.height(); ++y) {
+        unsigned value = unsigned(y) * 747796405u;
+        value ^= value >> 16;
+        const int gray = 30 + int(value % 170);
+        for (int x = 40; x < 320; ++x) sparse.setPixel(x, y, qRgb(gray, gray, gray));
+    }
+    for (int shift : {80, -80, 320, -320}) {
+        const int start = shift < 0 ? -shift : 0;
+        auto [found, score] = ImageMatcher::estimateScrollShift(
+            frameAt(sparse, start), frameAt(sparse, start + shift), -375, 375);
+        if (found != shift || score >= 0.15) {
+            std::fprintf(stderr, "Sparse-page scroll mismatch: expected=%d found=%d\n", shift, found);
+            return 1;
+        }
+    }
+
+    // Use real estimates to stitch a sequence that changes direction and crosses
+    // both previous extremes. Every output pixel must match the original page.
+    const QVector<int> path = {250, 330, 467, 330, 250, 113, 33, 170, 307, 444};
+    QVector<ScrollCaptureFrame> frames;
+    QImage previous;
+    for (int position : path) {
+        const QImage current = page.copy(0, position, page.width(), 500);
+        auto match = previous.isNull() ? std::pair<int, double>{0, 0.0}
+            : ImageMatcher::estimateScrollShift(previous, current, -375, 375);
+        if (match.second >= 0.15) return 1;
+        frames.push_back({current, match.first, match.second});
+        previous = current;
+    }
+    if (ScrollStitcher::stitch(frames) != page.copy(0, 33, page.width(), 934)) {
+        std::fprintf(stderr, "Matched bidirectional sequence has missing, repeated or misaligned pixels\n");
         return 1;
     }
     return 0;

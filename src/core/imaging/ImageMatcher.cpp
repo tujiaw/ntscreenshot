@@ -8,13 +8,17 @@
 // correlation peaks alone are ambiguous on repeated rows and fixed page chrome.
 static double overlapError(const cv::Mat& previous, const cv::Mat& current, int shift)
 {
-    if (shift < 0 || shift >= previous.rows || previous.size() != current.size()) {
+    if (std::abs(shift) >= previous.rows || previous.size() != current.size()) {
         return 1.0;
     }
     const int x0 = previous.cols * 15 / 100;
     const int x1 = previous.cols * 85 / 100;
-    const int y0 = qMax(0, previous.rows * 10 / 100);
-    const int y1 = qMin(previous.rows - shift, previous.rows * 90 / 100);
+    // Exclude chrome in both frames while retaining at least 20 overlapping
+    // rows for small viewports and large (but still supported) scroll steps.
+    const int marginY = qMin(previous.rows / 10,
+                             qMax(0, (previous.rows - std::abs(shift) - 20) / 2));
+    const int y0 = qMax(marginY, marginY - shift);
+    const int y1 = qMin(previous.rows - marginY, previous.rows - marginY - shift);
     if (x1 <= x0 || y1 - y0 < 20) {
         return 1.0;
     }
@@ -39,7 +43,7 @@ static std::pair<int, double> validatedShift(
 {
     const double error = overlapError(previous, current, shift);
     const double stationaryError = overlapError(previous, current, 0);
-    if (error >= 0.15 || (shift > 0 && error >= stationaryError * 0.9)) {
+    if (error >= 0.15 || (shift != 0 && error >= stationaryError * 0.9)) {
         return {-1, std::numeric_limits<double>::max()};
     }
     return {shift, error};
@@ -131,9 +135,9 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
     // 这个方案能完全忽略局部的动画、视频、悬停变化
     cv::Ptr<cv::ORB> orb = cv::ORB::create(500);
 
-    // 截取当前帧和上一帧底部的搜索区域以提高性能
+    // 双向滚动需要覆盖整个视口，大位移的重叠区域可能只在顶部。
     int searchHeight = qMin(previous.height(), current.height());
-    int cropHeight = qMin(searchHeight, qMax(300, searchHeight / 2)); // 调低最小截取高度，适应较小的截图区域
+    int cropHeight = searchHeight;
     
     int prevCropY = previous.height() - cropHeight;
     int currCropY = current.height() - cropHeight;
@@ -174,7 +178,7 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
             // 允许 X 轴方向有微小的容差
             if (std::abs(pt1.x - pt2.x) < 2.0f) {
                 int shift = std::round((pt1.y + prevCropY) - (pt2.y + currCropY));
-                // 注意：由于外部传入的 minShift 是 -10，这里允许 shift=0 的点进入投票。
+                // 保留正负位移以及 shift=0 的点，让调用方过滤静止帧。
                 // 这非常关键！如果实际没滚动（仅有局部 hover 导致重绘），我们要算出真实的 0，在外层将其拦截。
                 if (shift >= minShift && shift <= maxShift) {
                     yShifts.push_back(shift);
@@ -214,15 +218,15 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
             if (maxCount < 5) {
                 qDebug() << "[ImageMatcher] ORB maxCount too low:" << maxCount << "fallback.";
                 useTemplateFallback = true;
-            } else if (bestShift <= 0) {
+            } else if (bestShift == 0) {
                 // ORB 以高票数报告 shift=0，但这可能是表格重复列（如固定的"中国/墨西哥/徐州"）
                 // 造成的虚假共识：不同行的相同内容被错误匹配到同一位置。
                 // 转交给相位相关法做频域验证，它不受空间重复性干扰。
-                qDebug() << "[ImageMatcher] ORB shift<=0 (maxCount:" << maxCount << "), may be table content trap, trying phase correlation.";
+                qDebug() << "[ImageMatcher] ORB shift=0 (maxCount:" << maxCount << "), may be table content trap, trying phase correlation.";
                 useTemplateFallback = true;
             } else {
                 auto validated = validatedShift(grayPrev, grayCurr, bestShift);
-                if (validated.first >= 0) {
+                if (validated.second < 0.15) {
                     return validated;
                 }
                 qDebug() << "[ImageMatcher] ORB overlap validation failed:" << bestShift;
@@ -242,7 +246,7 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
         if (pcShift >= minShift && pcShift <= maxShift && pcScore < std::numeric_limits<double>::max()) {
             qDebug() << "[ImageMatcher] Phase correlation matched: shift=" << pcShift;
             auto validated = validatedShift(grayPrev, grayCurr, pcShift);
-            if (validated.first >= 0) return validated;
+            if (validated.second < 0.15) return validated;
         }
         qDebug() << "[ImageMatcher] Phase correlation insufficient, falling back to template matching.";
     }
@@ -257,6 +261,9 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
         if (searchWidth <= 0) return {-1, std::numeric_limits<double>::max()};
 
         const int candidates[] = {
+            0,
+            previous.height() / 10,
+            previous.height() / 3 - templateHeight / 2,
             previous.height() - templateHeight,
             previous.height() * 2 / 3 - templateHeight / 2,
             previous.height() / 2 - templateHeight / 2,
@@ -286,6 +293,7 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
                 templ = grayPrev(templateRoi);
                 cv::meanStdDev(templ, mean, stddev);
             }
+            if (stddev.at<double>(0) < 3.0) continue;
 
             int searchYStart = baseY - maxShift;
             int searchYEnd = baseY - minShift + templateHeight;
@@ -312,13 +320,14 @@ std::pair<int, double> ImageMatcher::estimateScrollShift(
             if (shift < minShift || shift > maxShift) {
                 continue;
             }
-            if (maxVal > bestMaxVal) {
+            if (maxVal > bestMaxVal && maxVal >= 0.70
+                && validatedShift(grayPrev, grayCurr, shift).second < 0.15) {
                 bestMaxVal = maxVal;
                 bestShift = shift;
             }
         }
 
-        if (bestShift < 0) {
+        if (bestMaxVal < 0.0) {
             return {-1, std::numeric_limits<double>::max()};
         }
 

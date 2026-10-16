@@ -107,6 +107,7 @@ endif()
 
 add_executable(image_matcher_tests
     capture/ImageMatcherTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/ScrollStitcher.cpp
     ${NT_SOURCE_DIR}/core/imaging/ImageMatcher.cpp)
 target_include_directories(image_matcher_tests PRIVATE ${NT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(image_matcher_tests PRIVATE Qt6::Core Qt6::Gui ${OpenCV_LIBS})
@@ -121,6 +122,13 @@ if(WIN32)
 else()
     add_test(NAME long_screenshot_matcher COMMAND image_matcher_tests)
 endif()
+
+add_executable(scroll_stitcher_tests
+    capture/ScrollStitcherTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/ScrollStitcher.cpp)
+target_include_directories(scroll_stitcher_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(scroll_stitcher_tests PRIVATE Qt6::Core Qt6::Gui)
+nt_add_qt_test(long_screenshot_stitcher scroll_stitcher_tests)
 
 add_executable(code_scanner_tests
     imaging/CodeScannerTest.cpp
