@@ -93,7 +93,6 @@ private:
     QPoint savedPosition_;
 
     QWidget* header_ = nullptr;
-    QLabel* dragHandle_ = nullptr;
     QToolButton* closeButton_ = nullptr;
     QToolButton* clearSearchButton_ = nullptr;
     QLineEdit* searchEdit_ = nullptr;

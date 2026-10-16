@@ -356,7 +356,8 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     clearSearchButton_->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
     clearSearchButton_->setIconSize(QSize(scaled(12), scaled(12)));
     clearSearchButton_->setFixedSize(scaled(18), scaled(18));
-    clearSearchButton_->setAccessibleName(QStringLiteral("Clear search"));
+    clearSearchButton_->setToolTip(QCoreApplication::translate("App", "清空搜索"));
+    clearSearchButton_->setAccessibleName(clearSearchButton_->toolTip());
     clearSearchButton_->setCursor(Qt::PointingHandCursor);
     clearSearchButton_->hide();
     auto* searchLayout = new QHBoxLayout(searchEdit_);
@@ -406,12 +407,6 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     });
     searchEdit_->setPlaceholderText(QCoreApplication::translate("App", "搜索剪切板"));
 
-    dragHandle_ = new QLabel(QStringLiteral("≡"), header_);
-    dragHandle_->setAlignment(Qt::AlignCenter);
-    dragHandle_->setCursor(Qt::SizeAllCursor);
-    dragHandle_->setFixedSize(scaled(24), scaled(24));
-    headerLayout->addWidget(dragHandle_);
-
     auto makeHeaderButton = [this](const QString& text,
                                    const QString& objectName) {
         auto* button = new QToolButton(header_);
@@ -423,6 +418,8 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     };
     closeButton_ = makeHeaderButton(QStringLiteral("×"),
                                     QStringLiteral("clipCloseButton"));
+    closeButton_->setToolTip(QCoreApplication::translate("App", "关闭"));
+    closeButton_->setAccessibleName(closeButton_->toolTip());
     headerLayout->addWidget(closeButton_);
     root->addWidget(header_);
 
@@ -500,7 +497,6 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     });
 
     header_->installEventFilter(this);
-    dragHandle_->installEventFilter(this);
     resizeGrip_->installEventFilter(this);
     list_->installEventFilter(this);
     searchEdit_->installEventFilter(this);
@@ -793,8 +789,6 @@ void HistoryWindow::ApplyTheme() {
                                    .arg(CssColor(text)));
     emptyDescription_->setStyleSheet(QStringLiteral("color: %1; background: transparent;")
                                          .arg(CssColor(muted)));
-    dragHandle_->setStyleSheet(QStringLiteral("color: %1; background: transparent;")
-                                   .arg(CssColor(muted)));
     searchEdit_->setStyleSheet(
         QStringLiteral("QLineEdit { color: %1; background: %2; border: %3px solid %4;"
                        " border-radius: %5px; padding: 0 %6px; }"
@@ -926,7 +920,7 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
             resized_(size());
         }
     }
-    if (obj == header_ || obj == dragHandle_) {
+    if (obj == header_) {
         if (event->type() == QEvent::MouseButtonPress) {
             auto* mouse = static_cast<QMouseEvent*>(event);
             if (mouse->button() == Qt::LeftButton) {

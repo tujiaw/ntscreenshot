@@ -2,6 +2,8 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>清空搜索</source><translation>Clear search</translation></message>
+    <message><source>关闭</source><translation>Close</translation></message>
     <message><source>收藏</source><translation>Favorites</translation></message>
     <message><source>取消收藏</source><translation>Remove from favorites</translation></message>
     <message><source>搜索剪切板</source><translation>Search clipboard</translation></message>
