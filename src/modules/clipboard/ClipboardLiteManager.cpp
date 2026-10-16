@@ -129,7 +129,19 @@ bool ClipboardLiteManager::nativeEvent(const QByteArray& eventType, void* messag
             CaptureTargetFromForeground();
             const int idx = id - cl::id::HotkeyPasteFirst;
             const UINT triggerKey = static_cast<UINT>('1' + idx);
-            BeginPaste(static_cast<size_t>(idx), true,
+            size_t index = size_t(-1);
+            if (popup_ && popup_->IsPopupVisible()) {
+                index = popup_->HistoryIndexForRow(idx);
+            } else {
+                int row = 0;
+                for (size_t i = 0; i < history_.Items().size(); ++i) {
+                    if (!history_.Items()[i].favorite && row++ == idx) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+            BeginPaste(index, true,
                        RegisteredPasteHotkeyModifiers(), triggerKey);
         }
         if (result) {
@@ -770,8 +782,8 @@ void ClipboardLiteManager::EnsurePopup() {
             RefreshPopupIfVisible();
         }
     };
-    auto togglePinned = [this](size_t index) {
-        if (history_.TogglePinned(index)) {
+    auto toggleFavorite = [this](size_t index) {
+        if (history_.ToggleFavorite(index)) {
             MarkHistoryDirty();
             SyncHistoryStore();
             RefreshPopupIfVisible();
@@ -783,7 +795,7 @@ void ClipboardLiteManager::EnsurePopup() {
     auto resized = [this](const QSize& size) { SavePopupSize(size); };
     const bool configured = aiFillSettings_.IsConfigured();
     if (popup_) {
-        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
+        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);
         popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
         popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
         popup_->SetBackgroundTransparency(backgroundTransparency_);
@@ -793,7 +805,7 @@ void ClipboardLiteManager::EnsurePopup() {
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
     connect(popup_, &HistoryWindow::imagePreviewRequested,
             this, &ClipboardLiteManager::imagePreviewRequested);
-    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, togglePinned);
+    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);
     popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
     popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
     popup_->SetBackgroundTransparency(backgroundTransparency_);

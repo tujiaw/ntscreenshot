@@ -11,6 +11,7 @@
 #include <QSizeGrip>
 #include <QTimer>
 #include <QToolButton>
+#include <QButtonGroup>
 #include <QWidget>
 
 #include <functional>
@@ -36,7 +37,7 @@ public:
                    MoveCallback moved,
                    ResizeCallback resized,
                    bool aiConfigured,
-                   DeleteCallback togglePinned = {});
+                   DeleteCallback toggleFavorite = {});
     void SetSavedPosition(const QPoint& position, bool available);
     void SetBackgroundTransparency(int percent);
     void SetSavedSize(const QSize& size, bool available, qreal savedScaleFactor = 1.0);
@@ -46,6 +47,7 @@ public:
     void Refresh();
     void ShowHint(const QString& text, int timeoutMs = 2400);
     bool IsPopupVisible() const;
+    size_t HistoryIndexForRow(int row) const;
 
 signals:
     void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
@@ -67,7 +69,6 @@ private slots:
     void onCloseClicked();
 
 private:
-    size_t HistoryIndexForRow(int row) const;
     void PasteSelected();
     void PasteRow(int row);
     void CopySelected();
@@ -82,7 +83,7 @@ private:
     const ClipboardHistory* history_ = nullptr;
     PasteCallback paste_;
     DeleteCallback remove_;
-    DeleteCallback togglePinned_;
+    DeleteCallback toggleFavorite_;
     CloseCallback close_;
     AiFillCallback aiFill_;
     MoveCallback moved_;
@@ -96,6 +97,10 @@ private:
     QToolButton* closeButton_ = nullptr;
     QToolButton* clearSearchButton_ = nullptr;
     QLineEdit* searchEdit_ = nullptr;
+    QButtonGroup* viewGroup_ = nullptr;
+    QWidget* viewSwitcher_ = nullptr;
+    QToolButton* clipboardViewButton_ = nullptr;
+    QToolButton* favoritesViewButton_ = nullptr;
     QWidget* body_ = nullptr;
     QListWidget* list_ = nullptr;
     QAbstractItemDelegate* delegate_ = nullptr;

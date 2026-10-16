@@ -2,6 +2,16 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>收藏</source><translation>Favorites</translation></message>
+    <message><source>取消收藏</source><translation>Remove from favorites</translation></message>
+    <message><source>搜索剪切板</source><translation>Search clipboard</translation></message>
+    <message><source>搜索收藏</source><translation>Search favorites</translation></message>
+    <message><source>没有匹配结果</source><translation>No matches</translation></message>
+    <message><source>暂无收藏</source><translation>No favorites yet</translation></message>
+    <message><source>剪切板为空</source><translation>Clipboard is empty</translation></message>
+    <message><source>试试其他关键词。</source><translation>Try a different search.</translation></message>
+    <message><source>右键剪切板记录，选择收藏即可保留。</source><translation>Right-click a clipboard entry and add it to favorites to keep it.</translation></message>
+    <message><source>复制文字或图片后会自动显示在这里。</source><translation>Copy text or an image and it will appear here automatically.</translation></message>
     <message><source>图片浏览</source><translation>Image Browser</translation></message>
     <message>
       <source>快捷启动</source>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ClipItem.h"
+#include <QImage>
 
 #include <algorithm>
 #include <vector>
@@ -24,7 +25,7 @@ public:
 
     void ReplaceItems(std::vector<ClipItem> items) {
         items_ = std::move(items);
-        std::stable_partition(items_.begin(), items_.end(), [](const ClipItem& item) { return item.pinned; });
+        std::stable_partition(items_.begin(), items_.end(), [](const ClipItem& item) { return item.favorite; });
         Trim();
     }
 
@@ -33,7 +34,8 @@ public:
     }
 
     void Clear() {
-        items_.clear();
+        items_.erase(std::remove_if(items_.begin(), items_.end(),
+                                   [](const ClipItem& item) { return !item.favorite; }), items_.end());
     }
 
     bool RemoveAt(size_t index) {
@@ -44,14 +46,21 @@ public:
         return true;
     }
 
-    bool TogglePinned(size_t index) {
+    bool ToggleFavorite(size_t index) {
         if (index >= items_.size()) return false;
-        ClipItem item = std::move(items_[index]);
-        items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
-        item.pinned = !item.pinned;
-        const auto position = item.pinned ? items_.begin() : FirstUnpinned();
-        items_.insert(position, std::move(item));
-        Trim();
+        if (items_[index].favorite) return RemoveAt(index);
+        ClipItem item = items_[index];
+        const auto existing = std::find_if(items_.begin(), items_.end(), [&](const ClipItem& candidate) {
+            return candidate.favorite && SameContent(candidate, item);
+        });
+        if (existing != items_.end()) {
+            existing->capturedAt = QDateTime::currentDateTime();
+            if (item.pixelHash != 0) existing->pixelHash = item.pixelHash;
+            return true;
+        }
+        item.favorite = true;
+        item.capturedAt = QDateTime::currentDateTime();
+        items_.insert(items_.begin(), std::move(item));
         return true;
     }
 
@@ -73,24 +82,26 @@ public:
             return false;
         }
 
+        const QDateTime copiedAt = QDateTime::currentDateTime();
+
         auto it = std::find_if(items_.begin(), items_.end(), [&](const ClipItem& item) {
-            return item.kind == ClipKind::Text && item.text == text;
+            return !item.favorite && item.kind == ClipKind::Text && item.text == text;
         });
         if (it != items_.end()) {
-            if (promoteExisting && !it->pinned) {
+            if (promoteExisting && !it->favorite) {
                 ClipItem existing = std::move(*it);
-                existing.capturedAt = QDateTime::currentDateTime();
+                existing.capturedAt = copiedAt;
                 items_.erase(it);
-                items_.insert(FirstUnpinned(), std::move(existing));
+                items_.insert(FirstHistoryItem(), std::move(existing));
             }
             return true;
         }
 
         ClipItem item;
         item.kind = ClipKind::Text;
-        item.capturedAt = QDateTime::currentDateTime();
+        item.capturedAt = copiedAt;
         item.text = std::move(text);
-        items_.insert(FirstUnpinned(), std::move(item));
+        items_.insert(FirstHistoryItem(), std::move(item));
         Trim();
         return true;
     }
@@ -109,27 +120,21 @@ public:
         item.height = height;
         item.pixelHash = pixelHash;
 
-        auto matchIt = items_.end();
-        if (pixelHash != 0) {
-            matchIt = std::find_if(items_.begin(), items_.end(), [&](const ClipItem& existing) {
-                return existing.kind == ClipKind::Image && existing.pixelHash == pixelHash;
-            });
-        } else {
-            matchIt = std::find_if(items_.begin(), items_.end(), [&](const ClipItem& existing) {
-                return existing.kind == ClipKind::Image && existing.data == item.data;
-            });
-        }
+        auto matchIt = std::find_if(items_.begin(), items_.end(), [&](const ClipItem& existing) {
+            return !existing.favorite && SameContent(existing, item);
+        });
         if (matchIt != items_.end()) {
-            if (promoteExisting && !matchIt->pinned) {
+            if (promoteExisting && !matchIt->favorite) {
                 ClipItem existing = std::move(*matchIt);
-                existing.capturedAt = QDateTime::currentDateTime();
+                existing.capturedAt = item.capturedAt;
+                if (item.pixelHash != 0) existing.pixelHash = item.pixelHash;
                 items_.erase(matchIt);
-                items_.insert(FirstUnpinned(), std::move(existing));
+                items_.insert(FirstHistoryItem(), std::move(existing));
             }
             return true;
         }
 
-        items_.insert(FirstUnpinned(), std::move(item));
+        items_.insert(FirstHistoryItem(), std::move(item));
         Trim();
         return true;
     }
@@ -141,10 +146,19 @@ public:
         if (left.kind == ClipKind::Text) {
             return left.text == right.text;
         }
-        if (left.pixelHash != 0 && right.pixelHash != 0) {
-            return left.pixelHash == right.pixelHash;
+        if (left.pixelHash != 0 && right.pixelHash != 0
+            && left.width > 0 && left.height > 0 && right.width > 0 && right.height > 0) {
+            return left.width == right.width && left.height == right.height
+                && left.pixelHash == right.pixelHash;
         }
-        return left.data == right.data;
+        if (left.data == right.data) return true;
+        // Legacy rows have no saved pixel hash. PNG metadata/encoding may differ
+        // after copying the same pixels, so compare decoded content as fallback.
+        const QImage leftImage = QImage::fromData(left.data);
+        const QImage rightImage = QImage::fromData(right.data);
+        return !leftImage.isNull() && !rightImage.isNull()
+            && leftImage.convertToFormat(QImage::Format_ARGB32)
+                == rightImage.convertToFormat(QImage::Format_ARGB32);
     }
 
     static QString DisplayText(const ClipItem& item) {
@@ -179,14 +193,14 @@ public:
     }
 
 private:
-    std::vector<ClipItem>::iterator FirstUnpinned() {
-        return std::find_if(items_.begin(), items_.end(), [](const ClipItem& item) { return !item.pinned; });
+    std::vector<ClipItem>::iterator FirstHistoryItem() {
+        return std::find_if(items_.begin(), items_.end(), [](const ClipItem& item) { return !item.favorite; });
     }
 
     void Trim() {
-        const size_t pinnedCount = static_cast<size_t>(std::distance(items_.begin(), FirstUnpinned()));
-        if (items_.size() - pinnedCount > maxItems_) {
-            items_.resize(pinnedCount + maxItems_);
+        const size_t favoriteCount = static_cast<size_t>(std::distance(items_.begin(), FirstHistoryItem()));
+        if (items_.size() - favoriteCount > maxItems_) {
+            items_.resize(favoriteCount + maxItems_);
         }
     }
 

@@ -40,6 +40,8 @@ int main(int argc, char *argv[])
         return 6;
     }
     const std::pair<const char*, const char*> clipboardLabels[] = {
+        {"剪切板", "Clipboard"}, {"收藏", "Favorites"}, {"取消收藏", "Remove from favorites"},
+        {"搜索剪切板", "Search clipboard"}, {"搜索收藏", "Search favorites"},
         {"置顶", "Pin to top"}, {"取消置顶", "Unpin"}, {"删除", "Delete"}, {"AI 填充", "AI Fill"},
         {"预览", "Preview"}, {"无法预览此图片", "Unable to preview this image"},
         {"监控剪切板", "Monitor clipboard"}, {"显示历史记录", "Show history"},

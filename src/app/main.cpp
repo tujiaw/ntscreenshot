@@ -26,6 +26,9 @@
 #ifdef NT_BUILD_SELECTION_TEST
 int runScreenshotSelectionTest(QApplication& app);
 #endif
+#ifdef NT_BUILD_CLIPBOARD_WINDOW_TEST
+int runClipboardWindowTest(QApplication& app);
+#endif
 #ifdef NT_BUILD_IMAGE_BROWSER_TEST
 int runImageBrowserTest(QApplication& app);
 #endif
@@ -63,7 +66,14 @@ int main(int argc, char *argv[])
 #else
         false;
 #endif
-    RunGuard guard(imageBrowserTest ? "ntscreenshot_image_browser_test_guard" :
+    const bool clipboardWindowTest =
+#ifdef NT_BUILD_CLIPBOARD_WINDOW_TEST
+        qEnvironmentVariableIsSet("NTSCREENSHOT_CLIPBOARD_WINDOW_TEST");
+#else
+        false;
+#endif
+    RunGuard guard(clipboardWindowTest ? "ntscreenshot_clipboard_window_test_guard" :
+                   imageBrowserTest ? "ntscreenshot_image_browser_test_guard" :
                    selectionTest ? "ntscreenshot_selection_test_guard" : "ntscreenshot_run_guard");
     if (!guard.tryToRun()) {
         qInfo() << "main: another instance is already running, exiting";
@@ -73,6 +83,13 @@ int main(int argc, char *argv[])
 
     qInfo() << "main: constructing QApplication...";
 	MyApplication a(argc, argv);
+#ifdef NT_BUILD_CLIPBOARD_WINDOW_TEST
+    if (clipboardWindowTest) {
+        qInstallMessageHandler(nullptr);
+        QStandardPaths::setTestModeEnabled(true);
+        return runClipboardWindowTest(a);
+    }
+#endif
     // Configure once on the main thread before any image-loading workers start.
     // Preserve an explicit user override, including Qt's zero (unlimited) setting.
     if (!qEnvironmentVariableIsSet("QT_IMAGEIO_MAXALLOC"))

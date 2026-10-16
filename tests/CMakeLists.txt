@@ -29,6 +29,15 @@ foreach(opencv_library IN LISTS OpenCV_LIBS)
     endif()
 endforeach()
 list(REMOVE_DUPLICATES nt_opencv_runtime_dirs)
+target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/clipboard/HistoryWindowTest.cpp)
+target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_CLIPBOARD_WINDOW_TEST=1)
+add_test(NAME clipboard_history_tabs COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_CLIPBOARD_WINDOW_TEST=1"
+    "QT_QPA_PLATFORM=offscreen"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(clipboard_history_tabs PROPERTIES TIMEOUT 30)
 add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
     "NTSCREENSHOT_SELECTION_TEST=1"
     "QT_FORCE_STDERR_LOGGING=1"
@@ -204,7 +213,7 @@ if(WIN32)
     add_executable(clipboard_history_tests clipboard/ClipboardHistoryTest.cpp
         ${NT_SOURCE_DIR}/modules/clipboard/ClipboardStore.cpp)
     target_include_directories(clipboard_history_tests PRIVATE ${NT_SOURCE_DIR})
-    target_link_libraries(clipboard_history_tests PRIVATE Qt6::Core Qt6::Sql)
+    target_link_libraries(clipboard_history_tests PRIVATE Qt6::Core Qt6::Gui Qt6::Sql)
     if(MSVC)
         target_compile_options(clipboard_history_tests PRIVATE /utf-8)
     endif()

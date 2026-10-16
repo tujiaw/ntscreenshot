@@ -11,6 +11,8 @@
 
 namespace {
 constexpr char kConnectionName[] = "clipboardlite";
+// Keep the legacy `pinned` column so existing pinned entries become favorites
+// without rewriting or losing the user's clipboard database.
 } // namespace
 
 ClipboardStore::ClipboardStore() {
@@ -29,7 +31,7 @@ std::vector<ClipItem> ClipboardStore::Load(size_t maxItems) {
 
     QSqlQuery query(QSqlDatabase::database(kConnectionName));
     query.prepare(QStringLiteral(
-        "SELECT kind, captured_at, text, dib, width, height, pinned "
+        "SELECT kind, captured_at, text, dib, width, height, pinned, content_hash "
         "FROM clips WHERE pinned = 1 OR id IN (SELECT id FROM clips WHERE pinned = 0 ORDER BY sort_order ASC, id ASC LIMIT ?) ORDER BY pinned DESC, sort_order ASC, id ASC"));
     query.addBindValue(static_cast<qint64>(maxItems));
     if (!query.exec()) {
@@ -44,7 +46,8 @@ std::vector<ClipItem> ClipboardStore::Load(size_t maxItems) {
         item.data = query.value(3).toByteArray();
         item.width = query.value(4).toInt();
         item.height = query.value(5).toInt();
-        item.pinned = query.value(6).toBool();
+        item.favorite = query.value(6).toBool();
+        item.pixelHash = query.value(7).toULongLong();
 
         if (item.kind == ClipKind::Text && item.text.isEmpty()) {
             continue;
@@ -81,10 +84,10 @@ bool ClipboardStore::Save(const std::vector<ClipItem>& items, size_t maxItems) {
         return false;
     }
 
-    size_t unpinnedCount = 0;
+    size_t historyCount = 0;
     for (size_t i = 0; i < items.size(); ++i) {
         const ClipItem& item = items[i];
-        if (!item.pinned && unpinnedCount++ >= maxItems) continue;
+        if (!item.favorite && historyCount++ >= maxItems) continue;
         const int kind = item.kind == ClipKind::Image ? 1 : 0;
         const qint64 captured = item.capturedAt.toMSecsSinceEpoch();
         const QString text = item.kind == ClipKind::Text ? item.text : QString();
@@ -99,9 +102,9 @@ bool ClipboardStore::Save(const std::vector<ClipItem>& items, size_t maxItems) {
         }
         insert.addBindValue(item.width);
         insert.addBindValue(item.height);
-        insert.addBindValue(QLatin1String(""));
+        insert.addBindValue(QString::number(item.pixelHash));
         insert.addBindValue(static_cast<qint64>(i));
-        insert.addBindValue(item.pinned ? 1 : 0);
+        insert.addBindValue(item.favorite ? 1 : 0);
         if (!insert.exec()) {
             db.rollback();
             return false;

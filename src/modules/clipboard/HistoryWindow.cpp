@@ -35,6 +35,60 @@ constexpr int kSearchHeight = 24;
 constexpr int kMaxPreviewLines = 3;
 constexpr int kNumberWidth = 28;
 constexpr int kTimeWidth = 40;
+constexpr int kFavoriteRole = Qt::UserRole + 1;
+
+void DrawStar(QPainter& painter, const QRectF& rect, const QColor& color, bool filled)
+{
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.translate(rect.topLeft());
+    painter.scale(rect.width() / 16.0, rect.height() / 16.0);
+    QPainterPath star;
+    star.moveTo(8, 1);
+    star.lineTo(10, 5.8);
+    star.lineTo(15, 6.2);
+    star.lineTo(11.2, 9.5);
+    star.lineTo(12.4, 14.7);
+    star.lineTo(8, 12);
+    star.lineTo(3.6, 14.7);
+    star.lineTo(4.8, 9.5);
+    star.lineTo(1, 6.2);
+    star.lineTo(6, 5.8);
+    star.closeSubpath();
+    painter.setPen(QPen(color, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(filled ? QBrush(color) : Qt::NoBrush);
+    painter.drawPath(star);
+    painter.restore();
+}
+
+QIcon ViewIcon(bool favorites, int size)
+{
+    QIcon icon;
+    const auto& tokens = ThemeManager::tokens();
+    for (bool checked : {false, true}) {
+        const qreal dpr = qApp->devicePixelRatio();
+        QPixmap pixmap(qRound(size * dpr), qRound(size * dpr));
+        pixmap.setDevicePixelRatio(dpr);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        const QColor color = checked ? tokens.accent : tokens.textSecondary;
+        if (favorites) {
+            DrawStar(painter, QRectF(0, 0, size, size), color, checked);
+        } else {
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.scale(size / 16.0, size / 16.0);
+            painter.setPen(QPen(color, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.drawRoundedRect(QRectF(3, 3.5, 10, 11.5), 1.5, 1.5);
+            painter.setBrush(checked ? tokens.accentSubtle : tokens.canvas);
+            painter.drawRoundedRect(QRectF(5.5, 1, 5, 4), 1, 1);
+            painter.drawLine(QPointF(5.5, 8), QPointF(10.5, 8));
+            painter.drawLine(QPointF(5.5, 11), QPointF(9, 11));
+        }
+        painter.end();
+        icon.addPixmap(pixmap, QIcon::Normal, checked ? QIcon::On : QIcon::Off);
+    }
+    return icon;
+}
 
 int Scaled(int value, qreal scaleFactor) {
     return qRound(value * scaleFactor);
@@ -88,7 +142,7 @@ public:
                 lineCount = kMaxPreviewLines;
             } else {
                 QTextLayout layout(PreviewText(item.text), option.font);
-                lineCount = LayoutPreview(layout, ContentWidth(width, option.font, historyIndex)).lines;
+                lineCount = LayoutPreview(layout, ContentWidth(width, option.font, index.row(), index.data(kFavoriteRole).toBool())).lines;
             }
         }
         return QSize(width, lineCount * QFontMetrics(option.font).height() + s(10));
@@ -126,7 +180,7 @@ public:
         const QFont numberFont = NumberFont(option.font);
         painter->setFont(numberFont);
         painter->setPen(secondary);
-        const QString numberText = QString::number(historyIndex + 1);
+        const QString numberText = QString::number(index.row() + 1);
         const int numberWidth = QFontMetrics(numberFont).horizontalAdvance(numberText);
         const QRect numberRect(rowRect.left() + s(2), rowRect.top() + s(6),
                                numberWidth, rowRect.height() - s(12));
@@ -139,21 +193,14 @@ public:
         painter->drawText(timeRect, Qt::AlignBottom | Qt::AlignRight,
                           TimeUtil::FormatRelativeTime(item.capturedAt));
 
-        if (item.pinned) {
-            painter->setPen(tokens.accent);
-            if (rowRect.height() <= QFontMetrics(option.font).height() + s(10)) {
-                // A compact marker leaves the timestamp readable on one-line rows.
-                painter->setBrush(tokens.accent);
-                painter->setPen(Qt::NoPen);
-                painter->drawEllipse(QRect(timeRect.left() - s(6), rowRect.center().y() - s(2), s(4), s(4)));
-            } else {
-                painter->drawText(timeRect, Qt::AlignTop | Qt::AlignRight, QStringLiteral("PIN"));
-            }
+        const bool favoriteMarker = index.data(kFavoriteRole).toBool();
+        if (favoriteMarker) {
+            DrawStar(*painter, QRectF(timeRect.left() - s(18), rowRect.center().y() - s(6), s(12), s(12)), tokens.accent, true);
         }
 
-        const int contentOffset = ContentOffset(option.font, historyIndex);
+        const int contentOffset = ContentOffset(option.font, index.row());
         const QRect contentRect(rowRect.left() + contentOffset, rowRect.top() + s(5),
-                                ContentWidth(rowRect.width(), option.font, historyIndex),
+                                ContentWidth(rowRect.width(), option.font, index.row(), favoriteMarker),
                                 rowRect.height() - s(10));
         if (item.kind == ClipKind::Image) {
             DrawImage(painter, contentRect, item, historyIndex);
@@ -184,8 +231,8 @@ private:
         return s(2) + numberWidth + gap;
     }
 
-    int ContentWidth(int rowWidth, const QFont& font, int historyIndex) const {
-        return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8));
+    int ContentWidth(int rowWidth, const QFont& font, int historyIndex, bool favoriteMarker = false) const {
+        return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8 + (favoriteMarker ? 18 : 0)));
     }
 
     static QString PreviewText(QString text) {
@@ -324,15 +371,46 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     searchEdit_->setFixedHeight(scaled(kSearchHeight));
     searchEdit_->setFixedWidth(scaled(kPopupWidth / 3));
     headerLayout->addWidget(searchEdit_);
+    viewSwitcher_ = new QWidget(header_);
+    viewSwitcher_->setObjectName(QStringLiteral("clipViewSwitcher"));
+    auto* switchLayout = new QHBoxLayout(viewSwitcher_);
+    switchLayout->setContentsMargins(scaled(1), scaled(1), scaled(1), scaled(1));
+    switchLayout->setSpacing(scaled(1));
+    viewGroup_ = new QButtonGroup(this);
+    viewGroup_->setObjectName(QStringLiteral("clipViewGroup"));
+    viewGroup_->setExclusive(true);
+    auto makeViewButton = [&](int id, const QString& name, const QString& label) {
+        auto* button = new QToolButton(viewSwitcher_);
+        button->setObjectName(name);
+        button->setCheckable(true);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setFixedSize(scaled(22), scaled(22));
+        button->setIconSize(QSize(scaled(16), scaled(16)));
+        button->setToolTip(label);
+        button->setAccessibleName(label);
+        button->setCursor(Qt::PointingHandCursor);
+        viewGroup_->addButton(button, id);
+        switchLayout->addWidget(button);
+        return button;
+    };
+    clipboardViewButton_ = makeViewButton(0, QStringLiteral("clipHistoryButton"), QCoreApplication::translate("App", "剪切板"));
+    favoritesViewButton_ = makeViewButton(1, QStringLiteral("clipFavoritesButton"), QCoreApplication::translate("App", "收藏"));
+    clipboardViewButton_->setChecked(true);
+    headerLayout->addWidget(viewSwitcher_);
     headerLayout->addStretch(1);
+    connect(viewGroup_, &QButtonGroup::idClicked, this, [this](int id) {
+        searchEdit_->setPlaceholderText(id == 1
+            ? QCoreApplication::translate("App", "搜索收藏")
+            : QCoreApplication::translate("App", "搜索剪切板"));
+        BuildList();
+    });
+    searchEdit_->setPlaceholderText(QCoreApplication::translate("App", "搜索剪切板"));
 
     dragHandle_ = new QLabel(QStringLiteral("≡"), header_);
     dragHandle_->setAlignment(Qt::AlignCenter);
     dragHandle_->setCursor(Qt::SizeAllCursor);
     dragHandle_->setFixedSize(scaled(24), scaled(24));
-    dragHandle_->move((width() - dragHandle_->width()) / 2,
-                      (scaled(kHeaderHeight) - dragHandle_->height()) / 2);
-    dragHandle_->raise();
+    headerLayout->addWidget(dragHandle_);
 
     auto makeHeaderButton = [this](const QString& text,
                                    const QString& objectName) {
@@ -443,11 +521,11 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
                               AiFillCallback aiFill,
                               MoveCallback moved,
                               ResizeCallback resized,
-                              bool aiConfigured, DeleteCallback togglePinned) {
+                              bool aiConfigured, DeleteCallback toggleFavorite) {
     history_ = history;
     paste_ = std::move(paste);
     remove_ = std::move(remove);
-    togglePinned_ = std::move(togglePinned);
+    toggleFavorite_ = std::move(toggleFavorite);
     close_ = std::move(close);
     aiFill_ = std::move(aiFill);
     moved_ = std::move(moved);
@@ -553,29 +631,32 @@ size_t HistoryWindow::HistoryIndexForRow(int row) const {
 void HistoryWindow::BuildList() {
     list_->clear();
     static_cast<HistoryDelegate*>(delegate_)->ClearThumbnails();
-    if (!history_ || history_->Empty()) {
-        emptyTitle_->setText(QStringLiteral("Clipboard is empty"));
-        emptyDescription_->setText(
-            QStringLiteral("Copy text or an image and it will appear here automatically."));
-        list_->hide();
-        emptyState_->show();
-        return;
-    }
-
+    const bool favorites = viewGroup_->checkedId() == 1;
     const QStringList terms = QueryTerms(lastQuery_);
-    for (size_t i = 0; i < history_->Items().size(); ++i) {
+    const size_t count = history_ ? history_->Items().size() : 0;
+    for (size_t i = 0; i < count; ++i) {
         const ClipItem& item = history_->Items()[i];
+        if (item.favorite != favorites) continue;
         const QString searchable = item.kind == ClipKind::Text ? item.text : QString();
         if (!terms.isEmpty() && !MatchesAllTerms(searchable, terms)) {
             continue;
         }
         auto* row = new QListWidgetItem(searchable, list_);
         row->setData(Qt::UserRole, static_cast<int>(i));
+        const bool marked = !favorites && std::any_of(history_->Items().begin(), history_->Items().end(),
+            [&](const ClipItem& saved) { return saved.favorite && ClipboardHistory::SameContent(saved, item); });
+        row->setData(kFavoriteRole, marked);
     }
 
     if (list_->count() == 0) {
-        emptyTitle_->setText(QStringLiteral("No matches"));
-        emptyDescription_->setText(QStringLiteral("Try a different search."));
+        emptyTitle_->setText(!terms.isEmpty()
+            ? QCoreApplication::translate("App", "没有匹配结果")
+            : favorites ? QCoreApplication::translate("App", "暂无收藏")
+                        : QCoreApplication::translate("App", "剪切板为空"));
+        emptyDescription_->setText(!terms.isEmpty()
+            ? QCoreApplication::translate("App", "试试其他关键词。")
+            : favorites ? QCoreApplication::translate("App", "右键剪切板记录，选择收藏即可保留。")
+                        : QCoreApplication::translate("App", "复制文字或图片后会自动显示在这里。"));
         list_->hide();
         emptyState_->show();
     } else {
@@ -636,10 +717,12 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     const ClipItem contextItem = history_->Items()[index];
     const bool isText = contextItem.kind == ClipKind::Text;
     QMenu menu(this);
-    QAction* pinAction = menu.addAction(contextItem.pinned
-        ? QCoreApplication::translate("App", "取消置顶")
-        : QCoreApplication::translate("App", "置顶"));
-    pinAction->setEnabled(static_cast<bool>(togglePinned_));
+    QAction* favoriteAction = menu.addAction(contextItem.favorite
+        ? QCoreApplication::translate("App", "取消收藏")
+        : QCoreApplication::translate("App", "收藏"));
+    favoriteAction->setIcon(QIcon(ViewIcon(true, scaled(16)).pixmap(QSize(scaled(16), scaled(16)),
+        QIcon::Normal, contextItem.favorite ? QIcon::On : QIcon::Off)));
+    favoriteAction->setEnabled(static_cast<bool>(toggleFavorite_));
     QAction* copyAction = menu.addAction(QCoreApplication::translate("App", "复制"));
     QAction* previewAction = nullptr;
     if (contextItem.kind == ClipKind::Image) {
@@ -650,12 +733,12 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     QAction* aiAction = menu.addAction(QCoreApplication::translate("App", "AI 填充"));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
     QAction* selected = menu.exec(globalPos);
-    if (selected == pinAction && togglePinned_) {
+    if (selected == favoriteAction && toggleFavorite_) {
         const auto& items = history_->Items();
         const auto found = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
-            return ClipboardHistory::SameContent(item, contextItem);
+            return item.favorite == contextItem.favorite && ClipboardHistory::SameContent(item, contextItem);
         });
-        if (found != items.end()) togglePinned_(static_cast<size_t>(std::distance(items.begin(), found)));
+        if (found != items.end()) toggleFavorite_(static_cast<size_t>(std::distance(items.begin(), found)));
     } else if (previewAction && selected == previewAction) {
         const QPixmap pixmap = QPixmap::fromImage(QImage::fromData(contextItem.data, "PNG"));
         if (!pixmap.isNull()) {
@@ -696,6 +779,16 @@ void HistoryWindow::ApplyTheme() {
     header_->setStyleSheet(QStringLiteral("background: transparent; border-bottom: %1px solid %2;")
                                .arg(scaled(1)).arg(CssColor(border)));
     body_->setStyleSheet(QStringLiteral("background: transparent;"));
+    clipboardViewButton_->setIcon(ViewIcon(false, scaled(16)));
+    favoritesViewButton_->setIcon(ViewIcon(true, scaled(16)));
+    viewSwitcher_->setStyleSheet(QStringLiteral(
+        "QWidget#clipViewSwitcher { background: %1; border: %2px solid %3; border-radius: %4px; }"
+        "QToolButton { background: transparent; border: none; border-radius: %5px; padding: 0; }"
+        "QToolButton:hover { background: %6; }"
+        "QToolButton:checked { background: %7; }"
+        "QToolButton:focus { border: %2px solid %8; }")
+        .arg(CssColor(base)).arg(scaled(1)).arg(CssColor(border)).arg(scaled(5))
+        .arg(scaled(4)).arg(CssColor(WithAlpha(text, 20)), CssColor(tokens.accentSubtle), CssColor(tokens.accent)));
     emptyTitle_->setStyleSheet(QStringLiteral("color: %1; background: transparent;")
                                    .arg(CssColor(text)));
     emptyDescription_->setStyleSheet(QStringLiteral("color: %1; background: transparent;")
@@ -820,11 +913,6 @@ void HistoryWindow::resizeEvent(QResizeEvent* event) {
     }
     if (searchEdit_) {
         searchEdit_->setFixedWidth(qMax(scaled(80), width() / 3));
-    }
-    if (dragHandle_) {
-        dragHandle_->move((width() - dragHandle_->width()) / 2,
-                          (scaled(kHeaderHeight) - dragHandle_->height()) / 2);
-        dragHandle_->raise();
     }
     if (isVisible() && resizeSaveTimer_) {
         resizeSaveTimer_->start();
