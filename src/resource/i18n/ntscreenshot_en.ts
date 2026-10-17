@@ -2,6 +2,69 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>GitHub 仅用于识别账号，不申请仓库权限。登录后合并本机与云端收藏，并自动同步更改。</source><translation>GitHub identifies your account without repository access. Signing in merges local and cloud favorites and automatically syncs changes.</translation></message>
+    <message><source>收藏同步空间已满，请稍后重试或联系支持</source><translation>Favorites sync storage is full. Retry later or contact support.</translation></message>
+    <message><source>无法保存收藏，请检查磁盘空间</source><translation>Unable to save favorites. Check disk space.</translation></message>
+    <message><source>复制验证码并打开 GitHub</source><translation>Copy code and open GitHub</translation></message>
+    <message><source>无法打开浏览器，请手动访问 https://github.com/login/device</source><translation>Unable to open your browser. Visit https://github.com/login/device manually.</translation></message>
+    <message><source>尚未配置云同步服务，请先填写服务地址</source><translation>No sync service is configured. Enter the service address first.</translation></message>
+    <message><source>其他收藏已同步，%1 项超出大小限制，保留在本机</source><translation>Other favorites are synced. %1 oversized items remain on this device.</translation></message>
+    <message><source>无法移除登录凭据，请重试</source><translation>Unable to remove sign-in credentials. Please retry.</translation></message>
+    <message><source>收藏云同步</source><translation>Favorites cloud sync</translation></message>
+    <message><source>收藏云同步...</source><translation>Favorites cloud sync...</translation></message>
+    <message><source>让收藏跟随你的 GitHub 账号</source><translation>Keep your favorites with your GitHub account</translation></message>
+    <message><source>在其他设备登录同一账号，即可同步收藏的文字和图片。普通剪切板历史仅保存在本机。</source><translation>Sign in with the same account on another device to sync favorite text and images. Ordinary clipboard history stays on this device.</translation></message>
+    <message><source>同步状态</source><translation>Sync status</translation></message>
+    <message><source>登录后合并本机与云端收藏，并自动同步后续更改</source><translation>Merge local and cloud favorites after sign-in and automatically sync subsequent changes</translation></message>
+    <message><source>GitHub 仅用于识别账号，不申请仓库权限。收藏存储在所配置的云同步服务中。</source><translation>GitHub identifies your account; repository access is not requested. Favorites are stored on the configured sync service.</translation></message>
+    <message><source>同步支持单条文字 100 KB、单张图片 2 MB。超出限制的收藏仍保存在本机。</source><translation>Sync supports up to 100 KB per text item and 2 MB per image. Larger favorites remain on this device.</translation></message>
+    <message><source>使用 GitHub 登录</source><translation>Sign in with GitHub</translation></message>
+    <message><source>立即同步</source><translation>Sync now</translation></message>
+    <message><source>退出登录</source><translation>Sign out</translation></message>
+    <message><source>完成 GitHub 授权</source><translation>Complete GitHub authorization</translation></message>
+    <message><source>复制下方验证码，在 GitHub 页面输入并授权。此窗口会自动等待登录结果。</source><translation>Copy the code below, enter it on GitHub, and authorize the app. This window will wait for sign-in to complete.</translation></message>
+    <message><source>复制验证码</source><translation>Copy code</translation></message>
+    <message><source>打开 GitHub 授权页</source><translation>Open GitHub authorization</translation></message>
+    <message><source>服务设置</source><translation>Service settings</translation></message>
+    <message><source>自建服务时填写部署后的 HTTPS 地址。已登录时需先退出，再修改地址。</source><translation>For a self-hosted service, enter its deployed HTTPS address. Sign out before changing the address.</translation></message>
+    <message><source>云同步服务地址</source><translation>Cloud sync service address</translation></message>
+    <message><source>保存地址</source><translation>Save address</translation></message>
+    <message><source>退出收藏同步</source><translation>Sign out of favorites sync</translation></message>
+    <message><source>退出后将停止云同步，本机和云端收藏都会保留。是否退出？</source><translation>Cloud sync will stop. Local and cloud favorites will be kept. Sign out?</translation></message>
+    <message><source>已登录 @%1</source><translation>Signed in as @%1</translation></message>
+    <message><source>本机收藏关联账号：@%1</source><translation>Local favorites are linked to @%1</translation></message>
+    <message><source>%1 项更改等待同步</source><translation>%1 changes waiting to sync</translation></message>
+    <message><source>上次同步：%1</source><translation>Last synced: %1</translation></message>
+    <message><source>取消登录</source><translation>Cancel sign-in</translation></message>
+    <message><source>正在同步…</source><translation>Syncing…</translation></message>
+    <message><source>准备同步收藏</source><translation>Preparing to sync favorites</translation></message>
+    <message><source>登录 GitHub，在设备间同步收藏</source><translation>Sign in with GitHub to sync favorites across devices</translation></message>
+    <message><source>请输入有效的 HTTPS 服务地址</source><translation>Enter a valid HTTPS service address</translation></message>
+    <message><source>服务地址已保存，可以登录 GitHub</source><translation>Service address saved. You can sign in with GitHub.</translation></message>
+    <message><source>无法保存同步记录，请检查磁盘空间后重试</source><translation>Unable to save sync records. Check disk space and retry.</translation></message>
+    <message><source>请先设置云同步服务地址</source><translation>Set the cloud sync service address first</translation></message>
+    <message><source>正在连接 GitHub…</source><translation>Connecting to GitHub…</translation></message>
+    <message><source>在 GitHub 输入验证码，完成后会自动开始同步</source><translation>Enter the code on GitHub. Sync will start automatically after authorization.</translation></message>
+    <message><source>本机收藏已关联 @%1，请登录原账号以避免混合数据</source><translation>Local favorites are linked to @%1. Sign in with that account to avoid mixing data.</translation></message>
+    <message><source>无法安全保存登录凭据，请重试</source><translation>Unable to securely save sign-in credentials. Please retry.</translation></message>
+    <message><source>已取消登录，收藏仍保存在本机</source><translation>Sign-in canceled. Favorites remain on this device.</translation></message>
+    <message><source>已退出登录，本机收藏已保留</source><translation>Signed out. Local favorites have been kept.</translation></message>
+    <message><source>正在同步收藏…</source><translation>Syncing favorites…</translation></message>
+    <message><source>收藏已同步</source><translation>Favorites are up to date</translation></message>
+    <message><source>登录已过期，请重新登录 GitHub</source><translation>Your session expired. Sign in with GitHub again.</translation></message>
+    <message><source>此 GitHub 账号尚未获准使用该同步服务</source><translation>This GitHub account is not allowed to use this sync service.</translation></message>
+    <message><source>云同步服务尚未配置 GitHub 登录，请联系服务提供者</source><translation>GitHub sign-in is not configured. Contact the sync service provider.</translation></message>
+    <message><source>已取消 GitHub 授权，可以重新登录</source><translation>GitHub authorization canceled. You can sign in again.</translation></message>
+    <message><source>验证码已过期，请重新登录</source><translation>The verification code expired. Sign in again.</translation></message>
+    <message><source>单条收藏文字超过 100 KB，请缩短后重试</source><translation>A favorite text item exceeds 100 KB. Shorten it and retry.</translation></message>
+    <message><source>云端图片空间已满，请联系服务提供者</source><translation>Cloud image storage is full. Contact the service provider.</translation></message>
+    <message><source>收藏图片超过 2 MB 或尺寸过大，请缩小后重试</source><translation>A favorite image exceeds 2 MB or its dimensions are too large. Resize it and retry.</translation></message>
+    <message><source>请求过于频繁，稍后重试</source><translation>Too many requests. Please retry later.</translation></message>
+    <message><source>暂时无法登录，请检查网络后重试</source><translation>Unable to sign in right now. Check your connection and retry.</translation></message>
+    <message><source>暂时无法同步，本机收藏已保留，将自动重试</source><translation>Unable to sync right now. Local favorites are safe; sync will retry automatically.</translation></message>
+    <message><source>云同步</source><translation>Cloud sync</translation></message>
+    <message><source>登录 GitHub，设置收藏云同步</source><translation>Sign in with GitHub and configure favorites sync</translation></message>
+    <message><source>登录后同步收藏</source><translation>Sign in to sync favorites</translation></message>
     <message><source>清空搜索</source><translation>Clear search</translation></message>
     <message><source>关闭</source><translation>Close</translation></message>
     <message><source>收藏</source><translation>Favorites</translation></message>

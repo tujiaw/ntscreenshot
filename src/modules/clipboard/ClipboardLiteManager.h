@@ -8,6 +8,9 @@
 #include "ClipboardStore.h"
 #include "Constants.h"
 #include "HistoryWindow.h"
+#include "FavoriteSyncController.h"
+#include <QPointer>
+
 
 #include <windows.h>
 
@@ -69,7 +72,7 @@ private:
     void SetImageScaleMaxEdge(int maxEdge);
     void SetCaptureEnabled(bool enabled);
     void LoadStoredHistory();
-    void MarkHistoryDirty();
+    void MarkHistoryDirty(bool favoritesChanged = false);
     void SyncHistoryStore();
     void RefreshPopupIfVisible();
     void ShowHintMessage(const QString& text);
@@ -110,6 +113,7 @@ private:
     // Popup
     void ShowHistory(bool activate = false);
     void EnsurePopup();
+    void ShowFavoriteSyncPage();
 
     // Shared state for AI Fill cross-thread results
     std::shared_ptr<std::vector<FillResult>> aiFillResults_;
@@ -118,6 +122,7 @@ private:
     ClipboardHistory history_;
     ClipboardStore store_;
     HistoryWindow* popup_ = nullptr;
+    FavoriteSyncController* favoriteSync_ = nullptr;
     AiFillSettings aiFillSettings_;
     std::unique_ptr<AiFillController> aiFillController_;
     AsyncRunner aiFillRunner_;

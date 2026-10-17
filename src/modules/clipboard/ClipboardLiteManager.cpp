@@ -1,6 +1,7 @@
 #include "ClipboardLiteManager.h"
 
 #include "AiFillSettingsDialog.h"
+#include "FavoriteSyncPage.h"
 #include "HotkeyOptions.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/platform/Util.h"
@@ -72,6 +73,15 @@ void ClipboardLiteManager::initialize()
     LoadSettings();
     SaveSettings();
     LoadStoredHistory();
+    favoriteSync_ = new FavoriteSyncController(history_, store_, this);
+    connect(favoriteSync_, &FavoriteSyncController::favoritesUpdated, this, [this]() {
+        historyDirty_ = false; // The sync controller persists before publishing.
+        RefreshPopupIfVisible();
+    });
+    connect(favoriteSync_, &FavoriteSyncController::statusChanged, this, [this]() {
+        if (popup_) popup_->SetSyncStatus(favoriteSync_->Status());
+    });
+    favoriteSync_->Initialize();
     lastClipboardSequence_ = WinClipboard::ClipboardSequence();
     pollTimer_->start();
     trackTimer_->start();
@@ -89,6 +99,8 @@ void ClipboardLiteManager::shutdown()
         return;
     }
     SyncHistoryStore();
+    delete favoriteSync_;
+    favoriteSync_ = nullptr;
     RemoveClipboardFormatListener(reinterpret_cast<HWND>(winId()));
     for (int id = cl::id::HotkeyShowHistory; id <= cl::id::HotkeyPasteLast; ++id) {
         UnregisterHotKey(reinterpret_cast<HWND>(winId()), id);
@@ -329,8 +341,18 @@ void ClipboardLiteManager::LoadStoredHistory() {
     historyDirty_ = false;
 }
 
-void ClipboardLiteManager::MarkHistoryDirty() {
+void ClipboardLiteManager::MarkHistoryDirty(bool favoritesChanged) {
     historyDirty_ = true;
+    if (favoritesChanged) {
+        // Commit the user's favorites before recording their sync operations.
+        // After a crash, startup reconciliation can recover either transition.
+        SyncHistoryStore();
+        if (historyDirty_) {
+            ShowHintMessage(QCoreApplication::translate("App", "无法保存收藏，请检查磁盘空间"));
+            return;
+        }
+        if (favoriteSync_) favoriteSync_->FavoritesChanged();
+    }
 }
 
 void ClipboardLiteManager::SyncHistoryStore() {
@@ -382,6 +404,7 @@ void ClipboardLiteManager::PopulateClipboardMenu(QMenu* menu) {
         MarkHistoryDirty();
         RefreshPopupIfVisible();
     });
+    menu->addAction(QCoreApplication::translate("App", "收藏云同步..."), this, &ClipboardLiteManager::ShowFavoriteSyncPage);
     menu->addSeparator();
 
     QMenu* hotkeyMenu = menu->addMenu(QCoreApplication::translate("App", "唤醒快捷键"));
@@ -766,6 +789,7 @@ void ClipboardLiteManager::ShowAiFillSettingsDialog() {
 void ClipboardLiteManager::ShowHistory(bool activate) {
     EnsurePopup();
     popup_->ShowPopup(activate);
+    if (favoriteSync_ && favoriteSync_->LastSync().secsTo(QDateTime::currentDateTimeUtc()) >= 60) favoriteSync_->SyncNow();
     if (!pendingHints_.isEmpty()) {
         for (const auto& hint : pendingHints_) {
             popup_->ShowHint(hint);
@@ -777,14 +801,16 @@ void ClipboardLiteManager::ShowHistory(bool activate) {
 void ClipboardLiteManager::EnsurePopup() {
     auto paste = [this](size_t index) { BeginPaste(index, true); };
     auto remove = [this](size_t index) {
+        const bool favorite = index < history_.Items().size() && history_.Items()[index].favorite;
         if (history_.RemoveAt(index)) {
-            MarkHistoryDirty();
+            MarkHistoryDirty(favorite);
+            SyncHistoryStore();
             RefreshPopupIfVisible();
         }
     };
     auto toggleFavorite = [this](size_t index) {
         if (history_.ToggleFavorite(index)) {
-            MarkHistoryDirty();
+            MarkHistoryDirty(true);
             SyncHistoryStore();
             RefreshPopupIfVisible();
         }
@@ -805,10 +831,19 @@ void ClipboardLiteManager::EnsurePopup() {
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
     connect(popup_, &HistoryWindow::imagePreviewRequested,
             this, &ClipboardLiteManager::imagePreviewRequested);
+    if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
+    if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
     popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);
     popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
     popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
     popup_->SetBackgroundTransparency(backgroundTransparency_);
+}
+
+void ClipboardLiteManager::ShowFavoriteSyncPage() {
+    if (!favoriteSync_) return;
+    EnsurePopup();
+    popup_->ShowSyncPage();
+    popup_->ShowPopup(true);
 }
 
 // ── Timer handlers ───────────────────────────────────────────────

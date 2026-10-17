@@ -13,6 +13,7 @@
 #include <QToolButton>
 #include <QButtonGroup>
 #include <QWidget>
+#include <QStackedWidget>
 
 #include <functional>
 
@@ -48,6 +49,9 @@ public:
     void ShowHint(const QString& text, int timeoutMs = 2400);
     bool IsPopupVisible() const;
     size_t HistoryIndexForRow(int row) const;
+    void SetSyncStatus(const QString& status);
+    void SetSyncPage(QWidget* page);
+    void ShowSyncPage();
 
 signals:
     void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
@@ -100,6 +104,9 @@ private:
     QWidget* viewSwitcher_ = nullptr;
     QToolButton* clipboardViewButton_ = nullptr;
     QToolButton* favoritesViewButton_ = nullptr;
+    QStackedWidget* pages_ = nullptr;
+    QWidget* syncPage_ = nullptr;
+    QToolButton* syncSettingsButton_ = nullptr;
     QWidget* body_ = nullptr;
     QListWidget* list_ = nullptr;
     QAbstractItemDelegate* delegate_ = nullptr;

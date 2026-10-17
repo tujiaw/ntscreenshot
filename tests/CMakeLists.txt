@@ -30,6 +30,7 @@ foreach(opencv_library IN LISTS OpenCV_LIBS)
 endforeach()
 list(REMOVE_DUPLICATES nt_opencv_runtime_dirs)
 target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/clipboard/HistoryWindowTest.cpp)
+target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/clipboard/FavoriteSyncControllerTest.cpp)
 target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_CLIPBOARD_WINDOW_TEST=1)
 add_test(NAME clipboard_history_tabs COMMAND ${CMAKE_COMMAND} -E env
     "NTSCREENSHOT_CLIPBOARD_WINDOW_TEST=1"
@@ -83,6 +84,16 @@ endif()
 
 nt_add_qt_test(english_translation translation_tests
     "${CMAKE_CURRENT_BINARY_DIR}/../ntscreenshot_en.qm")
+
+add_executable(favorite_sync_state_tests
+    clipboard/FavoriteSyncStateTest.cpp
+    ${NT_SOURCE_DIR}/modules/clipboard/FavoriteSyncState.cpp)
+target_include_directories(favorite_sync_state_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(favorite_sync_state_tests PRIVATE Qt6::Core Qt6::Gui)
+if(MSVC)
+    target_compile_options(favorite_sync_state_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(favorite_sync_state favorite_sync_state_tests)
 
 add_executable(draw_settings_layout_tests
     capture/DrawSettingsLayoutTest.cpp

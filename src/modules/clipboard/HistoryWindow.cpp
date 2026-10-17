@@ -7,6 +7,9 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCache>
+#include <QCryptographicHash>
+#include <QSignalBlocker>
 #include <QCloseEvent>
 #include <QCursor>
 #include <QGuiApplication>
@@ -90,6 +93,33 @@ QIcon ViewIcon(bool favorites, int size)
     return icon;
 }
 
+QIcon CloudIcon(int size) {
+    QIcon icon;
+    const auto& tokens = ThemeManager::tokens();
+    for (bool checked : {false, true}) {
+        const qreal dpr = qApp->devicePixelRatio();
+        QPixmap pixmap(qRound(size * dpr), qRound(size * dpr));
+        pixmap.setDevicePixelRatio(dpr);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.scale(size / 16.0, size / 16.0);
+        painter.setPen(QPen(checked ? tokens.accent : tokens.textSecondary, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        QPainterPath cloud;
+        cloud.moveTo(4, 12);
+        cloud.cubicTo(0, 12, 0, 6, 4, 6);
+        cloud.cubicTo(4, 0, 12, 0, 12, 6);
+        cloud.cubicTo(16, 6, 16, 12, 12, 12);
+        painter.drawPath(cloud);
+        painter.drawLine(QPointF(8, 14), QPointF(8, 7));
+        painter.drawLine(QPointF(5.5, 9.5), QPointF(8, 7));
+        painter.drawLine(QPointF(10.5, 9.5), QPointF(8, 7));
+        painter.end();
+        icon.addPixmap(pixmap, QIcon::Normal, checked ? QIcon::On : QIcon::Off);
+    }
+    return icon;
+}
+
 int Scaled(int value, qreal scaleFactor) {
     return qRound(value * scaleFactor);
 }
@@ -122,11 +152,33 @@ public:
         : QStyledItemDelegate(parent), history_(history), scaleFactor_(scaleFactor) {}
 
     void setHistory(const ClipboardHistory* history) {
+        if (history_ != history) {
+            markerItems_.clear(); favoriteMarkers_.clear(); sizeCache_.clear();
+        }
         history_ = history;
     }
 
-    void ClearThumbnails() {
-        thumbCache_.clear();
+    void UpdateFavoriteMarkers() {
+        const auto& items = history_->Items();
+        const auto same = [](const ClipItem& a, const ClipItem& b) {
+            return a.kind == b.kind && a.favorite == b.favorite && a.text == b.text
+                && a.data == b.data && a.width == b.width && a.height == b.height && a.pixelHash == b.pixelHash;
+        };
+        if (items.size() == markerItems_.size() && std::equal(items.begin(), items.end(), markerItems_.begin(), same)) return;
+        markerItems_ = items; // QString/QByteArray share storage; no image/text payload copies.
+        sizeCache_.clear();
+        favoriteMarkers_.assign(items.size(), false);
+        for (size_t i = 0; i < items.size(); ++i) {
+            if (items[i].favorite) continue;
+            for (const auto& saved : items) {
+                if (!saved.favorite || saved.kind != items[i].kind) continue;
+                if (SameForMarker(saved, items[i])) { favoriteMarkers_[i] = true; break; }
+            }
+        }
+    }
+
+    bool FavoriteMarked(size_t index) const {
+        return index < favoriteMarkers_.size() && favoriteMarkers_[index];
     }
 
     void setBackgroundAlpha(int alpha) { backgroundAlpha_ = alpha; }
@@ -134,8 +186,12 @@ public:
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
         const auto* view = qobject_cast<const QAbstractItemView*>(parent());
         const int width = view ? view->viewport()->width() : s(HistoryWindow::kPopupWidth);
-        int lineCount = 1;
         const int historyIndex = index.data(Qt::UserRole).toInt();
+        const bool marked = index.data(kFavoriteRole).toBool();
+        const auto cached = sizeCache_.constFind(historyIndex);
+        if (cached != sizeCache_.constEnd() && cached->width == width && cached->row == index.row()
+            && cached->font == option.font && cached->marked == marked) return cached->size;
+        int lineCount = 1;
         if (history_ && historyIndex >= 0 && historyIndex < static_cast<int>(history_->Items().size())) {
             const ClipItem& item = history_->Items()[static_cast<size_t>(historyIndex)];
             if (item.kind == ClipKind::Image) {
@@ -145,7 +201,9 @@ public:
                 lineCount = LayoutPreview(layout, ContentWidth(width, option.font, index.row(), index.data(kFavoriteRole).toBool())).lines;
             }
         }
-        return QSize(width, lineCount * QFontMetrics(option.font).height() + s(10));
+        const QSize result(width, lineCount * QFontMetrics(option.font).height() + s(10));
+        sizeCache_.insert(historyIndex, {width, index.row(), option.font, marked, result});
+        return result;
     }
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
@@ -236,6 +294,13 @@ private:
     }
 
     static QString PreviewText(QString text) {
+        // Only three lines are shown. Do not shape an entire multi-megabyte clip.
+        constexpr qsizetype maxPreviewCharacters = 2048;
+        if (text.size() > maxPreviewCharacters) {
+            text.truncate(maxPreviewCharacters);
+            if (text.back().isHighSurrogate()) text.chop(1);
+            text += QChar(0x2026);
+        }
         text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
         text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
         text.replace(QLatin1Char('\t'), QLatin1Char(' '));
@@ -264,13 +329,12 @@ private:
     }
 
     void DrawImage(QPainter* painter, const QRect& rect, const ClipItem& item,
-                   int historyIndex) const {
-        // Decode and downscale each image only once, then cache the thumbnail per
-        // history item so scrolling repaints pixmaps instead of re-decoding the
-        // full-resolution PNG (and smooth-scaling it) on every frame. The cache is
-        // cleared whenever the list is rebuilt, which is when indices can change.
-        const auto cached = thumbCache_.constFind(historyIndex);
-        if (cached != thumbCache_.constEnd() && cached->size == rect.size()) {
+                   int /*historyIndex*/) const {
+        // Keep thumbnails across tab switches and history reordering. Pin the
+        // shared PNG bytes in each bounded entry so pointer identities cannot recycle.
+        const QString key = QStringLiteral("%1:%2:%3").arg(reinterpret_cast<quintptr>(item.data.constData()))
+            .arg(rect.width()).arg(rect.height());
+        if (const auto* cached = thumbCache_.object(key)) {
             painter->drawPixmap(rect.topLeft(), cached->pixmap);
             return;
         }
@@ -283,7 +347,8 @@ private:
         if (pixmap.isNull()) {
             return;
         }
-        thumbCache_.insert(historyIndex, {pixmap, rect.size()});
+        const int cost = qMax<qsizetype>(1, (item.data.size() + pixmap.width() * pixmap.height() * 4 + 1023) / 1024);
+        thumbCache_.insert(key, new Thumbnail{pixmap, item.data}, cost);
         painter->drawPixmap(rect.topLeft(), pixmap);
     }
 
@@ -316,13 +381,40 @@ private:
 
     struct Thumbnail {
         QPixmap pixmap;
-        QSize size;
+        QByteArray source;
     };
+    struct RowSize { int width; int row; QFont font; bool marked; QSize size; };
+    struct ImageFingerprint { QByteArray source; QSize size; QByteArray digest; };
 
+    ImageFingerprint Fingerprint(const ClipItem& item) {
+        const auto key = reinterpret_cast<quintptr>(item.data.constData());
+        if (const auto* cached = imageFingerprints_.object(key)) return *cached;
+        const QImage image = QImage::fromData(item.data).convertToFormat(QImage::Format_ARGB32);
+        ImageFingerprint result{item.data, image.size(), {}};
+        if (!image.isNull()) result.digest = QCryptographicHash::hash(
+            QByteArrayView(reinterpret_cast<const char*>(image.constBits()), image.sizeInBytes()), QCryptographicHash::Sha256);
+        imageFingerprints_.insert(key, new ImageFingerprint(result), qMax<qsizetype>(1, (item.data.size() + 1023) / 1024));
+        return result;
+    }
+
+    bool SameForMarker(const ClipItem& a, const ClipItem& b) {
+        if (a.kind == ClipKind::Text) return a.text == b.text;
+        if (a.pixelHash && b.pixelHash && a.width > 0 && a.height > 0 && b.width > 0 && b.height > 0)
+            return a.width == b.width && a.height == b.height && a.pixelHash == b.pixelHash;
+        if (a.data == b.data) return true;
+        // Preserve legacy pixel equality without decoding both PNGs for every pair.
+        const auto left = Fingerprint(a), right = Fingerprint(b);
+        return !left.digest.isEmpty() && left.size == right.size && left.digest == right.digest;
+    }
+
+    std::vector<ClipItem> markerItems_;
+    std::vector<bool> favoriteMarkers_;
+    QCache<quintptr, ImageFingerprint> imageFingerprints_{32768}; // KiB, retained encoded bytes.
     const ClipboardHistory* history_ = nullptr;
     qreal scaleFactor_ = 1.0;
     int backgroundAlpha_ = 255;
-    mutable QHash<int, Thumbnail> thumbCache_;
+    mutable QCache<QString, Thumbnail> thumbCache_{32768};
+    mutable QHash<int, RowSize> sizeCache_;
 };
 
 } // namespace
@@ -400,6 +492,9 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     headerLayout->addWidget(viewSwitcher_);
     headerLayout->addStretch(1);
     connect(viewGroup_, &QButtonGroup::idClicked, this, [this](int id) {
+        pages_->setCurrentIndex(id == 2 ? 1 : 0);
+        searchEdit_->setEnabled(id != 2);
+        if (id == 2) { syncPage_->setFocus(); return; }
         searchEdit_->setPlaceholderText(id == 1
             ? QCoreApplication::translate("App", "搜索收藏")
             : QCoreApplication::translate("App", "搜索剪切板"));
@@ -416,6 +511,14 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
         button->setFixedSize(scaled(24), scaled(24));
         return button;
     };
+    syncSettingsButton_ = makeHeaderButton({}, QStringLiteral("clipSyncSettingsButton"));
+    syncSettingsButton_->setCheckable(true);
+    syncSettingsButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    syncSettingsButton_->setIconSize(QSize(scaled(16), scaled(16)));
+    syncSettingsButton_->setToolTip(QCoreApplication::translate("App", "云同步"));
+    syncSettingsButton_->setAccessibleName(QCoreApplication::translate("App", "云同步"));
+    viewGroup_->addButton(syncSettingsButton_, 2);
+    headerLayout->addWidget(syncSettingsButton_);
     closeButton_ = makeHeaderButton(QStringLiteral("×"),
                                     QStringLiteral("clipCloseButton"));
     closeButton_->setToolTip(QCoreApplication::translate("App", "关闭"));
@@ -457,7 +560,12 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
 
     bodyLayout->addWidget(list_, 1);
     bodyLayout->addWidget(emptyState_);
-    root->addWidget(body_, 1);
+    pages_ = new QStackedWidget(this);
+    pages_->setObjectName(QStringLiteral("clipPages"));
+    pages_->addWidget(body_);
+    syncPage_ = new QWidget(pages_);
+    pages_->addWidget(syncPage_);
+    root->addWidget(pages_, 1);
 
     toastLabel_ = new QLabel(this);
     toastLabel_->setAlignment(Qt::AlignCenter);
@@ -528,7 +636,6 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
     resized_ = std::move(resized);
     aiConfigured_ = aiConfigured;
     static_cast<HistoryDelegate*>(delegate_)->setHistory(history_);
-    static_cast<HistoryDelegate*>(delegate_)->ClearThumbnails();
 }
 
 void HistoryWindow::SetSavedPosition(const QPoint& position, bool available) {
@@ -577,7 +684,8 @@ void HistoryWindow::ShowPopup(bool activate) {
     if (activate) {
         activateWindow();
     }
-    searchEdit_->setFocus();
+    if (viewGroup_->checkedId() == 2) syncPage_->setFocus();
+    else searchEdit_->setFocus();
     timeTimer_->start();
 }
 
@@ -625,8 +733,12 @@ size_t HistoryWindow::HistoryIndexForRow(int row) const {
 }
 
 void HistoryWindow::BuildList() {
+    if (viewGroup_->checkedId() == 2) return; // Keep the hidden list intact on the sync page.
+    auto* delegate = static_cast<HistoryDelegate*>(delegate_);
+    if (history_) delegate->UpdateFavoriteMarkers();
+    const QSignalBlocker blocker(list_);
+    list_->setUpdatesEnabled(false);
     list_->clear();
-    static_cast<HistoryDelegate*>(delegate_)->ClearThumbnails();
     const bool favorites = viewGroup_->checkedId() == 1;
     const QStringList terms = QueryTerms(lastQuery_);
     const size_t count = history_ ? history_->Items().size() : 0;
@@ -637,11 +749,11 @@ void HistoryWindow::BuildList() {
         if (!terms.isEmpty() && !MatchesAllTerms(searchable, terms)) {
             continue;
         }
-        auto* row = new QListWidgetItem(searchable, list_);
+        auto* row = new QListWidgetItem(searchable);
         row->setData(Qt::UserRole, static_cast<int>(i));
-        const bool marked = !favorites && std::any_of(history_->Items().begin(), history_->Items().end(),
-            [&](const ClipItem& saved) { return saved.favorite && ClipboardHistory::SameContent(saved, item); });
+        const bool marked = !favorites && delegate->FavoriteMarked(i);
         row->setData(kFavoriteRole, marked);
+        list_->addItem(row);
     }
 
     if (list_->count() == 0) {
@@ -660,6 +772,7 @@ void HistoryWindow::BuildList() {
         list_->show();
         list_->setCurrentRow(0);
     }
+    list_->setUpdatesEnabled(true);
 }
 
 void HistoryWindow::PasteSelected() {
@@ -814,6 +927,8 @@ void HistoryWindow::ApplyTheme() {
             .arg(scaled(4)).arg(scaled(14)).arg(CssColor(WithAlpha(text, 40)));
     closeButton_->setStyleSheet(buttonStyle);
     clearSearchButton_->setStyleSheet(buttonStyle);
+    syncSettingsButton_->setIcon(CloudIcon(scaled(16)));
+    syncSettingsButton_->setStyleSheet(buttonStyle + QStringLiteral("QToolButton:checked { background: %1; } QToolButton:focus { border: 1px solid %2; }").arg(CssColor(tokens.accentSubtle), CssColor(tokens.accent)));
     toastLabel_->setStyleSheet(
         QStringLiteral("color: %1; background: %2; padding: %3px %4px; border-radius: %5px;")
             .arg(CssColor(palette.color(QPalette::HighlightedText)),
@@ -822,6 +937,24 @@ void HistoryWindow::ApplyTheme() {
     resizeGrip_->setStyleSheet(QStringLiteral("background: transparent;"));
     update();
     list_->viewport()->update();
+}
+
+void HistoryWindow::SetSyncStatus(const QString& status) {
+    syncSettingsButton_->setToolTip(QCoreApplication::translate("App", "云同步") + QStringLiteral("\n") + status);
+}
+
+void HistoryWindow::SetSyncPage(QWidget* page) {
+    if (!page || page == syncPage_) return;
+    const bool active = pages_->currentWidget() == syncPage_;
+    pages_->removeWidget(syncPage_);
+    delete syncPage_;
+    syncPage_ = page;
+    pages_->addWidget(page);
+    if (active) pages_->setCurrentWidget(page);
+}
+
+void HistoryWindow::ShowSyncPage() {
+    syncSettingsButton_->click();
 }
 
 void HistoryWindow::ShowToast(const QString& text, int timeoutMs) {
@@ -856,7 +989,7 @@ void HistoryWindow::paintEvent(QPaintEvent*) {
     painter.save();
     painter.setClipPath(path);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.fillRect(body_->geometry(), WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
+    painter.fillRect(pages_->geometry(), WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
     painter.restore();
     // Match the frame to the title area's effective background color. The
     // header is transparent and therefore uses QPalette::Window as well.
@@ -956,6 +1089,9 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
             onCloseClicked();
         }
         return true;
+    }
+    if (viewGroup_->checkedId() == 2) {
+        return QWidget::eventFilter(obj, event);
     }
     if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) {
         PasteSelected();

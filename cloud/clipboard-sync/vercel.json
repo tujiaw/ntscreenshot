@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": {
+    "api/sync.js": { "maxDuration": 60, "includeFiles": "migrations/**" }
+  },
+  "rewrites": [
+    { "source": "/v1/:path*", "destination": "/api/sync?route=/v1/:path*" },
+    { "source": "/", "destination": "/api/sync?route=/" }
+  ]
+}

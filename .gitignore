@@ -80,3 +80,11 @@ Release/
 
 # Visual Studio 临时编辑目录（VS 安全写机制产生，异常退出时残留）
 enc_temp_folder/
+
+# Cloud service dependencies, local state, and secrets
+node_modules/
+.vercel/
+.wrangler/
+.dev.vars
+.env
+.env.*

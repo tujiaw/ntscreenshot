@@ -52,6 +52,7 @@ One box for local apps, files, folders, and browser bookmarks. Arrow keys select
 
 - `F6` pins a clipboard image on the desktop, with multi-pin and border options
 - Local clipboard history
+- Optional cross-device favorites sync with GitHub sign-in and a shared hosted service. No server or storage setup is needed by users. [Service guide](cloud/clipboard-sync/README.md)
 
 ### Settings
 

@@ -4,6 +4,10 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- Added clipboard favorites cloud sync with GitHub sign-in, a favorites-view status bar, offline retries, deletion sync, and Windows Credential Manager sessions. The shared Vercel service uses Neon and private Blob storage with per-account isolation; users do not configure a server or storage. See `cloud/clipboard-sync/README.md`.
+
 ## [0.2.0] - 2026-10-13
 
 ### Added
