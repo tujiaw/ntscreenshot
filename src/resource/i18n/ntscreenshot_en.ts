@@ -2,6 +2,9 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>复制用户名</source><translation>Copy username</translation></message>
+    <message><source>复制密码</source><translation>Copy password</translation></message>
+    <message><source>复制网址</source><translation>Copy URL</translation></message>
     <message><source>GitHub 仅用于识别账号，不申请仓库权限。登录后合并本机与云端收藏，并自动同步更改。</source><translation>GitHub identifies your account without repository access. Signing in merges local and cloud favorites and automatically syncs changes.</translation></message>
     <message><source>收藏同步空间已满，请稍后重试或联系支持</source><translation>Favorites sync storage is full. Retry later or contact support.</translation></message>
     <message><source>无法保存收藏，请检查磁盘空间</source><translation>Unable to save favorites. Check disk space.</translation></message>

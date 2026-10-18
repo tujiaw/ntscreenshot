@@ -4,9 +4,11 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/AiFillSettingsDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ClipboardLiteManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ClipboardStore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ClipboardPreviewWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteSyncState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteSyncController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteSyncPage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteAccountParser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HistoryWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LlmClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UiaHelper.cpp

@@ -1,7 +1,9 @@
 #include "modules/clipboard/HistoryWindow.h"
 #include "modules/clipboard/FavoriteSyncController.h"
 #include "modules/clipboard/FavoriteSyncPage.h"
+#include "modules/clipboard/FavoriteAccountParser.h"
 #include <QApplication>
+#include <QClipboard>
 #include <QKeyEvent>
 #include <QButtonGroup>
 #include <QDir>
@@ -12,6 +14,11 @@
 #include <QFontDatabase>
 #include <QElapsedTimer>
 #include <QBuffer>
+#include <QScrollBar>
+#include <QPlainTextEdit>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QEventLoop>
 #include "core/theme/ThemeManager.h"
 #include <cstdio>
 
@@ -101,6 +108,165 @@ int runClipboardCacheRegression(QApplication& app) {
     history.AddText(QString(100000, QLatin1Char('x')) + QStringLiteral(" searchable-tail")); window.Refresh();
     window.findChild<QLineEdit*>(QStringLiteral("clipSearchEdit"))->setText(QStringLiteral("searchable-tail"));
     CHECK(list->count() == 1); // Preview truncation must not truncate full-text search.
+    window.findChild<QLineEdit*>(QStringLiteral("clipSearchEdit"))->clear();
+    history.ReplaceItems({});
+    for (int i = 0; i < 40; ++i) history.AddText(QStringLiteral("entry %1").arg(i));
+    window.Configure(&history, {}, {}, {}, {}, {}, {}, false,
+        [&](size_t index) { history.ToggleFavorite(index); window.Refresh(); });
+    window.Refresh();
+    list->setCurrentRow(25);
+    list->scrollToItem(list->currentItem(), QAbstractItemView::PositionAtCenter);
+    app.processEvents();
+    const QString selectedText = list->currentItem()->text();
+    const int scrollPosition = list->verticalScrollBar()->value();
+    CHECK(scrollPosition > 0);
+    for (int i = 0; i < 4; ++i) {
+        QKeyEvent favoriteKey(QEvent::KeyPress, Qt::Key_D, Qt::ControlModifier);
+        app.sendEvent(list, &favoriteKey); app.processEvents();
+        CHECK(list->count() == 40 && list->currentRow() == 25);
+        CHECK(list->currentItem()->text() == selectedText);
+        CHECK(list->currentItem()->data(Qt::UserRole + 1).toBool() == (i % 2 == 0));
+        CHECK(list->verticalScrollBar()->value() == scrollPosition);
+    }
+    return 0;
+}
+
+int runClipboardPreviewRegression(QApplication& app, const QString& previewDir) {
+    ClipItem first; first.text = QStringLiteral("<b>plain text</b>\n") + QString(10000, QLatin1Char('x'));
+    ClipItem second; second.kind = ClipKind::Image;
+    QImage image(320, 200, QImage::Format_ARGB32); image.fill(Qt::green);
+    QBuffer buffer(&second.data); buffer.open(QIODevice::WriteOnly); CHECK(image.save(&buffer, "PNG"));
+    ClipItem third; third.text = QStringLiteral("another selected item");
+    ClipboardHistory history; history.ReplaceItems({first, second, third});
+    HistoryWindow window(1.0); window.Configure(&history, {}, {}, {}, {}, {}, {}, false);
+    window.Refresh(); window.show(); window.activateWindow(); app.processEvents();
+    auto* list = window.findChild<QListWidget*>(QStringLiteral("clipList"));
+    QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    app.sendEvent(list, &space); app.processEvents();
+    auto* preview = window.findChild<QWidget*>(QStringLiteral("clipboardPreviewWindow"));
+    CHECK(preview && preview->isWindow() && preview->isVisible());
+    auto* text = preview->findChild<QPlainTextEdit*>(QStringLiteral("clipboardPreviewText"));
+    auto* canvas = preview->findChild<QGraphicsView*>(QStringLiteral("clipboardPreviewImage"));
+    CHECK(text && canvas && text->isReadOnly() && text->toPlainText() == first.text);
+    if (!previewDir.isEmpty()) CHECK(preview->grab().save(previewDir + QStringLiteral("/preview-text.png")));
+    list->setCurrentRow(1); app.processEvents();
+    CHECK(canvas->isVisible() && !text->isVisible() && canvas->scene()->items().size() == 1);
+    if (!previewDir.isEmpty()) CHECK(preview->grab().save(previewDir + QStringLiteral("/preview-image.png")));
+    QKeyEvent next(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+    app.sendEvent(canvas->viewport(), &next); app.processEvents();
+    CHECK(list->currentRow() == 2 && text->isVisible() && text->toPlainText() == third.text);
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(window.findChildren<QWidget*>(QStringLiteral("clipboardPreviewWindow")).size() == 1);
+    const auto settleFocus = [&]() { QEventLoop loop; QTimer::singleShot(80, &loop, &QEventLoop::quit); loop.exec(); };
+    preview->activateWindow(); app.processEvents(); settleFocus(); CHECK(preview->isVisible());
+    window.activateWindow(); app.processEvents(); settleFocus(); CHECK(preview->isVisible());
+    QWidget outside; outside.show(); outside.activateWindow(); app.processEvents(); settleFocus();
+    CHECK(!preview->isVisible()); outside.hide();
+    window.activateWindow(); app.processEvents(); app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible());
+    QEvent deactivate(QEvent::ApplicationDeactivate); app.sendEvent(&app, &deactivate);
+    CHECK(!preview->isVisible());
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible() && window.findChild<QWidget*>(QStringLiteral("clipboardPreviewWindow")) == preview);
+    history.ReplaceItems({}); window.Refresh(); CHECK(!preview->isVisible());
+    history.AddText("reopened"); window.Refresh(); app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible() && text->toPlainText() == QStringLiteral("reopened"));
+    QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    app.sendEvent(text, &escape); CHECK(!preview->isVisible() && window.isVisible());
+    app.sendEvent(list, &space); window.hide(); CHECK(!preview->isVisible());
+    return 0;
+}
+
+int runFavoriteAccountRegression(QApplication& app) {
+    struct Example { const char* input; const char* username; const char* password; const char* url = ""; };
+    const Example examples[] = {
+        {"用户名：xyz\n密码：dfdf", "xyz", "dfdf"},
+        {"username: admin password: 123", "admin", "123"},
+        {"账户：test \n密码: 123", "test", "123"},
+        {"user: test\npassword: 123", "test", "123"},
+        {"网址等信息\n登录：test\n密码：123", "test", "123"},
+        {"USERNAME = admin; PASSWORD = a:b=c!@#$%", "admin", "a:b=c!@#$%"},
+        {"帐号: test，口令: 123", "test", "123"},
+        {"帐户：test | pwd：123", "test", "123"},
+        {"user_name：admin\r\npasswd＝123", "admin", "123"},
+        {"login id: admin\npass word: 123", "admin", "123"},
+        {"邮箱：a@example.com\n登录密码：123", "a@example.com", "123"},
+        {"用户名\tadmin\n密码\t123", "admin", "123"},
+        {"网址: https://example.com 用户名: admin 密码: 123 备注: demo", "admin", "123", "https://example.com"},
+        {"用户名: admin\n密码: '  a; password: b  '", "admin", "  a; password: b  "},
+        {"用户名: admin\n密码: p:a=s;#%", "admin", "p:a=s;#%"},
+        {"{\"username\": \"admin\", \"password\": \"123\"}", "admin", "123"},
+        {"用户名：test", "test", ""},
+        {"密码：123", "", "123"},
+        {"password: username: test", "test", ""},
+        {"用户名：\n密码：", "", ""},
+        {"https://example.com/?username=admin&password=123", "", "", "https://example.com/?username=admin&password=123"},
+        {"用户名册：test\n修改密码：123\nusernames: test", "", ""},
+        {"https://example.com/login\n用户名: admin\n密码: 123", "admin", "123", "https://example.com/login"},
+        {"网站: example.com/login", "", "", "example.com/login"},
+        {"URL = https://example.com/?a=1&b=%2Fhome#top", "", "", "https://example.com/?a=1&b=%2Fhome#top"},
+        {"登录地址：'https://example.com/a(b)'", "", "", "https://example.com/a(b)"},
+        {"访问 (https://example.com/login).", "", "", "https://example.com/login"},
+        {"请访问 https://example.com/login。", "", "", "https://example.com/login"},
+        {"www.example.com/login", "", "", "www.example.com/login"},
+        {"网址: http://localhost:8080/login", "", "", "http://localhost:8080/login"},
+        {"网址: http://intranet/login", "", "", "http://intranet/login"},
+        {"地址: 127.0.0.1:8080", "", "", "127.0.0.1:8080"},
+        {"http://[::1]:8080/login", "", "", "http://[::1]:8080/login"},
+        {"网址: https://example.com\n备注: https://docs.example.com", "", "", "https://example.com"},
+        {"网址: https://one.example.com\n网址: https://two.example.com", "", "", ""},
+        {"https://one.example.com\nhttps://two.example.com", "", "", ""},
+        {"网址: https://example.com\nURL: https://example.com", "", "", "https://example.com"},
+        {"https://example.com/?a=1;user=admin;password=123", "", "", "https://example.com/?a=1;user=admin;password=123"},
+        {"用户名: admin\n密码: https://example.com/secret", "admin", "https://example.com/secret", ""},
+        {"密码: 'abc https://example.com secret'", "", "abc https://example.com secret", ""},
+        {"网址: javascript:alert(1)", "", "", ""},
+        {"网址: https:///missing-host", "", "", ""},
+        {"网址: 不是网址", "", "", ""},
+        {"test / 123", "", ""},
+        {"user: first password: one\nuser: second password: two", "", ""},
+    };
+    int exampleIndex = 0;
+    for (const auto& example : examples) {
+        ++exampleIndex;
+        const auto fields = ParseFavoriteAccount(QString::fromUtf8(example.input));
+        if (fields.username != QString::fromUtf8(example.username) || fields.password != QString::fromUtf8(example.password) || fields.url != QString::fromUtf8(example.url))
+            std::fprintf(stderr, "Account format fixture %d failed\n", exampleIndex);
+        CHECK(fields.username == QString::fromUtf8(example.username));
+        CHECK(fields.password == QString::fromUtf8(example.password));
+        CHECK(fields.url == QString::fromUtf8(example.url));
+    }
+    ClipboardHistory history; history.AddText(QStringLiteral("username: admin password: 123 网址: https://example.com/login?next=%2Fhome&a=1")); history.ToggleFavorite(0);
+    HistoryWindow window(1.0); window.Configure(&history, {}, {}, {}, {}, {}, {}, false); window.Refresh();
+    auto* views = window.findChild<QButtonGroup*>(QStringLiteral("clipViewGroup"));
+    auto* list = window.findChild<QListWidget*>(QStringLiteral("clipList"));
+    window.show(); app.processEvents();
+    const auto inspectMenu = [&](bool fieldsExpected, const char* choose) {
+        bool valid = false;
+        QTimer::singleShot(0, &window, [&]() {
+            auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+            if (!menu) return;
+            QAction *username = nullptr, *password = nullptr, *url = nullptr;
+            for (auto* action : menu->actions()) {
+                if (action->text() == QCoreApplication::translate("App", "复制用户名")) username = action;
+                if (action->text() == QCoreApplication::translate("App", "复制密码")) password = action;
+                if (action->text() == QCoreApplication::translate("App", "复制网址")) url = action;
+            }
+            valid = bool(username) == fieldsExpected && bool(password) == fieldsExpected && bool(url) == fieldsExpected;
+            auto* selected = choose ? (QString::fromUtf8(choose) == QStringLiteral("username") ? username : QString::fromUtf8(choose) == QStringLiteral("password") ? password : url) : nullptr;
+            if (selected) {
+                menu->setActiveAction(selected);
+                QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier); app.sendEvent(menu, &enter);
+            } else menu->close();
+        });
+        list->customContextMenuRequested(list->visualItemRect(list->item(0)).center());
+        return valid;
+    };
+    CHECK(inspectMenu(false, nullptr)); // A starred ordinary history row must not expose the fields.
+    views->button(1)->click();
+    CHECK(inspectMenu(true, "username")); CHECK(QApplication::clipboard()->text() == QStringLiteral("admin"));
+    CHECK(inspectMenu(true, "password")); CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
+    CHECK(inspectMenu(true, "url")); CHECK(QApplication::clipboard()->text() == QStringLiteral("https://example.com/login?next=%2Fhome&a=1"));
     return 0;
 }
 
@@ -135,7 +301,7 @@ int runClipboardWindowTest(QApplication& app) {
     CHECK(pages && pages->count() == 2);
     syncButton->click();
     CHECK(views->checkedId() == 2 && pages->currentIndex() == 1 && !search->isEnabled());
-    CHECK(!syncButton->toolTip().isEmpty());
+    CHECK(syncButton->toolTip().isEmpty());
     QKeyEvent syncEnter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
     app.sendEvent(syncButton->parentWidget(), &syncEnter);
     CHECK(pasted == size_t(-1));
@@ -209,13 +375,13 @@ int runClipboardWindowTest(QApplication& app) {
     CHECK(views->checkedId() == 0);
     window.show();
     app.processEvents();
-    for (int attempt = 0; attempt < 2; ++attempt) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
         bool sawFavoriteAction = false;
         QTimer::singleShot(0, &window, [&]() {
             auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
             if (!menu) return;
             for (auto* action : menu->actions()) {
-                if (action->text() == QCoreApplication::translate("App", "收藏")) {
+                if (action->text() == QCoreApplication::translate("App", attempt == 1 ? "取消收藏" : "收藏")) {
                     sawFavoriteAction = true;
                     menu->setActiveAction(action);
                     QKeyEvent choose(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
@@ -279,6 +445,8 @@ int runClipboardWindowTest(QApplication& app) {
         window.SetSyncPage(new QWidget);
     }
     qputenv("LOCALAPPDATA", originalLocalAppData);
+    CHECK(runFavoriteAccountRegression(app) == 0);
     CHECK(runClipboardCacheRegression(app) == 0);
+    CHECK(runClipboardPreviewRegression(app, previewDir) == 0);
     return runFavoriteSyncControllerTest(app, previewDir);
 }

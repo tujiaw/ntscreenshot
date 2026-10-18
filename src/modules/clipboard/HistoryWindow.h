@@ -17,6 +17,8 @@
 
 #include <functional>
 
+class ClipboardPreviewWindow;
+
 class HistoryWindow : public QWidget {
     Q_OBJECT
 
@@ -53,9 +55,6 @@ public:
     void SetSyncPage(QWidget* page);
     void ShowSyncPage();
 
-signals:
-    void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
-
 protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
@@ -78,6 +77,9 @@ private:
     void CopySelected();
     void DeleteSelected();
     void AiFillSelected();
+    void ToggleFavoriteSelected();
+    void PreviewSelected();
+    void PreviewItem(const ClipItem& item);
     void BuildList();
     void ShowContextMenu(const QPoint& globalPos);
     void ApplyTheme();
@@ -97,6 +99,7 @@ private:
     QPoint savedPosition_;
 
     QWidget* header_ = nullptr;
+    ClipboardPreviewWindow* preview_ = nullptr;
     QToolButton* closeButton_ = nullptr;
     QToolButton* clearSearchButton_ = nullptr;
     QLineEdit* searchEdit_ = nullptr;

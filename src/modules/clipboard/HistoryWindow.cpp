@@ -1,4 +1,6 @@
 #include "HistoryWindow.h"
+#include "ClipboardPreviewWindow.h"
+#include "FavoriteAccountParser.h"
 
 #include "core/foundation/TimeUtil.h"
 #include "core/platform/Util.h"
@@ -17,6 +19,7 @@
 #include <QHideEvent>
 #include <QImage>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QMenu>
 #include <QPaintEvent>
 #include <QPainter>
@@ -25,6 +28,7 @@
 #include <QRegularExpression>
 #include <QResizeEvent>
 #include <QScreen>
+#include <QScrollBar>
 #include <QShowEvent>
 #include <QStyledItemDelegate>
 #include <QTextLayout>
@@ -39,6 +43,8 @@ constexpr int kMaxPreviewLines = 3;
 constexpr int kNumberWidth = 28;
 constexpr int kTimeWidth = 40;
 constexpr int kFavoriteRole = Qt::UserRole + 1;
+constexpr int kContentRole = Qt::UserRole + 2;
+constexpr int kViewRole = Qt::UserRole + 3;
 
 void DrawStar(QPainter& painter, const QRectF& rect, const QColor& color, bool filled)
 {
@@ -448,8 +454,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     clearSearchButton_->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
     clearSearchButton_->setIconSize(QSize(scaled(12), scaled(12)));
     clearSearchButton_->setFixedSize(scaled(18), scaled(18));
-    clearSearchButton_->setToolTip(QCoreApplication::translate("App", "清空搜索"));
-    clearSearchButton_->setAccessibleName(clearSearchButton_->toolTip());
+    clearSearchButton_->setAccessibleName(QCoreApplication::translate("App", "清空搜索"));
     clearSearchButton_->setCursor(Qt::PointingHandCursor);
     clearSearchButton_->hide();
     auto* searchLayout = new QHBoxLayout(searchEdit_);
@@ -479,7 +484,6 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
         button->setFixedSize(scaled(22), scaled(22));
         button->setIconSize(QSize(scaled(16), scaled(16)));
-        button->setToolTip(label);
         button->setAccessibleName(label);
         button->setCursor(Qt::PointingHandCursor);
         viewGroup_->addButton(button, id);
@@ -494,7 +498,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     connect(viewGroup_, &QButtonGroup::idClicked, this, [this](int id) {
         pages_->setCurrentIndex(id == 2 ? 1 : 0);
         searchEdit_->setEnabled(id != 2);
-        if (id == 2) { syncPage_->setFocus(); return; }
+        if (id == 2) { if (preview_) preview_->hide(); syncPage_->setFocus(); return; }
         searchEdit_->setPlaceholderText(id == 1
             ? QCoreApplication::translate("App", "搜索收藏")
             : QCoreApplication::translate("App", "搜索剪切板"));
@@ -515,14 +519,12 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     syncSettingsButton_->setCheckable(true);
     syncSettingsButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
     syncSettingsButton_->setIconSize(QSize(scaled(16), scaled(16)));
-    syncSettingsButton_->setToolTip(QCoreApplication::translate("App", "云同步"));
     syncSettingsButton_->setAccessibleName(QCoreApplication::translate("App", "云同步"));
     viewGroup_->addButton(syncSettingsButton_, 2);
     headerLayout->addWidget(syncSettingsButton_);
     closeButton_ = makeHeaderButton(QStringLiteral("×"),
                                     QStringLiteral("clipCloseButton"));
-    closeButton_->setToolTip(QCoreApplication::translate("App", "关闭"));
-    closeButton_->setAccessibleName(closeButton_->toolTip());
+    closeButton_->setAccessibleName(QCoreApplication::translate("App", "关闭"));
     headerLayout->addWidget(closeButton_);
     root->addWidget(header_);
 
@@ -588,6 +590,9 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     connect(closeButton_, &QToolButton::clicked, this, &HistoryWindow::onCloseClicked);
     connect(searchEdit_, &QLineEdit::textChanged, this, &HistoryWindow::onSearchChanged);
     connect(list_, &QListWidget::itemActivated, this, &HistoryWindow::onItemActivated);
+    connect(list_, &QListWidget::currentRowChanged, this, [this]() {
+        if (preview_ && preview_->isVisible()) PreviewSelected();
+    });
     connect(timeTimer_, &QTimer::timeout, this, &HistoryWindow::onRelativeTimeTick);
     connect(toastTimer_, &QTimer::timeout, toastLabel_, &QLabel::hide);
     connect(resizeSaveTimer_, &QTimer::timeout, this, [this]() {
@@ -734,12 +739,18 @@ size_t HistoryWindow::HistoryIndexForRow(int row) const {
 
 void HistoryWindow::BuildList() {
     if (viewGroup_->checkedId() == 2) return; // Keep the hidden list intact on the sync page.
+    const bool favorites = viewGroup_->checkedId() == 1;
+    const auto* selected = list_->currentItem();
+    const bool restoreSelection = selected && selected->data(kViewRole).toBool() == favorites;
+    const QVariant selectedContent = selected ? selected->data(kContentRole) : QVariant();
+    const int selectedRow = list_->currentRow();
+    const int scrollPosition = list_->verticalScrollBar()->value();
+    int restoredRow = -1;
     auto* delegate = static_cast<HistoryDelegate*>(delegate_);
     if (history_) delegate->UpdateFavoriteMarkers();
     const QSignalBlocker blocker(list_);
     list_->setUpdatesEnabled(false);
     list_->clear();
-    const bool favorites = viewGroup_->checkedId() == 1;
     const QStringList terms = QueryTerms(lastQuery_);
     const size_t count = history_ ? history_->Items().size() : 0;
     for (size_t i = 0; i < count; ++i) {
@@ -753,6 +764,10 @@ void HistoryWindow::BuildList() {
         row->setData(Qt::UserRole, static_cast<int>(i));
         const bool marked = !favorites && delegate->FavoriteMarked(i);
         row->setData(kFavoriteRole, marked);
+        row->setData(kContentRole, item.kind == ClipKind::Text ? QVariant(item.text) : QVariant(item.data));
+        row->setData(kViewRole, favorites);
+        if (restoreSelection && row->data(kContentRole).metaType() == selectedContent.metaType()
+            && row->data(kContentRole) == selectedContent) restoredRow = list_->count();
         list_->addItem(row);
     }
 
@@ -770,9 +785,18 @@ void HistoryWindow::BuildList() {
     } else {
         emptyState_->hide();
         list_->show();
-        list_->setCurrentRow(0);
+        list_->setCurrentRow(restoreSelection
+            ? (restoredRow >= 0 ? restoredRow : qBound(0, selectedRow, list_->count() - 1)) : 0);
+        if (restoreSelection) {
+            list_->doItemsLayout();
+            list_->verticalScrollBar()->setValue(scrollPosition);
+        }
     }
     list_->setUpdatesEnabled(true);
+    if (preview_ && preview_->isVisible()) {
+        if (list_->currentItem()) PreviewSelected();
+        else preview_->hide();
+    }
 }
 
 void HistoryWindow::PasteSelected() {
@@ -824,48 +848,89 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     }
 
     const ClipItem contextItem = history_->Items()[index];
+    const bool isFavorite = contextItem.favorite || static_cast<HistoryDelegate*>(delegate_)->FavoriteMarked(index);
     const bool isText = contextItem.kind == ClipKind::Text;
     QMenu menu(this);
-    QAction* favoriteAction = menu.addAction(contextItem.favorite
+    QAction* favoriteAction = menu.addAction(isFavorite
         ? QCoreApplication::translate("App", "取消收藏")
         : QCoreApplication::translate("App", "收藏"));
     favoriteAction->setIcon(QIcon(ViewIcon(true, scaled(16)).pixmap(QSize(scaled(16), scaled(16)),
-        QIcon::Normal, contextItem.favorite ? QIcon::On : QIcon::Off)));
+        QIcon::Normal, isFavorite ? QIcon::On : QIcon::Off)));
     favoriteAction->setEnabled(static_cast<bool>(toggleFavorite_));
+    favoriteAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
     QAction* copyAction = menu.addAction(QCoreApplication::translate("App", "复制"));
-    QAction* previewAction = nullptr;
-    if (contextItem.kind == ClipKind::Image) {
-        previewAction = menu.addAction(QCoreApplication::translate("App", "预览"));
+    copyAction->setShortcut(QKeySequence::Copy);
+    const FavoriteAccountFields account = isText && contextItem.favorite && viewGroup_->checkedId() == 1
+        ? ParseFavoriteAccount(contextItem.text) : FavoriteAccountFields{};
+    QAction* copyUsername = nullptr;
+    QAction* copyPassword = nullptr;
+    QAction* copyUrl = nullptr;
+    if (!account.username.isEmpty()) copyUsername = menu.addAction(QCoreApplication::translate("App", "复制用户名"));
+    if (!account.password.isEmpty()) copyPassword = menu.addAction(QCoreApplication::translate("App", "复制密码"));
+    if (!account.url.isEmpty()) copyUrl = menu.addAction(QCoreApplication::translate("App", "复制网址"));
+    QAction* previewAction = menu.addAction(QCoreApplication::translate("App", "预览"));
+    previewAction->setShortcut(QKeySequence(Qt::Key_Space));
+    QAction* deleteAction = nullptr;
+    if (viewGroup_->checkedId() == 0) {
+        deleteAction = menu.addAction(QCoreApplication::translate("App", "删除"));
+        deleteAction->setShortcut(QKeySequence(Qt::Key_Delete));
     }
-    QAction* deleteAction = menu.addAction(QCoreApplication::translate("App", "删除"));
     menu.addSeparator();
     QAction* aiAction = menu.addAction(QCoreApplication::translate("App", "AI 填充"));
+    aiAction->setShortcut(QKeySequence(Qt::Key_I));
     aiAction->setEnabled(isText && aiConfigured_ && aiFill_);
     QAction* selected = menu.exec(globalPos);
-    if (selected == favoriteAction && toggleFavorite_) {
+    if (copyUsername && selected == copyUsername) {
+        QApplication::clipboard()->setText(account.username);
+    } else if (copyPassword && selected == copyPassword) {
+        QApplication::clipboard()->setText(account.password);
+    } else if (copyUrl && selected == copyUrl) {
+        QApplication::clipboard()->setText(account.url);
+    } else if (selected == favoriteAction && toggleFavorite_) {
         const auto& items = history_->Items();
         const auto found = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
-            return item.favorite == contextItem.favorite && ClipboardHistory::SameContent(item, contextItem);
+            return item.favorite == isFavorite && ClipboardHistory::SameContent(item, contextItem);
         });
         if (found != items.end()) toggleFavorite_(static_cast<size_t>(std::distance(items.begin(), found)));
     } else if (previewAction && selected == previewAction) {
-        const QPixmap pixmap = QPixmap::fromImage(QImage::fromData(contextItem.data, "PNG"));
-        if (!pixmap.isNull()) {
-            const QScreen* historyScreen = screen();
-            const QRect previewArea = historyScreen ? historyScreen->availableGeometry() : frameGeometry();
-            const QPoint screenCenter = previewArea.topLeft()
-                + QPoint(previewArea.width() / 2, previewArea.height() / 2);
-            emit imagePreviewRequested(pixmap, screenCenter);
-        } else {
-            ShowHint(QCoreApplication::translate("App", "无法预览此图片"));
-        }
+        PreviewItem(contextItem);
     } else if (selected == copyAction) {
         CopySelected();
-    } else if (selected == deleteAction) {
+    } else if (deleteAction && selected == deleteAction) {
         DeleteSelected();
     } else if (selected == aiAction) {
         AiFillSelected();
     }
+}
+
+void HistoryWindow::ToggleFavoriteSelected() {
+    const size_t index = HistoryIndexForRow(list_->currentRow());
+    if (!history_ || index >= history_->Items().size() || !toggleFavorite_) return;
+    const auto& items = history_->Items();
+    if (!items[index].favorite && list_->currentItem()->data(kFavoriteRole).toBool()) {
+        const auto saved = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
+            return item.favorite && ClipboardHistory::SameContent(item, items[index]);
+        });
+        if (saved != items.end()) toggleFavorite_(static_cast<size_t>(std::distance(items.begin(), saved)));
+    } else {
+        toggleFavorite_(index);
+    }
+}
+
+void HistoryWindow::PreviewSelected() {
+    const size_t index = HistoryIndexForRow(list_->currentRow());
+    if (!history_ || index >= history_->Items().size()) return;
+    PreviewItem(history_->Items()[index]);
+}
+
+void HistoryWindow::PreviewItem(const ClipItem& item) {
+    if (!preview_) {
+        preview_ = new ClipboardPreviewWindow(this);
+        connect(preview_, &ClipboardPreviewWindow::navigateRequested, this, [this](int delta) {
+            list_->setCurrentRow(qBound(0, list_->currentRow() + delta, list_->count() - 1));
+        });
+    }
+    preview_->ShowItem(item);
 }
 
 void HistoryWindow::ApplyTheme() {
@@ -940,7 +1005,7 @@ void HistoryWindow::ApplyTheme() {
 }
 
 void HistoryWindow::SetSyncStatus(const QString& status) {
-    syncSettingsButton_->setToolTip(QCoreApplication::translate("App", "云同步") + QStringLiteral("\n") + status);
+    syncSettingsButton_->setAccessibleDescription(status);
 }
 
 void HistoryWindow::SetSyncPage(QWidget* page) {
@@ -999,6 +1064,7 @@ void HistoryWindow::paintEvent(QPaintEvent*) {
 
 void HistoryWindow::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
+        if (preview_ && preview_->isVisible()) { preview_->hide(); return; }
         onCloseClicked();
         return;
     }
@@ -1017,6 +1083,7 @@ void HistoryWindow::showEvent(QShowEvent* event) {
 }
 
 void HistoryWindow::hideEvent(QHideEvent* event) {
+    if (preview_) preview_->hide();
     timeTimer_->stop();
     toastTimer_->stop();
     toastLabel_->hide();
@@ -1083,6 +1150,7 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
     const bool fromSearch = obj == searchEdit_;
     const bool control = key->modifiers().testFlag(Qt::ControlModifier);
     if (key->key() == Qt::Key_Escape) {
+        if (preview_ && preview_->isVisible()) { preview_->hide(); return true; }
         if (fromSearch && !searchEdit_->text().isEmpty()) {
             searchEdit_->clear();
         } else {
@@ -1111,6 +1179,14 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
     }
     if (control && key->key() == Qt::Key_C) {
         CopySelected();
+        return true;
+    }
+    if (key->modifiers() == Qt::ControlModifier && key->key() == Qt::Key_D) {
+        ToggleFavoriteSelected();
+        return true;
+    }
+    if (key->modifiers() == Qt::NoModifier && key->key() == Qt::Key_Space) {
+        PreviewSelected();
         return true;
     }
     if (key->key() == Qt::Key_Delete) {

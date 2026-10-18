@@ -829,8 +829,6 @@ void ClipboardLiteManager::EnsurePopup() {
     }
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
-    connect(popup_, &HistoryWindow::imagePreviewRequested,
-            this, &ClipboardLiteManager::imagePreviewRequested);
     if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
     if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
     popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);

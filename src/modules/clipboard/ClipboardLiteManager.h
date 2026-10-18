@@ -40,7 +40,6 @@ public:
 
 signals:
     void wakeHotkeyChanged(const QString& hotkey);
-    void imagePreviewRequested(const QPixmap& pixmap, const QPoint& screenCenter);
 
 protected:
     bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
