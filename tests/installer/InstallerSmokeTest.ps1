@@ -23,8 +23,8 @@ if ((Test-Path $userKey) -or (Test-Path $machineKey)) {
 }
 New-Item -ItemType Directory -Path $work | Out-Null
 $appDir = Join-Path $work 'app'
-$group = 'ntscreenshot Installer QA ' + [guid]::NewGuid().ToString('N')
-$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) "$group\ntscreenshot.lnk"
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'ntscreenshot\ntscreenshot.lnk'
+if (Test-Path -LiteralPath $shortcut) { throw 'An ntscreenshot shortcut already exists. Use a clean Windows runner.' }
 $profile = Join-Path $work 'userdata/ClipboardLite'
 New-Item -ItemType Directory -Force -Path $profile | Out-Null
 $favorites = Join-Path $profile 'history.db'
@@ -34,7 +34,7 @@ $note = Join-Path $appDir 'user-added-note.txt'
 
 function Invoke-Setup([string]$Path, [string]$Log) {
   $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LANG=english',
-    "/DIR=`"$appDir`"", "/GROUP=`"$group`"", '/MERGETASKS=!desktopicon', "/LOG=`"$Log`"")
+    "/DIR=`"$appDir`"", '/MERGETASKS=!desktopicon', "/LOG=`"$Log`"")
   $process = Start-Process -FilePath $Path -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
   if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode). See $Log" }
 }
