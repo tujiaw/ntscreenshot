@@ -4,9 +4,23 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-18
+
 ### Added
 
-- Added clipboard favorites cloud sync with GitHub sign-in, a favorites-view status bar, offline retries, deletion sync, and Windows Credential Manager sessions. The shared Vercel service uses Neon and private Blob storage with per-account isolation; users do not configure a server or storage. See `cloud/clipboard-sync/README.md`.
+- Added clipboard favorites cloud sync with GitHub sign-in, an integrated sync tab, offline retries, deletion sync, and Windows Credential Manager sessions. The shared Vercel service uses Neon and private Blob storage with per-account isolation; users do not configure a server or storage. See `cloud/clipboard-sync/README.md`.
+- Added one reusable clipboard preview window for images and full text. The preview follows the selected item and closes when focus leaves the clipboard and preview windows.
+- Added recognition of common username, password, and website formats in favorite text, with separate context-menu copy actions.
+- Added context-menu keyboard shortcuts, including Ctrl+D to toggle favorites and Space to preview images or text.
+
+### Changed
+
+- Moved the sync icon next to the clipboard close button and removed the favorites footer, duplicate Delete menu action, and header button tooltips.
+
+### Fixed
+
+- Eliminated repeated image decoding and full-text preview layout during clipboard tab switches by caching favorite markers, thumbnails, and row sizes and bounding preview text.
+- Preserved the selected clipboard item and scroll position when toggling favorites; Ctrl+D now supports both adding and removing the corresponding favorite.
 
 ## [0.2.0] - 2026-10-13
 
