@@ -103,3 +103,13 @@ ctest --preset windows-opencv-release
 ```
 
 输出 ZIP 与 SHA256 校验文件；`-Deploy` 保留用于本地运行库部署。
+
+安装 Inno Setup 6.7 或更新版本后，可同时生成安装版：
+
+```powershell
+./scripts/build-win.ps1 -Package -Installer
+# 已构建、只重新打包时：
+./scripts/package-win.ps1 -Zip -Installer
+```
+
+安装包为 `dist/ntscreenshot-版本号-x64-Setup.exe`，附带 `.sha256`。也可运行 `scripts/package-installer-win.ps1` 直接使用已部署的目录，并用 `-CompilerPath` 指定 ISCC.exe。安装版仅支持 Release x64；详情见 [安装包说明](../installer/README.md)。GitHub 的 Windows installer 工作流在 Release 成功后自动从已校验的 ZIP 生成并验证安装包，再上传到同一 Release。

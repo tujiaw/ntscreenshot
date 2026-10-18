@@ -4,6 +4,14 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- Added a per-user Windows installer with English and Simplified Chinese, Start menu shortcuts, an optional desktop shortcut, upgrade support, and uninstall that preserves user data. Release automation builds and verifies the installer from the tested portable ZIP and adds an EXE and SHA-256 checksum to the same release.
+
+### Fixed
+
+- Bundle the MSVC redistributable DLLs beside the application so portable and installer builds do not require a machine-wide runtime installation.
+
 ## [0.2.1] - 2026-10-18
 
 ### Added

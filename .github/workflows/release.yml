@@ -117,9 +117,9 @@ jobs:
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           generate_release_notes: true
           body: |
-            Windows 10/11 x64 portable build. No installation required.
+            Windows 10/11 x64. Choose the Setup EXE for installation, or the portable ZIP to run without installation.
 
-            Windows 10/11 x64 绿色版，解压即用，无需安装。
+            Windows 10/11 x64：选择 Setup EXE 安装版，或解压即用的 ZIP 绿色版。
 
             ### Download / 下载
 

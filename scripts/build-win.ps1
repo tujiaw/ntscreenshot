@@ -22,6 +22,10 @@ param(
 
   [switch]$Package,
 
+  [switch]$Installer,
+
+  [string]$CompilerPath = '',
+
   [switch]$Clean,
 
   [switch]$Reconfigure
@@ -382,15 +386,17 @@ if ($LASTEXITCODE -ne 0) {
 $exePath = Join-Path $buildDir 'ntscreenshot.exe'
 Write-Host '==> Build finished'
 Write-Host "    Output   : $exePath"
-if ($Deploy -or $Package) {
+if ($Deploy -or $Package -or $Installer) {
   Write-Host '==> Deploying runtime dependencies'
   $deployParams = @{
     Config = $Config
     Platform = $Platform
     QtDir = $qtRoot
     ExePath = $exePath
-    InPlace = (-not $Package)
+    InPlace = (-not ($Package -or $Installer))
     Zip = [bool]$Package
+    Installer = [bool]$Installer
+    CompilerPath = $CompilerPath
   }
   if ($openCvRoot) {
     $deployParams.OpenCvDir = $openCvRoot

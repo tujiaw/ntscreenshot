@@ -3,6 +3,9 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+*.iss text eol=crlf
+*.isl text eol=lf
+installer/Languages/*.isl whitespace=-blank-at-eol
 *.sh text eol=lf
 
 *.dll binary

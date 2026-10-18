@@ -12,9 +12,11 @@
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[Download the Windows portable build](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [What's new](https://github.com/tujiaw/ntscreenshot/releases/latest) · [FAQ](#faq) · [Build from source](docs/building.en.md)
+**[Download the Windows installer](https://github.com/tujiaw/ntscreenshot/releases/latest)** · [Portable ZIP](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip) · [FAQ](#faq) · [Build from source](docs/building.en.md)
 
-Extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe`. No installer. If a release has no assets yet, follow the [build guide](docs/building.en.md).
+Install `ntscreenshot-VERSION-x64-Setup.exe` for the current user without administrator privileges. The default location is `%LocalAppData%\Programs\ntscreenshot`; Start menu shortcuts are included and the desktop shortcut is optional. Upgrading and uninstalling preserve settings and favorites.
+
+Alternatively, extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe` without installation. If a release has no assets yet, follow the [build guide](docs/building.en.md).
 
 ## Features
 

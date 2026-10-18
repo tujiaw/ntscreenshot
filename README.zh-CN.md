@@ -12,9 +12,11 @@
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[立即下载 Windows 绿色版](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip)** · [查看更新](https://github.com/tujiaw/ntscreenshot/releases/latest) · [常见问题](#faq) · [从源码构建](docs/building.md)
+**[下载 Windows 安装版](https://github.com/tujiaw/ntscreenshot/releases/latest)** · [ZIP 绿色版](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip) · [常见问题](#faq) · [从源码构建](docs/building.md)
 
-解压 `ntscreenshot-x64-Release.zip`，运行 `ntscreenshot.exe`。无需安装。若 Releases 还没有附件，按 [构建指南](docs/building.md) 自行编译。
+下载 `ntscreenshot-版本号-x64-Setup.exe` 安装版，仅为当前用户安装，无需管理员权限。默认安装到 `%LocalAppData%\Programs\ntscreenshot`，创建开始菜单快捷方式，桌面快捷方式可选。升级和卸载保留设置与收藏。
+
+也可解压 `ntscreenshot-x64-Release.zip`，运行 `ntscreenshot.exe`，无需安装。若 Releases 还没有附件，按 [构建指南](docs/building.md) 自行编译。
 
 ## 功能
 

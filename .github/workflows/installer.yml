@@ -1,0 +1,116 @@
+name: Windows installer
+
+on:
+  push:
+    branches: [master, main]
+    paths: ['installer/**', 'scripts/*installer*.ps1', 'scripts/deploy-msvc-runtime.ps1', 'tests/installer/**', '.github/workflows/installer.yml']
+  pull_request:
+    paths: ['installer/**', 'scripts/*installer*.ps1', 'scripts/deploy-msvc-runtime.ps1', 'tests/installer/**', '.github/workflows/installer.yml']
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published release tag (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.event_name }}-${{ inputs.tag || github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Test installer lifecycle
+    runs-on: windows-2022
+    timeout-minutes: 15
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Check out installer recipe
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Build two installer versions and test upgrade
+        shell: pwsh
+        run: |
+          ./tests/installer/BuildInstallerFixture.ps1 -OutDir build/fixture-old -Version 1.2.3
+          ./tests/installer/BuildInstallerFixture.ps1 -OutDir build/fixture-new -Version 1.2.4
+          ./scripts/package-installer-win.ps1 -PackageDir build/fixture-old -OutDir build/installers -Version 1.2.3
+          ./scripts/package-installer-win.ps1 -PackageDir build/fixture-new -OutDir build/installers -Version 1.2.4
+          ./tests/installer/InstallerSmokeTest.ps1 -InstallerPath build/installers/ntscreenshot-1.2.3-x64-Setup.exe `
+            -PackageDir build/fixture-old -WorkDir build/installer-contract `
+            -UpgradeInstallerPath build/installers/ntscreenshot-1.2.4-x64-Setup.exe -UpgradePackageDir build/fixture-new
+      - name: Upload installer test logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installer-test-logs
+          path: build/installer-contract/*.log
+          if-no-files-found: ignore
+
+  publish:
+    name: Build and publish release installer
+    needs: contract
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out installer recipe
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download and verify tested portable package
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Invalid release tag.' }
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY `
+            --pattern ntscreenshot-x64-Release.zip --pattern ntscreenshot-x64-Release.zip.sha256 --dir dist/incoming
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot download the published package.' }
+          $zip = 'dist/incoming/ntscreenshot-x64-Release.zip'
+          $expected = ((Get-Content -Raw "$zip.sha256").Trim() -split '\s+')[0]
+          if ($expected -notmatch '^[a-fA-F0-9]{64}$' -or (Get-FileHash $zip -Algorithm SHA256).Hash -ne $expected) {
+            throw 'Portable package checksum mismatch.'
+          }
+          Expand-Archive -LiteralPath $zip -DestinationPath dist/installer-source
+      - name: Build installer and checksum
+        shell: pwsh
+        run: |
+          ./scripts/package-installer-win.ps1 -PackageDir dist/installer-source -OutDir dist -Version ($env:RELEASE_TAG.Substring(1))
+      - name: Test real installer without launching the application
+        shell: pwsh
+        run: |
+          $installer = "dist/ntscreenshot-$($env:RELEASE_TAG.Substring(1))-x64-Setup.exe"
+          ./tests/installer/InstallerSmokeTest.ps1 -InstallerPath $installer -PackageDir dist/installer-source -WorkDir build/release-installer-test
+      - name: Upload tested installer
+        shell: pwsh
+        run: |
+          $installer = "dist/ntscreenshot-$($env:RELEASE_TAG.Substring(1))-x64-Setup.exe"
+          gh release upload $env:RELEASE_TAG $installer "$installer.sha256" --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot upload installer assets.' }
+          $notes = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json body --jq .body
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read release notes.' }
+          $fileName = Split-Path -Leaf $installer
+          if (($notes -join "`n") -notlike "*$fileName*") {
+            $addition = "`n`n### Installer / 安装版`n`nDownload $fileName from Assets for a per-user installation with shortcuts and uninstall support. No administrator privileges are required.`n`n下载 $fileName 安装版：仅为当前用户安装，无需管理员权限。升级和卸载均保留设置与收藏。"
+            (($notes -join "`n") + $addition) | Set-Content -Path build/installer-release-notes.md -Encoding utf8
+            gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --notes-file build/installer-release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot update installer download instructions.' }
+          }
+      - name: Upload package and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-installer
+          path: |
+            dist/*-Setup.exe
+            dist/*-Setup.exe.sha256
+            build/release-installer-test/*.log
+          if-no-files-found: ignore

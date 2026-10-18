@@ -103,3 +103,13 @@ ctest --preset windows-opencv-release
 ```
 
 Produces the portable ZIP and SHA256 checksum. `-Deploy` remains available for local runtime deployment.
+
+With Inno Setup 6.7 or later installed, build both distribution formats:
+
+```powershell
+./scripts/build-win.ps1 -Package -Installer
+# Package an existing build:
+./scripts/package-win.ps1 -Zip -Installer
+```
+
+The installer is `dist/ntscreenshot-VERSION-x64-Setup.exe` with a `.sha256` checksum. `scripts/package-installer-win.ps1` also accepts a staged directory directly; use `-CompilerPath` to specify ISCC.exe. Installers require a Release x64 build. See the [installer guide](../installer/README.md). The Windows installer workflow runs after Release succeeds, verifies the published ZIP, builds and tests the installer, and uploads it to the same release.

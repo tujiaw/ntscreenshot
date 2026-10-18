@@ -22,7 +22,11 @@ param(
 
   [switch]$InPlace,
 
-  [switch]$Zip
+  [switch]$Zip,
+
+  [switch]$Installer,
+
+  [string]$CompilerPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -319,7 +323,10 @@ $qtRoot = Resolve-QtDir -QtDir $QtDir
 $sourceExe = Resolve-ExePath -RepoRoot $repoRoot -Explicit $ExePath -Platform $Platform -Config $Config
 $sourceDir = Split-Path -Parent $sourceExe
 $dumpbin = Resolve-Dumpbin -Explicit $DumpbinExe
-$stageToDist = $Zip -or (-not $InPlace)
+$stageToDist = $Zip -or $Installer -or (-not $InPlace)
+if ($Installer -and ($Config -ne 'Release' -or $Platform -ne 'x64')) {
+  throw 'The installer requires a Release x64 build.'
+}
 
 if ($stageToDist) {
   $outputRoot = if ([IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-Path $repoRoot $OutDir }
@@ -335,6 +342,10 @@ if ($stageToDist) {
 }
 
 Invoke-WinDeploy -QtRoot $qtRoot -DeployExe $deployExe -TargetDir $targetDir -Config $Config
+if ($Config -eq 'Release') {
+  & (Join-Path $PSScriptRoot 'deploy-msvc-runtime.ps1') -TargetDir $targetDir `
+    -Architecture $(if ($Platform -eq 'x64') { 'x64' } else { 'x86' })
+}
 
 Write-Host '==> Copying third-party runtime DLLs'
 $otherRuntimeDirs = @($targetDir, (Join-Path $qtRoot 'bin'),
@@ -398,6 +409,11 @@ if ($stageToDist) {
   Remove-BuildArtifacts -TargetDir $targetDir
   Copy-PackageDocuments -RepoRoot $repoRoot -StageDir $targetDir -QtDir $qtRoot `
     -SourceExe $sourceExe -VcpkgInstalledDir $VcpkgInstalledDir -VcpkgTriplet $VcpkgTriplet -OpenCvRoot $openCvRoot
+}
+
+if ($Installer) {
+  & (Join-Path $PSScriptRoot 'package-installer-win.ps1') -PackageDir $targetDir `
+    -OutDir (Split-Path -Parent $targetDir) -CompilerPath $CompilerPath
 }
 
 if ($Zip) {
