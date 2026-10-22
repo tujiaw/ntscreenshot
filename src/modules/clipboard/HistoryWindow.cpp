@@ -435,7 +435,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     resize(scaled(kPopupWidth), scaled(kPopupHeight));
 
     auto* root = new QVBoxLayout(this);
-    // Keep one physical pixel around the children so the window-colored frame
+    // Keep room around the children so the contrasting frame
     // is not covered by the header/body widgets.
     root->setContentsMargins(scaled(1), scaled(1), scaled(1), scaled(1));
     root->setSpacing(0);
@@ -1044,8 +1044,10 @@ void HistoryWindow::SetBackgroundTransparency(int percent) {
 void HistoryWindow::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    const int frameWidth = scaled(1);
+    const qreal frameInset = frameWidth / 2.0;
     QPainterPath path;
-    path.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
+    path.addRoundedRect(QRectF(rect()).adjusted(frameInset, frameInset, -frameInset, -frameInset),
                         scaled(kRadius), scaled(kRadius));
     const QColor windowBackground = WithAlpha(palette().color(QPalette::Window), backgroundAlpha_);
     painter.fillPath(path, windowBackground);
@@ -1056,9 +1058,8 @@ void HistoryWindow::paintEvent(QPaintEvent*) {
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.fillRect(pages_->geometry(), WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
     painter.restore();
-    // Match the frame to the title area's effective background color. The
-    // header is transparent and therefore uses QPalette::Window as well.
-    painter.setPen(QPen(windowBackground, scaled(1)));
+    // Keep the outline visible in both themes, independently of background transparency.
+    painter.setPen(QPen(ThemeManager::tokens().borderStrong, frameWidth));
     painter.drawPath(path);
 }
 

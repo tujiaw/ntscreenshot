@@ -611,7 +611,9 @@ QWidget#browserControlRight QToolButton:checked { background: @ACCENT_SUBTLE@; }
 QWidget#browserControlLeft QToolButton:disabled,
 QWidget#browserControlRight QToolButton:disabled { background: transparent; }
 
-/* 中间工具胶囊 */
+QFrame#browserControlSeparator { background: @BORDER@; border: none; margin: 0px; }
+
+/* 编辑工具胶囊 */
 QFrame#browserToolPill { background: @SURFACE_SUBTLE@; border: 1px solid @BORDER@; border-radius: 12px; }
 QFrame#browserToolPill QToolButton { background: transparent; border: none; border-radius: 6px; padding: 0px; color: @TEXT@; }
 QFrame#browserToolPill QToolButton:hover { background: @SURFACE_RAISED@; }

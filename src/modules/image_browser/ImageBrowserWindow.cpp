@@ -257,7 +257,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     connect(overlayPrevious_, &QToolButton::clicked, this, [this] { selectRow(model_->indexOf(document_.path) - 1); });
     connect(overlayNext_, &QToolButton::clicked, this, [this] { selectRow(model_->indexOf(document_.path) + 1); });
 
-    // ---- 底部控制栏。三段等分：左组、胶囊、右组各占 1/3 拉伸，胶囊自然落在窗口正中。
+    // 底部翻页靠左、编辑工具居中，缩放、保存和图片信息靠右。
     auto panelAction = [this](const QString& title, const QString& icon, const QKeySequence& key,
                               std::function<void()> callback) {
         QIcon image = ThemeIcon::icon(icon);
@@ -301,7 +301,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     counterLabel_->setObjectName(QStringLiteral("browserImageCounter"));
     counterLabel_->setTextFormat(Qt::PlainText);
     counterLabel_->setAlignment(Qt::AlignCenter);
-    controlCopySave_ = new QWidget(controlLeft_);
+    controlCopySave_ = new QWidget(controlRight_);
     auto* copySaveRow = new QHBoxLayout(controlCopySave_);
     copySaveRow->setContentsMargins(0, 0, 0, 0);
     copySaveRow->setSpacing(0);
@@ -345,14 +345,12 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     statusLabel_->installEventFilter(this);
 
     leftRow->addWidget(sidebarButton_);
-    leftRow->addWidget(controlButton(previousAction_));
-    leftRow->addWidget(counterLabel_);
-    leftRow->addWidget(controlButton(nextAction_));
-    leftRow->addWidget(controlCopySave_);
+    auto* saveSeparator = new QFrame(controlCopySave_);
+    saveSeparator->setObjectName(QStringLiteral("browserControlSeparator"));
+    saveSeparator->setFrameShape(QFrame::VLine);
+    copySaveRow->addWidget(saveSeparator);
     copySaveRow->addWidget(controlButton(copyAction_));
     copySaveRow->addWidget(controlButton(saveAction_));
-    leftRow->addWidget(details_);
-    leftRow->addWidget(statusLabel_);
 
     toolPill_ = new QFrame(controlBar_);
     toolPill_->setObjectName(QStringLiteral("browserToolPill"));
@@ -425,13 +423,21 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
     fullscreenAction_ = panelAction(tr("全屏"), "browser-fit.png", QKeySequence("F11"), [this] { toggleFullscreen(); });
     fullscreenAction_->setCheckable(true);
 
-    rightRow->addWidget(controlButton(playAction_));
-    rightRow->addWidget(controlButton(frameAction_));
-    rightRow->addWidget(zoomButton_);
+    leftRow->addWidget(controlButton(previousAction_));
+    leftRow->addWidget(counterLabel_);
+    leftRow->addWidget(controlButton(nextAction_));
+    leftRow->addWidget(controlButton(playAction_));
+    leftRow->addWidget(controlButton(frameAction_));
+    leftRow->addWidget(statusLabel_);
+    leftRow->addStretch(1);
+    rightRow->addStretch(1);
     rightRow->addWidget(controlButton(zoomOutAction_));
+    rightRow->addWidget(zoomButton_);
     rightRow->addWidget(controlButton(zoomInAction_));
     rightRow->addWidget(controlButton(fullscreenAction_));
-    rightRow->insertStretch(0, 1);
+    rightRow->addWidget(controlCopySave_);
+    rightRow->addWidget(details_);
+    details_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     controlRow->addWidget(controlLeft_, 1);
     controlRow->addWidget(toolPill_);
@@ -603,13 +609,17 @@ void ImageBrowserWindow::applyDpi(double scale) {
     }
     for (auto* line : toolPill_->findChildren<QFrame*>(QStringLiteral("browserToolPillSeparator")))
         line->setFixedSize(qRound(1 * scale), qRound(16 * scale));
+    for (auto* line : controlRight_->findChildren<QFrame*>(QStringLiteral("browserControlSeparator")))
+        line->setFixedSize(qRound(1 * scale), qRound(16 * scale));
     details_->setMaximumWidth(qRound(220 * scale));
     statusLabel_->setMaximumWidth(qRound(280 * scale));
     for (QHBoxLayout* row : {qobject_cast<QHBoxLayout*>(controlLeft_->layout()), qobject_cast<QHBoxLayout*>(controlRight_->layout())})
         if (row) row->setSpacing(qRound(2 * scale));
+    if (auto* row = qobject_cast<QHBoxLayout*>(controlCopySave_->layout()))
+        row->setSpacing(qRound(2 * scale));
     if (auto* row = qobject_cast<QHBoxLayout*>(controlBar_->layout())) {
         row->setContentsMargins(qRound(8 * scale), 0, qRound(8 * scale), 0);
-        // 左右两组各占一半宽度，内容贴各自的外侧；留出间隔，文件信息才不会顶到胶囊上。
+        // 左右两侧等宽，保证工具胶囊相对整个窗口居中。
         row->setSpacing(qRound(12 * scale));
     }
     // 高度必须固定：底栏内容一变就会顶动状态栏高度，中央部件跟着 resize，
@@ -775,27 +785,30 @@ void ImageBrowserWindow::layoutControlBar() {
     };
     // 用「候选档位」而不是控件的 isVisible() 来量宽度：任何祖先隐藏时 isVisible() 都是 false，
     // 会让底栏的取舍跟着窗口显隐变化，进而在重排回调里来回抖动。
-    auto measure = [this](int level) {
-        auto groupWidth = [this, level](QWidget* group) {
-            auto* row = qobject_cast<QHBoxLayout*>(group->layout());
-            const auto margins = row->contentsMargins();
-            int width = margins.left()+margins.right(), count = 0;
-            for (int i = 0; i < row->count(); ++i) {
-                auto* widget = row->itemAt(i)->widget();
-                if (!widget || widget == statusLabel_) continue;
-                if (widget == details_ && (level >= 1 || !hasDetails_)) continue;
-                if (widget == controlCopySave_ && level >= 3) continue;
-                if (auto* button = qobject_cast<QToolButton*>(widget))
-                    if (button->defaultAction() && !button->defaultAction()->isVisible()) continue;
-                width += qBound(widget->minimumWidth(), widget->sizeHint().width(), widget->maximumWidth());
-                ++count;
-            }
-            return width + qMax(0, count-1)*row->spacing();
-        };
-        int width = qRound(48 * scaleFactor_);
-        width += groupWidth(controlLeft_);
+    auto groupWidth = [this](QWidget* group, int level) {
+        auto* row = qobject_cast<QHBoxLayout*>(group->layout());
+        const auto margins = row->contentsMargins();
+        int width = margins.left()+margins.right(), count = 0;
+        for (int i = 0; i < row->count(); ++i) {
+            auto* widget = row->itemAt(i)->widget();
+            if (!widget || widget == statusLabel_) continue;
+            if (widget == details_ && (level >= 1 || !hasDetails_)) continue;
+            if (widget == controlCopySave_ && level >= 3) continue;
+            if (auto* button = qobject_cast<QToolButton*>(widget))
+                if (button->defaultAction() && !button->defaultAction()->isVisible()) continue;
+            width += qBound(widget->minimumWidth(), widget->sizeHint().width(), widget->maximumWidth());
+            ++count;
+        }
+        return width + qMax(0, count-1)*row->spacing();
+    };
+    auto sideWidth = [this, &groupWidth](int level) {
+        return qMax(groupWidth(controlLeft_, level), groupWidth(controlRight_, level));
+    };
+    auto measure = [this, &sideWidth](int level) {
+        const auto margins = controlBar_->layout()->contentsMargins();
+        int width = margins.left() + margins.right() + controlBar_->layout()->spacing() * (level < 2 ? 2 : 1);
+        width += 2 * sideWidth(level);
         if (level < 2) width += toolPill_->sizeHint().width();
-        width += groupWidth(controlRight_);
         return width;
     };
     int level = 3;
@@ -803,6 +816,9 @@ void ImageBrowserWindow::layoutControlBar() {
         if (measure(candidate) <= controlBar_->width()) { level = candidate; break; }
     }
     apply(level);
+    const int minimumSide = sideWidth(level);
+    controlLeft_->setMinimumWidth(minimumSide);
+    controlRight_->setMinimumWidth(minimumSide);
     controlLevel_ = level;
 }
 
