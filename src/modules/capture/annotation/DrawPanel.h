@@ -186,6 +186,7 @@ protected:
 
 private:
     SettingModel* settings_ = nullptr;
+    double lastScaleFactor_ = -1.0;
     Q_DISABLE_COPY(DrawPanel)
     void applyCurrentStyle(DrawMode &mode) const;
     void uncheckOtherButtons(QAbstractButton *checkedButton);

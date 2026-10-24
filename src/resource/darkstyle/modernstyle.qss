@@ -322,14 +322,18 @@ QSlider::handle:vertical {
 QSlider::handle:vertical:hover { background: @ACCENT@; border-color: @ACCENT@; }
 QSlider::handle:vertical:pressed { background: @ACCENT_PRESSED@; border-color: @ACCENT_PRESSED@; }
 
-QWidget#DrawPanel { background: @SURFACE_RAISED@; border-top: 1px solid @BORDER@; border-radius: 10px; }
+QWidget#DrawPanel { background: transparent; border: none; }
 QWidget#DrawPanel > QPushButton {
-    min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px;
-    padding: 0; background: transparent; border: 1px solid transparent; border-radius: 6px;
+    min-width: 0px; min-height: 0px;
+    padding: 0; background: transparent; border: 1px solid transparent; border-radius: 20px;
 }
-QWidget#DrawPanel > QPushButton:hover { background: @SURFACE_SUBTLE@; }
-QWidget#DrawPanel > QPushButton:checked { background: @ACCENT_SUBTLE@; border-color: @ACCENT@; }
+QWidget#DrawPanel > QPushButton:hover { background: @BORDER@; }
+QWidget#DrawPanel > QPushButton:checked { background: @ACCENT_SUBTLE@; border-color: transparent; }
+QWidget#DrawPanel > QPushButton:pressed { background: @ACCENT_SUBTLE@; }
+QWidget#DrawPanel > QPushButton:focus { border-color: @ACCENT@; }
 QWidget#DrawPanel > QPushButton[uiRole="primary"] { color: #FFFFFF; background: @ACCENT@; border-color: @ACCENT@; }
+QWidget#DrawPanel > QPushButton[uiRole="primary"]:hover { background: @ACCENT_HOVER@; }
+QWidget#DrawPanel > QPushButton[uiRole="primary"]:pressed { background: @ACCENT_PRESSED@; }
 QFrame#DrawPanelSeparator { background: @BORDER@; border: none; }
 
 QWidget#DrawSettingsPanel {
