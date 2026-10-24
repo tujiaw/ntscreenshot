@@ -4,6 +4,19 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-24
+
+### Changed
+
+- Refreshed screenshot and pinned-image annotation toolbars with a Material-inspired rounded surface, consistent vector icons, circular selection states, and a labeled Copy button.
+- Moved long screenshot and GIF recording to the top of the More menu.
+- Unified long screenshot and GIF control panel heights, button sizes, spacing, and theme-aware gray backgrounds; kept GIF panel width stable between recording states.
+
+### Fixed
+
+- Corrected black backgrounds around rounded annotation toolbars in screenshot and pinned-image windows, including when expanding or collapsing drawing settings.
+- Added padding around drawing settings and result messages, and drew circular button states from their actual geometry to avoid scaling artifacts.
+
 ## [0.2.2] - 2026-10-24
 
 ### Added
