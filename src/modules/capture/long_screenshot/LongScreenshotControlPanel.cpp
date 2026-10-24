@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "LongScreenshotControlPanel.h"
+#include "modules/capture/CaptureControlPanelStyle.h"
 #include <QHBoxLayout>
 #include <QPainter>
 #include "core/platform/Util.h"
@@ -27,8 +28,8 @@ void LongScreenshotControlPanel::setupUI()
     setAttribute(Qt::WA_ShowWithoutActivating);
     setObjectName(QStringLiteral("LongScreenshotControlPanel"));
 
-    const int btnSize = Util::scaleSize(30);
-    const int iconSize = Util::scaleSize(16);
+    const int btnSize = Util::scaleSize(CaptureControlPanelStyle::ButtonSize);
+    const int iconSize = Util::scaleSize(CaptureControlPanelStyle::IconSize);
 
     infoLabel_ = new QLabel(this);
     infoLabel_->setObjectName(QStringLiteral("longScreenshotInfoLabel"));
@@ -44,6 +45,8 @@ void LongScreenshotControlPanel::setupUI()
     finishButton_->setFixedSize(btnSize, btnSize);
     finishButton_->setIconSize(QSize(iconSize, iconSize));
     UiStyler::setRole(finishButton_, UiRole::PrimaryButton);
+    finishButton_->ensurePolished();
+    finishButton_->setFixedSize(btnSize, btnSize);
     connect(finishButton_, &QPushButton::clicked, this, &LongScreenshotControlPanel::sigFinishClicked);
 
     cancelButton_ = new QPushButton(
@@ -53,11 +56,12 @@ void LongScreenshotControlPanel::setupUI()
     cancelButton_->setFixedSize(btnSize, btnSize);
     cancelButton_->setIconSize(QSize(iconSize, iconSize));
     UiStyler::setRole(cancelButton_, UiRole::DangerButton);
+    cancelButton_->ensurePolished();
+    cancelButton_->setFixedSize(btnSize, btnSize);
     connect(cancelButton_, &QPushButton::clicked, this, &LongScreenshotControlPanel::sigCancelClicked);
 
     QHBoxLayout* hLayout = new QHBoxLayout(this);
-    Util::scaleLayoutMargins(hLayout, 10, 6, 6, 6);
-    hLayout->setSpacing(Util::scaleSize(4));
+    CaptureControlPanelStyle::setup(this, hLayout);
     hLayout->addWidget(finishButton_);
     hLayout->addWidget(cancelButton_);
 
@@ -75,12 +79,5 @@ void LongScreenshotControlPanel::setInfoText(const QString &text)
 
 void LongScreenshotControlPanel::paintEvent(QPaintEvent *)
 {
-    // 透明窗口上手动绘制不透明的圆角面板背景
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    const ThemeTokens& tokens = ThemeManager::tokens();
-    const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    painter.setPen(QPen(tokens.border, 1));
-    painter.setBrush(tokens.surfaceRaised);
-    painter.drawRoundedRect(r, Util::scaleSize(8), Util::scaleSize(8));
+    CaptureControlPanelStyle::paint(this);
 }

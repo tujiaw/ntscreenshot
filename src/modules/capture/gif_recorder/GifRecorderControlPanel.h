@@ -6,6 +6,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QToolButton;
+class QStackedWidget;
 
 class GifRecorderControlPanel : public QWidget
 {
@@ -39,4 +40,5 @@ protected:
     QPushButton *copyButton_ = nullptr;
     QPushButton *openButton_ = nullptr;
     QToolButton *cancelButton_ = nullptr;
+    QStackedWidget *actions_ = nullptr;
 };

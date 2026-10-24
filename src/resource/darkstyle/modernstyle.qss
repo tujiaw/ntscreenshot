@@ -462,20 +462,18 @@ QListWidget#settingsNavigation::item:selected {
 }
 
 /* === 截长图 控制面板（透明窗口 + paintEvent 绘制圆角背景） === */
-QWidget#LongScreenshotControlPanel {
+QWidget#LongScreenshotControlPanel,
+QWidget#GifRecorderControlPanel,
+QWidget#GifRecorderControlPanel QStackedWidget,
+QWidget#GifRecorderControlPanel QStackedWidget > QWidget {
     background: transparent;
+    border: none;
 }
-QWidget#LongScreenshotControlPanel QPushButton {
+QWidget#LongScreenshotControlPanel QPushButton,
+QWidget#GifRecorderControlPanel QToolButton {
+    min-width: 0px; min-height: 0px;
     padding: 0px;
-    border-radius: 8px;
-}
-QWidget#LongScreenshotControlPanel QPushButton#longScreenshotFinishButton {
-    min-width: 28px; max-width: 28px;
-    min-height: 28px; max-height: 28px;
-}
-QWidget#LongScreenshotControlPanel QPushButton#longScreenshotCancelButton {
-    min-width: 28px; max-width: 28px;
-    min-height: 28px; max-height: 28px;
+    border-radius: 6px;
 }
 QLabel#longScreenshotInfoLabel {
     color: @TEXT_SECONDARY@; background: transparent; border: none; font-size: 12px;
@@ -489,8 +487,8 @@ QWidget#GifRecorderControlPanel QLabel {
     color: @TEXT_SECONDARY@; background: transparent; font-size: 12px;
 }
 QWidget#GifRecorderControlPanel QLineEdit {
-    color: @TEXT@; background: @SURFACE@;
-    border: 1px solid @BORDER@; border-radius: 4px;
+    color: @TEXT@; background: @CANVAS@;
+    border: 1px solid @BORDER_STRONG@; border-radius: 6px;
     padding: 0 4px; font-size: 12px;
 }
 QWidget#GifRecorderControlPanel QLineEdit:disabled {
@@ -498,12 +496,12 @@ QWidget#GifRecorderControlPanel QLineEdit:disabled {
 }
 QWidget#GifRecorderControlPanel QPushButton {
     font-size: 12px;
-    min-height: 22px;
+    min-height: 0px;
     padding: 0 10px;
-    border-radius: 5px;
+    border-radius: 6px;
     color: @TEXT@;
-    background: @SURFACE_RAISED@;
-    border: 1px solid @BORDER@;
+    background: @CANVAS@;
+    border: 1px solid @BORDER_STRONG@;
 }
 QWidget#GifRecorderControlPanel QPushButton:hover {
     background: @SURFACE_SUBTLE@;
@@ -527,14 +525,14 @@ QWidget#GifRecorderControlPanel QPushButton#gifCopyButton:enabled:hover {
 }
 QWidget#GifRecorderControlPanel QToolButton#gifCloseButton {
     background: transparent;
-    border: none;
-    border-radius: 4px;
-    padding: 0px;
-    min-width: 22px; max-width: 22px;
-    min-height: 22px; max-height: 22px;
+    border: 1px solid @DANGER@;
 }
 QWidget#GifRecorderControlPanel QToolButton#gifCloseButton:hover {
+    background: @BORDER@;
+}
+QWidget#GifRecorderControlPanel QToolButton#gifCloseButton:disabled {
     background: @SURFACE_SUBTLE@;
+    border-color: @BORDER@;
 }
 
 QFrame#chatInputSurface { background: @SURFACE@; border: 1px solid @BORDER@; border-radius: 18px; }

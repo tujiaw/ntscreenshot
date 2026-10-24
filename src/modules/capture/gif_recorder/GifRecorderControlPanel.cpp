@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "GifRecorderControlPanel.h"
+#include "modules/capture/CaptureControlPanelStyle.h"
 
 #include "core/theme/ThemeIcon.h"
 #include "core/theme/ThemeManager.h"
@@ -12,6 +13,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QToolButton>
+#include <QStackedWidget>
 
 GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     : QWidget(parent)
@@ -22,8 +24,8 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     setObjectName(QStringLiteral("GifRecorderControlPanel"));
 
     auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 4, 8, 4);
-    layout->setSpacing(6);
+    CaptureControlPanelStyle::setup(this, layout);
+    const int buttonSize = Util::scaleSize(CaptureControlPanelStyle::ButtonSize);
 
     auto *fpsLabel = new QLabel(QStringLiteral("FPS"), this);
     fpsLabel->setObjectName(QStringLiteral("gifFpsLabel"));
@@ -32,13 +34,18 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     fpsEdit_->setValidator(new QIntValidator(1, 30, fpsEdit_));
     fpsEdit_->setAlignment(Qt::AlignCenter);
     fpsEdit_->setMaxLength(2);
-    fpsEdit_->setFixedSize(34, 22);
+    fpsEdit_->ensurePolished();
+    fpsEdit_->setFixedSize(Util::scaleSize(38), buttonSize);
     fpsEdit_->setToolTip(QCoreApplication::translate("App", "输入 FPS（1–30）"));
 
     sizeLabel_ = new QLabel(this);
     sizeLabel_->setObjectName(QStringLiteral("gifSizeLabel"));
     elapsedLabel_ = new QLabel(QStringLiteral("00:00 · 0"), this);
     elapsedLabel_->setObjectName(QStringLiteral("gifElapsedLabel"));
+    sizeLabel_->ensurePolished();
+    elapsedLabel_->ensurePolished();
+    sizeLabel_->setMinimumWidth(sizeLabel_->fontMetrics().horizontalAdvance(QStringLiteral("9999×9999")));
+    elapsedLabel_->setMinimumWidth(elapsedLabel_->fontMetrics().horizontalAdvance(QStringLiteral("000:00 · 99999")));
     recordButton_ = new QPushButton(QCoreApplication::translate("App", "录制"), this);
     copyButton_ = new QPushButton(QCoreApplication::translate("App", "完成/复制"), this);
     openButton_ = new QPushButton(QCoreApplication::translate("App", "完成/打开"), this);
@@ -50,24 +57,42 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
     openButton_->setObjectName(QStringLiteral("gifOpenButton"));
     openButton_->setToolTip(QCoreApplication::translate("App", "打开已保存的 GIF 文件"));
     cancelButton_->setObjectName(QStringLiteral("gifCloseButton"));
-    recordButton_->setFixedSize(56, 24);
-    copyButton_->setMinimumWidth(copyButton_->fontMetrics().horizontalAdvance(copyButton_->text()) + 28);
-    openButton_->setMinimumWidth(openButton_->fontMetrics().horizontalAdvance(openButton_->text()) + 28);
-    copyButton_->setFixedHeight(24);
-    openButton_->setFixedHeight(24);
-    cancelButton_->setFixedSize(22, 22);
-    cancelButton_->setIconSize(QSize(12, 12));
-    cancelButton_->setIcon(ThemeIcon::icon(QStringLiteral("icon_window_close.png")));
+    recordButton_->ensurePolished();
+    copyButton_->ensurePolished();
+    openButton_->ensurePolished();
+    cancelButton_->ensurePolished();
+    recordButton_->setFixedSize(Util::scaleSize(64), buttonSize);
+    copyButton_->setMinimumWidth(copyButton_->fontMetrics().horizontalAdvance(copyButton_->text()) + Util::scaleSize(24));
+    openButton_->setMinimumWidth(openButton_->fontMetrics().horizontalAdvance(openButton_->text()) + Util::scaleSize(24));
+    copyButton_->setFixedHeight(buttonSize);
+    openButton_->setFixedHeight(buttonSize);
+    cancelButton_->setFixedSize(buttonSize, buttonSize);
+    const int iconSize = Util::scaleSize(CaptureControlPanelStyle::IconSize);
+    cancelButton_->setIconSize(QSize(iconSize, iconSize));
+    cancelButton_->setIcon(ThemeIcon::icon(QStringLiteral("remove.png"), IconTone::Danger, iconSize));
     cancelButton_->setToolTip(QCoreApplication::translate("App", "取消录制 (Esc)"));
 
     layout->addWidget(fpsLabel);
     layout->addWidget(fpsEdit_);
     layout->addWidget(sizeLabel_);
     layout->addWidget(elapsedLabel_);
-    layout->addSpacing(8);
-    layout->addWidget(recordButton_);
-    layout->addWidget(copyButton_);
-    layout->addWidget(openButton_);
+    // Reserve the same action area for preparing and recording so the panel
+    // stays anchored when the finish buttons replace the record button.
+    actions_ = new QStackedWidget(this);
+    auto* preparing = new QWidget(actions_);
+    auto* preparingLayout = new QHBoxLayout(preparing);
+    preparingLayout->setContentsMargins(0, 0, 0, 0);
+    preparingLayout->addStretch();
+    preparingLayout->addWidget(recordButton_);
+    auto* recording = new QWidget(actions_);
+    auto* recordingLayout = new QHBoxLayout(recording);
+    recordingLayout->setContentsMargins(0, 0, 0, 0);
+    recordingLayout->setSpacing(Util::scaleSize(6));
+    recordingLayout->addWidget(copyButton_);
+    recordingLayout->addWidget(openButton_);
+    actions_->addWidget(preparing);
+    actions_->addWidget(recording);
+    layout->addWidget(actions_);
     layout->addWidget(cancelButton_);
 
     connect(recordButton_, &QPushButton::clicked, this, &GifRecorderControlPanel::sigRecordClicked);
@@ -79,13 +104,7 @@ GifRecorderControlPanel::GifRecorderControlPanel(QWidget *parent)
 
 void GifRecorderControlPanel::paintEvent(QPaintEvent*)
 {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    const ThemeTokens& tokens = ThemeManager::tokens();
-    const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    painter.setPen(QPen(tokens.border, 1));
-    painter.setBrush(tokens.surfaceRaised);
-    painter.drawRoundedRect(r, Util::scaleSize(8), Util::scaleSize(8));
+    CaptureControlPanelStyle::paint(this);
 }
 
 void GifRecorderControlPanel::applyTheme()
@@ -120,10 +139,8 @@ void GifRecorderControlPanel::setPreparing()
     fpsEdit_->setEnabled(true);
     fpsEdit_->show();
     recordButton_->setEnabled(true);
-    recordButton_->show();
+    actions_->setCurrentIndex(0);
     recordButton_->setText(QCoreApplication::translate("App", "录制"));
-    copyButton_->hide();
-    openButton_->hide();
     cancelButton_->setEnabled(true);
     cancelButton_->setToolTip(QCoreApplication::translate("App", "取消录制 (Esc)"));
     setElapsedMilliseconds(0, 0);
@@ -133,10 +150,8 @@ void GifRecorderControlPanel::setPreparing()
 void GifRecorderControlPanel::setRecording()
 {
     fpsEdit_->setEnabled(false);
-    recordButton_->hide();
-    copyButton_->show();
+    actions_->setCurrentIndex(1);
     copyButton_->setEnabled(true);
-    openButton_->show();
     openButton_->setEnabled(true);
     cancelButton_->setEnabled(true);
     setElapsedMilliseconds(0, 0);
