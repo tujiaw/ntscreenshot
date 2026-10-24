@@ -4,9 +4,17 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-24
+
 ### Added
 
 - Added a per-user Windows installer with English and Simplified Chinese, Start menu shortcuts, an optional desktop shortcut, upgrade support, and uninstall that preserves user data. Release automation builds and verifies the installer from the tested portable ZIP and adds an EXE and SHA-256 checksum to the same release.
+
+### Changed
+
+- Improved image browser controls and the clipboard window border; widened the clipboard history and favorites buttons.
+- Show recognized OCR text in screenshot and pinned-image success messages while retaining automatic clipboard copying.
+- Made selection adjustment consistent: arrow keys move the selection, Ctrl+arrow expands the indicated edge, and Shift+arrow contracts it, with screen boundary and minimum-size checks.
 
 ### Fixed
 
