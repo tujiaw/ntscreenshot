@@ -482,7 +482,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
         button->setObjectName(name);
         button->setCheckable(true);
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        button->setFixedSize(scaled(22), scaled(22));
+        button->setFixedSize(scaled(32), scaled(22));
         button->setIconSize(QSize(scaled(16), scaled(16)));
         button->setAccessibleName(label);
         button->setCursor(Qt::PointingHandCursor);

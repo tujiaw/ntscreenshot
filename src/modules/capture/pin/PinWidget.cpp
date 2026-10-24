@@ -454,7 +454,7 @@ void PinWidget::onOcr()
     auto* client = new PaddleOcrClient(this);
     connect(client, &PaddleOcrClient::succeeded, this, [this, client](const QString& text) {
         QApplication::clipboard()->setText(text);
-        notifyToolMessage(QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板"), false);
+        notifyToolMessage(QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板") + QLatin1Char('\n') + text, false);
         client->deleteLater();
     });
     connect(client, &PaddleOcrClient::failed, this, [this, client](const QString& error) {

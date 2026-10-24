@@ -85,6 +85,11 @@ endif()
 nt_add_qt_test(english_translation translation_tests
     "${CMAKE_CURRENT_BINARY_DIR}/../ntscreenshot_en.qm")
 
+add_executable(selection_keyboard_tests capture/SelectionKeyboardTest.cpp)
+target_include_directories(selection_keyboard_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(selection_keyboard_tests PRIVATE Qt6::Core)
+nt_add_qt_test(selection_keyboard selection_keyboard_tests)
+
 add_executable(favorite_sync_state_tests
     clipboard/FavoriteSyncStateTest.cpp
     ${NT_SOURCE_DIR}/modules/clipboard/FavoriteSyncState.cpp)

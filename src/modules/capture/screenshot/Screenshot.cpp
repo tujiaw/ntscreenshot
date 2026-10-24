@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "Screenshot.h"
+#include "SelectionKeyboard.h"
 #include "modules/capture/annotation/DrawPanel.h"
 #include "modules/capture/screenshot/ScreenshotActionController.h"
 #include <QApplication>
@@ -586,7 +587,7 @@ void ScreenshotWidget::recognizeSelection()
         QApplication::clipboard()->setText(text);
         if (drawPanel_) {
             drawPanel_->showToolMessage(
-                QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板"), false);
+                QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板") + QLatin1Char('\n') + text, false);
         }
         client->deleteLater();
     });
@@ -1105,48 +1106,24 @@ void ScreenshotWidget::updateMouse(bool force) {
 
 void ScreenshotWidget::handleArrowKeyPress(QKeyEvent *e)
 {
-    int left = 0, top = 0, right = 0, bottom = 0;
-    
-    // Calculate movement based on key and modifiers
-    auto calcMove = [&](int& primary, int& secondary, int val) {
-        if (e->modifiers() & Qt::ControlModifier) {
-            primary = val;
-            secondary = 0;
-        } else if (e->modifiers() & Qt::ShiftModifier) {
-            primary = 0;
-            secondary = val;
-        } else {
-            primary = val;
-            secondary = val;
-        }
-    };
-
+    QPoint direction;
     switch(e->key()) {
-        case Qt::Key_Left:  calcMove(left, right, -1); break;
-        case Qt::Key_Right: calcMove(left, right, 1);  break;
-        case Qt::Key_Up:    calcMove(top, bottom, -1); break;
-        case Qt::Key_Down:  calcMove(top, bottom, 1);  break;
+        case Qt::Key_Left:  direction = {-1, 0}; break;
+        case Qt::Key_Right: direction = {1, 0}; break;
+        case Qt::Key_Up:    direction = {0, -1}; break;
+        case Qt::Key_Down:  direction = {0, 1}; break;
         default: return;
     }
 
 	if (currentState_ == ScreenState::Editing) {
-		onSelectRectChanged(left, top, right, bottom);
+		const QRect next = selectionAfterArrow(currentRect_, Util::desktopLocalRect(),
+                                              e->key(), e->modifiers());
+        if (next == currentRect_) return;
+        onSelectRectChanged(next.left() - currentRect_.left(), next.top() - currentRect_.top(),
+                            next.right() - currentRect_.right(), next.bottom() - currentRect_.bottom());
 		moveDrawPanel();
 	} else {
-		QPoint p(0, 0);
-		if (left != 0) {
-			p.setX(left);
-		} else if (right != 0) {
-			p.setX(right);
-		} else if (top != 0) {
-			p.setY(top);
-		} else if (bottom != 0) {
-			p.setY(bottom);
-		}
-		if (!p.isNull()) {
-			QCursor cursor;
-			cursor.setPos(cursor.pos() + p);
-		}
+        QCursor::setPos(QCursor::pos() + direction);
 	}
 }
 	
