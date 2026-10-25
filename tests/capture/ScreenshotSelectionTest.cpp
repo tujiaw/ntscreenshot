@@ -17,6 +17,9 @@
 #include <QMimeData>
 #include <QEventLoop>
 #include <QPushButton>
+#include <QTextEdit>
+#include <QScrollBar>
+#include <QEnterEvent>
 #include "core/platform/Util.h"
 
 int runScreenshotSelectionTest(QApplication& app) {
@@ -125,15 +128,38 @@ int runScreenshotSelectionTest(QApplication& app) {
         // Expiring a result must restore the exact toolbar/settings height,
         // even after Qt processes the queued layout and native resize events.
         auto verifyResultExpiry = [&](DrawPanel* target) {
+          const QPoint previousMousePosition = QCursor::pos();
+          QCursor::setPos(target->mapToGlobal(QPoint(0, -4)));
           for (bool settingsOpen : {false, true}) {
             if (settingsOpen) target->onColorBtnClicked();
             QApplication::processEvents();
             const int originalHeight = target->height();
             for (int attempt = 0; attempt < 2; ++attempt) {
-                target->showToolMessage(QStringLiteral("OCR result\nFirst line\nSecond line"));
+                const QString resultText = attempt == 0 ? QStringLiteral("OCR result\nFirst line\nSecond line")
+                    : QStringLiteral("Long OCR result, preserved in full for scrolling and copying.\n").repeated(80);
+                target->showToolMessage(resultText);
                 QApplication::processEvents();
                 okay &= target->height() > originalHeight;
                 auto* expiry = target->findChild<QTimer*>(QString(), Qt::FindDirectChildrenOnly);
+                auto* result = target->findChild<QTextEdit*>(QStringLiteral("DrawPanelToolMessage"));
+                okay &= result && result->height() <= Util::scaleSize(160) && result->toPlainText() == resultText;
+                if (attempt == 1 && result && expiry) {
+                    okay &= result->verticalScrollBar()->maximum() > 0;
+                    result->verticalScrollBar()->setValue(result->verticalScrollBar()->maximum());
+                    for (QWidget* hoverTarget : {static_cast<QWidget*>(result), result->viewport(),
+                                                 static_cast<QWidget*>(result->verticalScrollBar())}) {
+                        QEnterEvent enter(QPointF(1, 1), QPointF(1, 1),
+                                          QPointF(hoverTarget->mapToGlobal(QPoint(1, 1))));
+                        QApplication::sendEvent(hoverTarget, &enter);
+                        okay &= !expiry->isActive();
+                        QMetaObject::invokeMethod(expiry, "timeout", Qt::DirectConnection);
+                        okay &= result->isVisible();
+                        QEvent leave(QEvent::Leave);
+                        QApplication::sendEvent(hoverTarget, &leave);
+                        QApplication::processEvents();
+                        okay &= expiry->isActive();
+                    }
+                }
                 okay &= expiry && QMetaObject::invokeMethod(expiry, "timeout", Qt::DirectConnection);
                 QEventLoop layoutSettle;
                 QTimer::singleShot(50, &layoutSettle, &QEventLoop::quit);
@@ -143,6 +169,7 @@ int runScreenshotSelectionTest(QApplication& app) {
             }
             if (settingsOpen) target->onColorBtnClicked();
           }
+          QCursor::setPos(previousMousePosition);
         };
         verifyResultExpiry(panel);
         {

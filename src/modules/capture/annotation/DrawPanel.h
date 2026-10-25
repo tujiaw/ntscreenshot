@@ -13,6 +13,7 @@
 class QPushButton;
 class QAbstractButton;
 class QLabel;
+class QTextEdit;
 class QTimer;
 class TextEdit;
 class QButtonGroup;
@@ -185,6 +186,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     SettingModel* settings_ = nullptr;
@@ -203,7 +205,8 @@ private:
     DrawSettings *drawSettings_ = nullptr;
     QButtonGroup *shapeGroup_ = nullptr;
     QList<QPair<QPushButton*, DrawMode>> btns_;
-    QLabel *toolMessageLabel_ = nullptr;
+    QTextEdit *toolMessageLabel_ = nullptr;
+    bool messageHovered_ = false;
     QTimer *toolMessageTimer_ = nullptr;
     Drawer drawer_;
 };

@@ -20,6 +20,10 @@
 #include <QApplication>
 #include <QPaintEvent>
 #include <QTimer>
+#include <QTextEdit>
+#include <QScrollBar>
+#include <QAbstractTextDocumentLayout>
+#include <QtMath>
 #include <QStyleOptionButton>
 #include "core/theme/AppTheme.h"
 #include "core/theme/ThemeManager.h"
@@ -165,18 +169,24 @@ void DrawPanel::setupPanels()
     drawSettings_->setVisible(false);
     connect(drawSettings_, &DrawSettings::sigChanged, this, &DrawPanel::onSettingChanged);
 
-    toolMessageLabel_ = new QLabel(this);
+    toolMessageLabel_ = new QTextEdit(this);
     toolMessageLabel_->setObjectName(QStringLiteral("DrawPanelToolMessage"));
     toolMessageLabel_->setVisible(false);
-    toolMessageLabel_->setWordWrap(true);
-    toolMessageLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    toolMessageLabel_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    const int pad = Util::scaleSize(6);
-    toolMessageLabel_->setContentsMargins(pad, pad / 2, pad, pad / 2);
+    toolMessageLabel_->setReadOnly(true);
+    toolMessageLabel_->setAcceptRichText(false);
+    toolMessageLabel_->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    toolMessageLabel_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    toolMessageLabel_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    toolMessageLabel_->document()->setDocumentMargin(Util::scaleSize(6));
+    toolMessageLabel_->installEventFilter(this);
+    toolMessageLabel_->viewport()->installEventFilter(this);
+    toolMessageLabel_->verticalScrollBar()->installEventFilter(this);
 
     toolMessageTimer_ = new QTimer(this);
     toolMessageTimer_->setSingleShot(true);
-    connect(toolMessageTimer_, &QTimer::timeout, this, &DrawPanel::clearToolMessage);
+    connect(toolMessageTimer_, &QTimer::timeout, this, [this] {
+        if (!messageHovered_) clearToolMessage();
+    });
 }
 
 void DrawPanel::setupButtonsAndLayout(bool hasParent)
@@ -382,8 +392,15 @@ void DrawPanel::refreshPanelHeight()
         const int horizontalPadding = Util::scaleSize(32);
         const int msgWidth = qMax(minMsgWidth, qMax(width() - horizontalPadding, maxMsgWidth));
         toolMessageLabel_->setFixedWidth(msgWidth);
-        toolMessageLabel_->adjustSize();
-        height += toolMessageLabel_->sizeHint().height() + Util::scaleSize(4);
+        // Reserve scrollbar width while measuring so wrapping is stable when
+        // the content crosses the height cap.
+        const int scrollbarWidth = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+        toolMessageLabel_->document()->setTextWidth(qMax(1, msgWidth - scrollbarWidth - 2 * toolMessageLabel_->frameWidth()));
+        const int contentHeight = qCeil(toolMessageLabel_->document()->documentLayout()->documentSize().height())
+            + 2 * toolMessageLabel_->frameWidth();
+        const int messageHeight = qBound(Util::scaleSize(32), contentHeight, Util::scaleSize(160));
+        toolMessageLabel_->setFixedHeight(messageHeight);
+        height += messageHeight + Util::scaleSize(4);
         if (width() < msgWidth + horizontalPadding) {
             setMinimumWidth(msgWidth + horizontalPadding);
         }
@@ -409,19 +426,23 @@ void DrawPanel::showToolMessage(const QString& message, bool isError)
     background.setAlpha(tokens.theme == AppTheme::Dark ? 48 : 24);
 
     toolMessageLabel_->setStyleSheet(
-        QStringLiteral("QLabel#DrawPanelToolMessage {"
+        QStringLiteral("QTextEdit#DrawPanelToolMessage {"
                        " background-color:%1; color:%2;"
                        " border-top:1px solid %3; font-size:%4px; }")
             .arg(background.name(QColor::HexArgb), tone.name(), tokens.border.name())
             .arg(Util::scaleSize(12)));
-    toolMessageLabel_->setText(message);
+    toolMessageLabel_->setPlainText(message);
     toolMessageLabel_->setVisible(true);
     toolMessageLabel_->setToolTip(isError ? QString() : QCoreApplication::translate("App", "内容已复制，可选中文本再次复制"));
     refreshPanelHeight();
     adjustPos();
 
     if (toolMessageTimer_) {
-        toolMessageTimer_->start(isError ? 3500 : 8000);
+        toolMessageTimer_->stop();
+        toolMessageTimer_->setInterval(isError ? 3500 : 8000);
+        messageHovered_ = toolMessageLabel_->isVisible()
+            && toolMessageLabel_->rect().contains(toolMessageLabel_->mapFromGlobal(QCursor::pos()));
+        if (!messageHovered_) toolMessageTimer_->start();
     }
 }
 
@@ -431,6 +452,7 @@ void DrawPanel::clearToolMessage()
         return;
     }
     if (toolMessageTimer_) toolMessageTimer_->stop();
+    messageHovered_ = false;
     toolMessageLabel_->clear();
     toolMessageLabel_->setVisible(false);
     toolMessageLabel_->setToolTip(QString());
@@ -614,6 +636,27 @@ void DrawPanel::mouseMoveEvent(QMouseEvent* event)
     // Transparent padding belongs to the toolbar too. Do not forward its
     // hover events to the screenshot's selection/resize cursor handling.
     event->accept();
+}
+
+bool DrawPanel::eventFilter(QObject* watched, QEvent* event)
+{
+    if (toolMessageLabel_ && (watched == toolMessageLabel_ || watched == toolMessageLabel_->viewport()
+                              || watched == toolMessageLabel_->verticalScrollBar())) {
+        if (event->type() == QEvent::Enter && toolMessageLabel_->isVisible()) {
+            messageHovered_ = true;
+            toolMessageTimer_->stop();
+        } else if (event->type() == QEvent::Leave) {
+            // Moving between the text and its scrollbar is still inside the
+            // result. Check after all enter/leave events have been delivered.
+            QTimer::singleShot(0, this, [this] {
+                if (toolMessageLabel_->isHidden()) return;
+                messageHovered_ = toolMessageLabel_->rect().contains(
+                    toolMessageLabel_->mapFromGlobal(QCursor::pos()));
+                if (!messageHovered_) toolMessageTimer_->start();
+            });
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 //////////////////////////////////////////////////////////////////////////
