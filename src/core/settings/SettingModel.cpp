@@ -462,7 +462,11 @@ QColor SettingModel::selectionBorderColor() const
 
 void SettingModel::setSelectionBorderColor(const QColor& color)
 {
-    if (color.isValid()) settings_.setValue(KEY_SELECTION_BORDER_COLOR, color.name(QColor::HexRgb));
+    if (!color.isValid()) return;
+    const QColor previous = selectionBorderColor();
+    settings_.setValue(KEY_SELECTION_BORDER_COLOR, color.name(QColor::HexRgb));
+    const QColor current = selectionBorderColor();
+    if (current != previous) emit selectionBorderColorChanged(current);
 }
 
 void SettingModel::setOpenCVMode(bool enable)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QFrame>
+#include <QColor>
 
 class QEnterEvent;
 
@@ -23,6 +24,7 @@ public:
     void setBackground(const QPixmap &pixmap);
     void setActiveStyle();
     void setDeactiveStyle();
+    void setBorderColor(const QColor& color);
 
 protected:
 	void mousePressEvent(QMouseEvent *event);
@@ -47,4 +49,5 @@ private:
 	bool enableHighlight_;
     Direction m_dir;
     QPixmap backgroundPixmap_;
+    QColor borderColor_;
 };

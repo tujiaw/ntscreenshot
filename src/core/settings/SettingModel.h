@@ -106,6 +106,9 @@ public:
     HttpServerConfig httpServerConfig() const;
     void setHttpServerConfig(const HttpServerConfig &config);
 
+signals:
+    void selectionBorderColorChanged(const QColor& color);
+
 private:
     Q_DISABLE_COPY(SettingModel)
     QSettings settings_;

@@ -105,9 +105,11 @@ void PinWidget::popup(WindowManager* windowManager, const QPixmap &pixmap, const
 {
     FramelessWidget* widget = new FramelessWidget();
 	widget->setEnableHighlight(hasBorder(windowManager->setting()));
+    widget->setBorderColor(windowManager->setting()->selectionBorderColor());
+    connect(windowManager->setting(), &SettingModel::selectionBorderColorChanged,
+            widget, &FramelessWidget::setBorderColor);
     PinWidget* content = new PinWidget(windowManager, pixmap, widget);
     widget->setContent(content);
-    if (hasBorder(windowManager->setting())) widget->setActiveStyle();
     widget->ensurePolished();
     widget->resize(pixmap.deviceIndependentSize().toSize() + content->framePadding());
     widget->move(pos);

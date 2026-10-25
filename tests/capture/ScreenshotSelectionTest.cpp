@@ -27,6 +27,7 @@
 #include <QPainter>
 #include <QWheelEvent>
 #include "core/platform/Util.h"
+#include "shared/ui/FramelessWidget.h"
 
 int runScreenshotSelectionTest(QApplication& app) {
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));
@@ -281,6 +282,8 @@ int runScreenshotSelectionTest(QApplication& app) {
         }
         QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         const bool previousNoBorder = manager.setting()->pinNoBorder();
+        const QColor previousPinColor = manager.setting()->selectionBorderColor();
+        manager.setting()->setSelectionBorderColor(testBorderColor);
         for (bool border : {false, true}) {
             for (qreal dpr : {1.0, 2.0}) {
                 manager.setting()->setPinNoBorder(!border);
@@ -298,6 +301,24 @@ int runScreenshotSelectionTest(QApplication& app) {
                 if (pins.size() != 1) { okay = false; break; }
                 auto* alignedPin = pins.first();
                 okay &= alignedPin->size() == original.deviceIndependentSize().toSize();
+                auto* frame = qobject_cast<FramelessWidget*>(alignedPin->parentWidget());
+                if (frame && border) {
+                    auto paintedColor = [frame]() { return frame->grab(QRect(0, 10, 1, 1)).toImage().pixelColor(0, 0); };
+                    frame->setActiveStyle();
+                    okay &= paintedColor() == testBorderColor;
+                    frame->setDeactiveStyle();
+                    okay &= paintedColor() == testBorderColor;
+                    const QColor updatedColor(QStringLiteral("#22B877"));
+                    manager.setting()->setSelectionBorderColor(updatedColor);
+                    okay &= paintedColor() == updatedColor;
+                    frame->setActiveStyle();
+                    okay &= paintedColor() == updatedColor;
+                    manager.setting()->setSelectionBorderColor(testBorderColor);
+                } else if (frame) {
+                    manager.setting()->setSelectionBorderColor(QColor(QStringLiteral("#22B877")));
+                    okay &= frame->contentsMargins().isNull();
+                    manager.setting()->setSelectionBorderColor(testBorderColor);
+                } else okay = false;
                 QMetaObject::invokeMethod(alignedPin, "onOcr", Qt::DirectConnection);
                 auto* alignedOverlay = alignedPin->findChild<OcrSelectionOverlay*>();
                 if (alignedOverlay) {
@@ -336,6 +357,7 @@ int runScreenshotSelectionTest(QApplication& app) {
             }
         }
         manager.setting()->setPinNoBorder(previousNoBorder);
+        manager.setting()->setSelectionBorderColor(previousPinColor);
         manager.setting()->setPaddleOcrConfig(previousOcr);
         qInfo() << "Screenshot OCR pins automatically, preserves annotations, scans and cancels:" << okay;
         manager.destroy();

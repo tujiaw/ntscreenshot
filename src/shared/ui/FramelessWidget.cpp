@@ -254,13 +254,22 @@ void FramelessWidget::setBackground(const QPixmap &pixmap)
 void FramelessWidget::setActiveStyle()
 {
     this->setStyleSheet(QString("QWidget#FramelessWidget{ background: transparent; border:1px solid %1;}").arg(
-        ThemeManager::tokens().accent.name()));
+        (borderColor_.isValid() ? borderColor_ : ThemeManager::tokens().accent).name()));
 }
 
 void FramelessWidget::setDeactiveStyle()
 {
     this->setStyleSheet(QString("QWidget#FramelessWidget{ background: transparent; border: 1px solid %1;}").arg(
-        ThemeManager::tokens().border.name()));
+        (borderColor_.isValid() ? borderColor_ : ThemeManager::tokens().border).name()));
+}
+
+void FramelessWidget::setBorderColor(const QColor& color)
+{
+    borderColor_ = color;
+    if (enableHighlight_) {
+        if (isActiveWindow()) setActiveStyle();
+        else setDeactiveStyle();
+    }
 }
 
 // 鼠标目前的位置转换对应窗口所在区域
