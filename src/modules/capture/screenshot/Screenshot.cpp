@@ -185,6 +185,22 @@ void ScreenshotWidget::pin() const
 	}
 }
 
+QPixmap ScreenshotWidget::composeSelectionForClipboard()
+{
+    // 先提交正在编辑的文字：hide() 之后 textEdit_ 不再是 visible，
+    // 之后 drawPixmap() 内部的 saveText() 就取不到这段文字了。
+    if (drawPanel_) {
+        drawPanel_->drawer()->saveText();
+    }
+    // 先隐藏遮罩，点击复制后立即露出桌面；合成与剪贴板写入在遮罩消失后进行。
+    hide();
+    QPixmap pixmap = originScreen_->copy(currentRect_);
+    if (drawPanel_) {
+        drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
+    }
+    return pixmap;
+}
+
 void ScreenshotWidget::setPinGlobalKey(const QString &key) const
 {
 	PIN_KEY = key;
@@ -214,11 +230,7 @@ void ScreenshotWidget::contextMenuEvent(QContextMenuEvent *e) {
 void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton) {
         if (currentState_ == ScreenState::Editing) {
-            QPixmap pixmap = originScreen_->copy(currentRect_);
-            if (drawPanel_) {
-                drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
-            }
-            emit actionController_->onSaveToClipboardRequested(pixmap);
+            emit actionController_->onSaveToClipboardRequested(composeSelectionForClipboard());
         }
 		emit sigDoubleClick();
 		e->accept();
@@ -390,11 +402,7 @@ void ScreenshotWidget::initDrawPanel(void)
         });
         
         connect(drawPanel_.get(), &DrawPanel::sigFinished, this, [this]() {
-            QPixmap pixmap = originScreen_->copy(currentRect_);
-            if (drawPanel_) {
-                drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
-            }
-            emit actionController_->onSaveToClipboardRequested(pixmap);
+            emit actionController_->onSaveToClipboardRequested(composeSelectionForClipboard());
         });
 
         auto captureSelection = [this]() -> QPixmap {
@@ -510,11 +518,7 @@ void ScreenshotWidget::initDrawPanel(void)
         menu_ = new QMenu(this);
 
         menu_->addAction(QCoreApplication::translate("App", "完成"), this, [this]() {
-            QPixmap pixmap = originScreen_->copy(currentRect_);
-            if (drawPanel_) {
-                drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
-            }
-            emit actionController_->onSaveToClipboardRequested(pixmap);
+            emit actionController_->onSaveToClipboardRequested(composeSelectionForClipboard());
         }, QKeySequence("Ctrl+C"));
         
         menu_->addAction(QCoreApplication::translate("App", "保存"), this, [this]() {

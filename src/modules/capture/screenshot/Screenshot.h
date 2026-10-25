@@ -89,6 +89,7 @@ private:
     void initMeasureWidget(void);
     void initDrawPanel(void);
     void recognizeSelection();
+    QPixmap composeSelectionForClipboard();
     const std::shared_ptr<QPixmap>& getBackgroundScreen(void);
     QRect getDesktopRect(void);
     std::shared_ptr<QPixmap> getGlobalScreen(void);

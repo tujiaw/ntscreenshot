@@ -108,8 +108,10 @@ void CaptureModule::openGifRecorder(const QRect& captureRect)
 void CaptureModule::closeScreenshot()
 {
     if (screenshot_) {
-        screenshot_->close();
-        screenshot_.reset();
+        // 立即隐藏，但把全屏位图和子控件的销毁推迟到事件循环空闲时，
+        // 避免关闭动作和剪贴板写入一起阻塞 GUI 线程。
+        screenshot_->hide();
+        screenshot_.release()->deleteLater();
     }
 }
 

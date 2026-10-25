@@ -221,6 +221,9 @@ int runScreenshotSelectionTest(QApplication& app) {
         qInfo() << "Completion:" << closeCount << capture.size() << okay;
         QApplication::clipboard()->setMimeData(previous);
         QApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        // CaptureModule::closeScreenshot() hides immediately and defers widget
+        // destruction with deleteLater() so teardown does not block the copy.
+        QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         okay &= screenshot.isNull();
         qInfo() << "Selection, delayed callbacks, resize, drawing and explicit completion:" << okay;
         // Entering OCR from a screenshot must hand off to a pin before starting
