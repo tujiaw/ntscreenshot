@@ -42,6 +42,11 @@ int main(int argc, char *argv[])
     if (QCoreApplication::translate("App", "未找到明确留白") != QStringLiteral("No clear border found")) {
         return 15;
     }
+    if (QCoreApplication::translate("App", "进入选字模式") != QStringLiteral("Select text")) return 16;
+    if (QCoreApplication::translate("App", "所选文字已复制到剪切板") !=
+        QStringLiteral("Selected text copied to the clipboard")) return 17;
+    if (QCoreApplication::translate("App", "正在识别文字，按 Esc 取消") !=
+        QStringLiteral("Recognizing text. Press Esc to cancel.")) return 18;
     const std::pair<const char*, const char*> clipboardLabels[] = {
         {"剪切板", "Clipboard"}, {"收藏", "Favorites"}, {"取消收藏", "Remove from favorites"},
         {"搜索剪切板", "Search clipboard"}, {"搜索收藏", "Search favorites"},

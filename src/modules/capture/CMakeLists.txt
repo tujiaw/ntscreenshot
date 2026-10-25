@@ -1,6 +1,7 @@
 target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/CaptureModule.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/annotation/DrawPanel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/annotation/OcrSelectionOverlay.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/annotation/DrawSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gif_recorder/GifEncoderWorker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gif_recorder/GifRecorderControlPanel.cpp

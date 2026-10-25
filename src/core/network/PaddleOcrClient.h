@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 
 #include "core/settings/SettingModel.h"
+#include "core/imaging/OcrResult.h"
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -20,7 +21,7 @@ public:
     void recognize(const QByteArray& pngData, const PaddleOcrConfig& config);
 
 signals:
-    void succeeded(const QString& text);
+    void succeeded(const OcrResult& result);
     void failed(const QString& error);
 
 private:

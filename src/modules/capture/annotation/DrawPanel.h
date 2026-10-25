@@ -112,6 +112,9 @@ public:
     void cancelText();
     void setDrawRect(const QRect &rect);
 
+signals:
+    void interactionStarted();
+
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
     bool onMousePressEvent(QMouseEvent *e);

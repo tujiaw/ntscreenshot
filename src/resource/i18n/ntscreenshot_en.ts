@@ -908,8 +908,8 @@ Please choose another key combination.</translation>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="50" />
       <location filename="../../modules/capture/screenshot/Screenshot.cpp" line="541" />
-      <source>OCR 识别</source>
-      <translation>Recognize text (OCR)</translation>
+      <source>进入选字模式</source>
+      <translation>Select text</translation>
     </message>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="55" />
@@ -1040,8 +1040,8 @@ Please choose another key combination.</translation>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="457" />
       <location filename="../../modules/capture/screenshot/Screenshot.cpp" line="586" />
-      <source>OCR 识别成功，文本已复制到剪切板</source>
-      <translation>Text recognized and copied to the clipboard</translation>
+      <source>已进入选字模式，拖选文字后按 Ctrl+C 复制，Esc 退出</source>
+      <translation>Text selection ready. Drag to select, press Ctrl+C to copy, or Esc to exit.</translation>
     </message>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="461" />
@@ -1194,14 +1194,9 @@ Please choose another key combination.</translation>
       <translation>Scrolling capture</translation>
     </message>
     <message>
-      <location filename="../../modules/capture/annotation/DrawPanel.cpp" line="234" />
-      <source>识别文字并复制到剪切板</source>
-      <translation>Recognize text and copy it to the clipboard</translation>
-    </message>
-    <message>
       <location filename="../../modules/capture/annotation/DrawPanel.cpp" line="373" />
-      <source>内容已复制，可选中文本再次复制</source>
-      <translation>Content copied; select text to copy it again</translation>
+      <source>可选中提示文字进行复制</source>
+      <translation>Select message text to copy it</translation>
     </message>
     <message>
       <location filename="../../modules/capture/annotation/DrawSettings.cpp" line="34" />
@@ -1755,6 +1750,26 @@ Copied to clipboard</translation>
       <location filename="../../modules/capture/gif_recorder/GifEncoderWorker.cpp" line="572" />
       <source>无法完成 GIF 文件保存</source>
       <translation>Could not finish saving GIF file</translation>
+    </message>
+    <message>
+      <source>OCR 未返回文字坐标，无法进入选字模式</source>
+      <translation>OCR returned no text coordinates; text selection is unavailable.</translation>
+    </message>
+    <message>
+      <source>所选文字已复制到剪切板</source>
+      <translation>Selected text copied to the clipboard</translation>
+    </message>
+    <message>
+      <source>退出选字模式</source>
+      <translation>Exit text selection</translation>
+    </message>
+    <message>
+      <source>全选</source>
+      <translation>Select all</translation>
+    </message>
+    <message>
+      <source>正在识别文字，按 Esc 取消</source>
+      <translation>Recognizing text. Press Esc to cancel.</translation>
     </message>
   </context>
   <context>

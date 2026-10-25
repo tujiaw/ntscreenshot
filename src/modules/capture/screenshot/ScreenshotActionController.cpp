@@ -76,7 +76,7 @@ void ScreenshotActionController::onSaveToClipboardRequested(const QPixmap &pixma
     emit sigClose();
 }
 
-void ScreenshotActionController::onStickerRequested(const QPixmap &pixmap, const QPoint &pos) {
+void ScreenshotActionController::onStickerRequested(const QPixmap &pixmap, const QPoint &pos, bool selectText) {
     if (pixmap.isNull()) return;
     QPoint stickerPos = pos;
     if (PinWidget::hasBorder(windowManager_->setting())) {
@@ -84,7 +84,7 @@ void ScreenshotActionController::onStickerRequested(const QPixmap &pixmap, const
     }
     emit sigClose();
     WindowManager* windowManager = windowManager_;
-    QTimer::singleShot(0, [windowManager, pixmap, stickerPos]() {
-        PinWidget::popup(windowManager, pixmap, stickerPos);
+    QTimer::singleShot(0, [windowManager, pixmap, stickerPos, selectText]() {
+        PinWidget::popup(windowManager, pixmap, stickerPos, selectText);
     });
 }

@@ -7,6 +7,7 @@
 
 class QLabel;
 class QContextMenuEvent;
+class OcrSelectionOverlay;
 class QMenu;
 class DrawPanel;
 class SettingModel;
@@ -20,8 +21,9 @@ public:
     ~PinWidget();
     void flush();
     QPixmap getPixmap() const;
+    QRectF imageDisplayRect() const;
     static bool hasBorder(const SettingModel* settings);
-    static void popup(WindowManager* windowManager, const QPixmap &pixmap, const QPoint &pos);
+    static void popup(WindowManager* windowManager, const QPixmap &pixmap, const QPoint &pos, bool selectText = false);
     static void showAll(WindowManager* windowManager);
     static void hideAll();
     static int allCount();
@@ -38,6 +40,7 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent *event);
     virtual void paintEvent(QPaintEvent *event);
     virtual void wheelEvent(QWheelEvent *event);
+    void resizeEvent(QResizeEvent* event) override;
 
 private slots:
     void onDraw();
@@ -59,9 +62,11 @@ private slots:
 
 private:
     WindowManager* windowManager_ = nullptr;
+    OcrSelectionOverlay* ocrOverlay_ = nullptr;
     Q_DISABLE_COPY(PinWidget)
     void updateScaledPixmap(const QSize &targetSize);
-    int getBorderWidth() const;
+    QSize framePadding() const;
+    void syncOcrGeometry();
     void connectDrawPanelTools();
     void replacePixmap(const QPixmap& pixmap);
     QImage currentImage();

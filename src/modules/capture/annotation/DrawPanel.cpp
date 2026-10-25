@@ -260,8 +260,8 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
 
     QPushButton* pbUndo = createActionBtn("undo.png", QCoreApplication::translate("App", "撤销"));
     QPushButton* pbSticker = createActionBtn("pin.png", QCoreApplication::translate("App", "贴图"));
-    QPushButton* pbOcr = createActionBtn("ocr", QCoreApplication::translate("App", "识别文字并复制到剪切板"));
-    pbOcr->setToolTip(QCoreApplication::translate("App", "识别文字并复制到剪切板"));
+    QPushButton* pbOcr = createActionBtn("ocr", QCoreApplication::translate("App", "进入选字模式"));
+    pbOcr->setToolTip(QCoreApplication::translate("App", "进入选字模式"));
     pbOcr->setFixedSize(btnSize, btnSize);
     pbOcr->setVisible(settings_ && settings_->paddleOcrConfig().enabled);
     QPushButton* pbSave = createActionBtn("save.png", QCoreApplication::translate("App", "保存"));
@@ -433,7 +433,7 @@ void DrawPanel::showToolMessage(const QString& message, bool isError)
             .arg(Util::scaleSize(12)));
     toolMessageLabel_->setPlainText(message);
     toolMessageLabel_->setVisible(true);
-    toolMessageLabel_->setToolTip(isError ? QString() : QCoreApplication::translate("App", "内容已复制，可选中文本再次复制"));
+    toolMessageLabel_->setToolTip(isError ? QString() : QCoreApplication::translate("App", "可选中提示文字进行复制"));
     refreshPanelHeight();
     adjustPos();
 
@@ -981,6 +981,7 @@ bool Drawer::enable() const
 
 void Drawer::setMode(const DrawMode &drawMode)
 {
+    emit interactionStarted();
     saveText();
     drawMode_ = drawMode;
     if (parent_) {
@@ -1004,6 +1005,7 @@ bool Drawer::isDraw() const
 
 void Drawer::undo()
 {
+    emit interactionStarted();
     if (textEdit_ && textEdit_->isVisible()) {
         cancelText();
         return;
@@ -1033,6 +1035,7 @@ void Drawer::rememberState(bool replacesModes, std::function<void()> onUndo)
 
 void Drawer::pushBitmap(const QImage &image, const QRect &rect)
 {
+    emit interactionStarted();
     if (image.isNull() || !rect.isValid()) {
         return;
     }
@@ -1046,6 +1049,7 @@ void Drawer::pushBitmap(const QImage &image, const QRect &rect)
 void Drawer::replaceWithBitmap(const QImage &image, const QRect &rect,
                                std::function<void()> onUndo)
 {
+    emit interactionStarted();
     if (image.isNull() || !rect.isValid()) return;
     rememberState(true, std::move(onUndo));
     drawModeCache_.clear();
@@ -1057,6 +1061,7 @@ void Drawer::replaceWithBitmap(const QImage &image, const QRect &rect,
 
 void Drawer::clearForTransformation(std::function<void()> onUndo)
 {
+    emit interactionStarted();
     rememberState(true, std::move(onUndo));
     drawModeCache_.clear();
     parent_->update();
@@ -1064,6 +1069,7 @@ void Drawer::clearForTransformation(std::function<void()> onUndo)
 
 void Drawer::clearHistory()
 {
+    emit interactionStarted();
     drawModeCache_.clear();
     undoHistory_.clear();
     drawMode_.clear();

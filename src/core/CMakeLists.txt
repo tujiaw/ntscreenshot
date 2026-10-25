@@ -6,6 +6,7 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ImageMatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ScrollStitcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ImageUtil.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/imaging/OcrResult.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/SmartMask.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/detector/RectDetector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/network/HttpRequest.cpp

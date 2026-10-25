@@ -5,6 +5,10 @@
 #include "modules/capture/annotation/DrawPanel.h"
 #include "core/theme/ThemeManager.h"
 #include "core/settings/SettingModel.h"
+#include "modules/capture/pin/PinWidget.h"
+#include "modules/capture/annotation/OcrSelectionOverlay.h"
+#include <QTcpServer>
+#include <QElapsedTimer>
 #include <QApplication>
 #include <QMouseEvent>
 #include <QPointer>
@@ -20,10 +24,13 @@
 #include <QTextEdit>
 #include <QScrollBar>
 #include <QEnterEvent>
+#include <QPainter>
+#include <QWheelEvent>
 #include "core/platform/Util.h"
 
 int runScreenshotSelectionTest(QApplication& app) {
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));
+    app.setQuitOnLastWindowClosed(false);
     QSettings clean(Util::getConfigPath(), QSettings::IniFormat);
     clean.setValue(QStringLiteral("AUTO_PIN"), false);
     clean.setValue(QStringLiteral("OPENCV_MODE"), false);
@@ -215,6 +222,122 @@ int runScreenshotSelectionTest(QApplication& app) {
         QApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
         okay &= screenshot.isNull();
         qInfo() << "Selection, delayed callbacks, resize, drawing and explicit completion:" << okay;
+        // Entering OCR from a screenshot must hand off to a pin before starting
+        // recognition. Keep the mock server silent to inspect the scanning state.
+        QTcpServer ocrServer;
+        const auto previousOcr = manager.setting()->paddleOcrConfig();
+        okay &= ocrServer.listen(QHostAddress::LocalHost);
+        manager.setting()->setPaddleOcrConfig({true,
+            QStringLiteral("http://127.0.0.1:%1/jobs").arg(ocrServer.serverPort()),
+            QStringLiteral("test"), QStringLiteral("PP-OCRv6")});
+        manager.openWidget(WidgetID::SCREENSHOT);
+        for (auto* widget : QApplication::topLevelWidgets())
+            if (auto* candidate = qobject_cast<ScreenshotWidget*>(widget)) screenshot = candidate;
+        if (screenshot) {
+            mouse(QEvent::MouseButtonPress, {200,200}, Qt::LeftButton, Qt::LeftButton);
+            mouse(QEvent::MouseMove, {800,550}, Qt::NoButton, Qt::LeftButton);
+            mouse(QEvent::MouseButtonRelease, {800,550}, Qt::LeftButton, Qt::NoButton);
+            auto* ocrPanel = screenshot->findChild<DrawPanel*>();
+            if (ocrPanel) {
+                ocrPanel->drawer()->setEnable(true);
+                ocrPanel->drawer()->setMode(line);
+                mouse(QEvent::MouseButtonPress, {300,300}, Qt::LeftButton, Qt::LeftButton);
+                mouse(QEvent::MouseMove, {450,300}, Qt::NoButton, Qt::LeftButton);
+                mouse(QEvent::MouseButtonRelease, {450,300}, Qt::LeftButton, Qt::NoButton);
+                ocrPanel->sigOcr();
+            } else okay = false;
+        } else okay = false;
+        QPointer<PinWidget> pin;
+        QPointer<OcrSelectionOverlay> ocrOverlay;
+        QElapsedTimer pinWait;
+        pinWait.start();
+        while (!ocrOverlay && pinWait.elapsed() < 3000) {
+            QApplication::processEvents();
+            const auto pins = PinWidget::getAllSticker();
+            if (!pins.isEmpty()) {
+                pin = pins.last();
+                ocrOverlay = pin->findChild<OcrSelectionOverlay*>();
+            }
+        }
+        qInfo() << "OCR handoff:" << screenshot.isNull() << bool(pin) << bool(ocrOverlay)
+                << (ocrOverlay && ocrOverlay->isRecognizing());
+        okay &= screenshot.isNull() && pin && ocrOverlay && ocrOverlay->isRecognizing();
+        if (pin && ocrOverlay) {
+            okay &= pin->findChild<DrawPanel*>() == nullptr;
+            okay &= pin->size() == pin->getPixmap().deviceIndependentSize().toSize();
+            const QImage bitmap = pin->getPixmap().toImage();
+            qInfo() << "OCR annotation:" << bitmap.size() << bitmap.pixelColor(150,100);
+            okay &= bitmap.pixelColor(150,100) == QColor(Qt::red);
+            const QImage scanFrame = ocrOverlay->grab().toImage();
+            QEventLoop scan;
+            QTimer::singleShot(120, &scan, &QEventLoop::quit);
+            scan.exec();
+            okay &= ocrOverlay->isRecognizing() && scanFrame != ocrOverlay->grab().toImage();
+            okay &= pin->getPixmap().toImage() == bitmap;
+            QKeyEvent cancel(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+            QApplication::sendEvent(ocrOverlay, &cancel);
+            okay &= !ocrOverlay->isVisible() && !ocrOverlay->isRecognizing() && pin->isVisible();
+            pin->parentWidget()->close();
+        }
+        QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        const bool previousNoBorder = manager.setting()->pinNoBorder();
+        for (bool border : {false, true}) {
+            for (qreal dpr : {1.0, 2.0}) {
+                manager.setting()->setPinNoBorder(!border);
+                QPixmap original(300, 100);
+                original.fill(Qt::white);
+                {
+                    QPainter imagePainter(&original);
+                    imagePainter.fillRect(QRect(4, 25, 10, 50), Qt::black);
+                    imagePainter.fillRect(QRect(285, 25, 10, 50), Qt::black);
+                }
+                original.setDevicePixelRatio(dpr);
+                PinWidget::popup(&manager, original, QPoint(100, 100));
+                QApplication::processEvents();
+                const auto pins = PinWidget::getAllSticker();
+                if (pins.size() != 1) { okay = false; break; }
+                auto* alignedPin = pins.first();
+                okay &= alignedPin->size() == original.deviceIndependentSize().toSize();
+                QMetaObject::invokeMethod(alignedPin, "onOcr", Qt::DirectConnection);
+                auto* alignedOverlay = alignedPin->findChild<OcrSelectionOverlay*>();
+                if (alignedOverlay) {
+                    const OcrResult alignment = OcrResult::parse(R"({"rec_texts":["left right"],
+                        "text_word":[["left","right"]],
+                        "text_word_boxes":[[[4,25,14,75],[285,25,295,75]]]})");
+                    alignedOverlay->setResult(alignment, QSize(300, 100));
+                    for (int delta : {0, 120, -120}) {
+                        if (delta) {
+                            QWheelEvent zoom(QPointF(20,20), QPointF(alignedPin->mapToGlobal(QPoint(20,20))),
+                                             QPoint(), QPoint(0, delta), Qt::NoButton, Qt::NoModifier,
+                                             Qt::NoScrollPhase, false);
+                            QApplication::sendEvent(alignedPin, &zoom);
+                            QApplication::processEvents();
+                        }
+                        const QRectF display = alignedPin->imageDisplayRect();
+                        const QPointF left(display.left() + display.width() * 9 / 300,
+                                           display.top() + display.height() / 2);
+                        const QPointF right(display.left() + display.width() * 290 / 300, left.y());
+                        QMouseEvent begin(QEvent::MouseButtonPress, left, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                        QMouseEvent end(QEvent::MouseButtonRelease, right, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                        QApplication::sendEvent(alignedOverlay, &begin);
+                        QApplication::sendEvent(alignedOverlay, &end);
+                        okay &= alignedOverlay->selectedText() == QStringLiteral("left right");
+                        const QPixmap rendered = alignedPin->grab();
+                        const QImage pixels = rendered.toImage();
+                        for (const QPointF& point : {left, right}) {
+                            const QColor color = pixels.pixelColor((point * rendered.devicePixelRatio()).toPoint());
+                            okay &= color.blue() > color.red() + 25;
+                        }
+                    }
+                } else okay = false;
+                qInfo() << "Pin OCR alignment: border" << border << "DPR" << dpr << okay;
+                alignedPin->parentWidget()->close();
+                QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+            }
+        }
+        manager.setting()->setPinNoBorder(previousNoBorder);
+        manager.setting()->setPaddleOcrConfig(previousOcr);
+        qInfo() << "Screenshot OCR pins automatically, preserves annotations, scans and cancels:" << okay;
         manager.destroy();
         app.exit(okay ? 0 : 2);
     });

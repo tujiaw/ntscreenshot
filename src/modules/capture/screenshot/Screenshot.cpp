@@ -32,7 +32,6 @@
 #include "core/imaging/ImageEnhance.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/imaging/SmartMask.h"
-#include "core/network/PaddleOcrClient.h"
 #include "core/foundation/Constants.h"
 #include "core/platform/Util.h"
 #include "modules/capture/screenshot/Amplifier.h"
@@ -545,7 +544,7 @@ void ScreenshotWidget::initDrawPanel(void)
         });
 
         if (windowManager_->setting()->paddleOcrConfig().enabled) {
-            menu_->addAction(QCoreApplication::translate("App", "OCR 识别"),
+            menu_->addAction(QCoreApplication::translate("App", "进入选字模式"),
                              this, &ScreenshotWidget::recognizeSelection);
         }
         
@@ -569,38 +568,11 @@ void ScreenshotWidget::initDrawPanel(void)
 
 void ScreenshotWidget::recognizeSelection()
 {
-    if (!drawPanel_) return;
-
-    const PaddleOcrConfig config = windowManager_->setting()->paddleOcrConfig();
-    if (!config.enabled) {
-        drawPanel_->showToolMessage(QCoreApplication::translate("App", "请先在设置 / 图片中启用 OCR"), true);
-        return;
-    }
-
+    if (!drawPanel_ || !originScreen_) return;
     QPixmap pixmap = originScreen_->copy(currentRect_);
     drawPanel_->drawer()->drawPixmap(pixmap, currentRect_.topLeft());
-    if (pixmap.isNull()) {
-        drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 失败：截图数据为空"), true);
-        return;
-    }
-
-    drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 识别中…"), false);
-    auto* client = new PaddleOcrClient(this);
-    connect(client, &PaddleOcrClient::succeeded, this, [this, client](const QString& text) {
-        QApplication::clipboard()->setText(text);
-        if (drawPanel_) {
-            drawPanel_->showToolMessage(
-                QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板") + QLatin1Char('\n') + text, false);
-        }
-        client->deleteLater();
-    });
-    connect(client, &PaddleOcrClient::failed, this, [this, client](const QString& error) {
-        if (drawPanel_) {
-            drawPanel_->showToolMessage(QCoreApplication::translate("App", "OCR 失败：%1").arg(error), true);
-        }
-        client->deleteLater();
-    });
-    client->recognize(Util::pixmap2ByteArray(pixmap), config);
+    if (pixmap.isNull()) return;
+    actionController_->onStickerRequested(pixmap, currentRect_.topLeft(), true);
 }
 
 void ScreenshotWidget::moveDrawPanel()

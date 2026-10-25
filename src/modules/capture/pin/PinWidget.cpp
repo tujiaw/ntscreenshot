@@ -16,6 +16,7 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QWheelEvent>
+#include <QResizeEvent>
 #include <QTimer>
 #include <thread>
 #include <algorithm>
@@ -31,7 +32,7 @@
 #include "core/imaging/ImageEnhance.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/imaging/SmartMask.h"
-#include "core/network/PaddleOcrClient.h"
+#include "modules/capture/annotation/OcrSelectionOverlay.h"
 #include "shared/ui/TipsWidget.h"
 
 static QList<QPair<QPoint, QPixmap>> HidedStickerList;
@@ -47,7 +48,7 @@ PinWidget::PinWidget(WindowManager* windowManager, const QPixmap& pixmap, QWidge
 	menu_->addAction(QCoreApplication::translate("App", "复制"), this, SLOT(onCopy()), QKeySequence("Ctrl+C"));
     menu_->addAction(QCoreApplication::translate("App", "保存"), this, SLOT(onSave()), QKeySequence("Ctrl+S"));
     if (windowManager_->setting()->paddleOcrConfig().enabled) {
-        menu_->addAction(QCoreApplication::translate("App", "OCR 识别"), this, SLOT(onOcr()));
+        menu_->addAction(QCoreApplication::translate("App", "进入选字模式"), this, SLOT(onOcr()));
     }
     {
         auto *s = windowManager_->setting();
@@ -100,17 +101,24 @@ bool PinWidget::hasBorder(const SettingModel* settings)
     return settings && !settings->pinNoBorder();
 }
 
-void PinWidget::popup(WindowManager* windowManager, const QPixmap &pixmap, const QPoint &pos)
+void PinWidget::popup(WindowManager* windowManager, const QPixmap &pixmap, const QPoint &pos, bool selectText)
 {
     FramelessWidget* widget = new FramelessWidget();
 	widget->setEnableHighlight(hasBorder(windowManager->setting()));
     PinWidget* content = new PinWidget(windowManager, pixmap, widget);
     widget->setContent(content);
-    widget->resize(pixmap.size());
+    if (hasBorder(windowManager->setting())) widget->setActiveStyle();
+    widget->ensurePolished();
+    widget->resize(pixmap.deviceIndependentSize().toSize() + content->framePadding());
     widget->move(pos);
     Util::setWndTopMost(widget);
     widget->show();
     widget->raise();
+    if (selectText) {
+        // Start after the new pin has been laid out and can paint its scan effect.
+        widget->activateWindow();
+        QTimer::singleShot(0, content, &PinWidget::onOcr);
+    }
 }
 
 void PinWidget::showAll(WindowManager* windowManager)
@@ -174,6 +182,7 @@ void PinWidget::setSaveDir(const QDir &dir)
 
 void PinWidget::keyPressEvent(QKeyEvent *event)
 {
+    if (ocrOverlay_ && ocrOverlay_->handleKey(event)) return;
     QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
     QString key = Util::strKeyEvent(keyEvent);
     if (!key.isEmpty()) {
@@ -224,7 +233,7 @@ void PinWidget::mouseReleaseEvent(QMouseEvent *event)
 void PinWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
-    painter.drawPixmap(QPoint(0, 0), pixmap_, pixmap_.rect());
+    painter.drawPixmap(imageDisplayRect(), pixmap_, QRectF(pixmap_.rect()));
     if (drawPanel_) {
         drawPanel_->drawer()->onPaint(painter);
     }
@@ -273,11 +282,10 @@ void PinWidget::wheelEvent(QWheelEvent *event)
     int newWidth = static_cast<int>(oldSize.width() * scaleFactor);
     int newHeight = static_cast<int>(oldSize.height() * scaleFactor);
     
-    const int borderWidth = getBorderWidth();
-    const int originalWidth = originalPixmap_.width();
-    const int originalHeight = originalPixmap_.height();
-    const int targetOriginalWidth = originalWidth + borderWidth * 2;
-    const int targetOriginalHeight = originalHeight + borderWidth * 2;
+    const QSize padding = framePadding();
+    const QSize originalSize = originalPixmap_.deviceIndependentSize().toSize();
+    const int targetOriginalWidth = originalSize.width() + padding.width();
+    const int targetOriginalHeight = originalSize.height() + padding.height();
 
     if (newWidth < 20 || newHeight < 20) {
         event->accept();
@@ -300,20 +308,19 @@ void PinWidget::wheelEvent(QWheelEvent *event)
     const QSize newSize(newWidth, newHeight);
     parent->resize(newSize);
     
-    const QSize contentSize = QSize(
-        (newSize.width() - borderWidth * 2),
-        (newSize.height() - borderWidth * 2)
-    );
+    const QSize contentSize = newSize - padding;
     
     if (isOriginal) {
         pixmap_ = originalPixmap_;
     }
     else {
-        pixmap_ = originalPixmap_.scaled(contentSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        pixmap_ = originalPixmap_.scaled((QSizeF(contentSize) * originalPixmap_.devicePixelRatio()).toSize(),
+                                         Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
     
     currentScale_ = static_cast<double>(pixmap_.width()) / originalPixmap_.width();
     showScaleInfo_ = true;
+    syncOcrGeometry();
     update();
     
     QTimer::singleShot(3000, this, &PinWidget::hideScaleInfo);
@@ -321,13 +328,29 @@ void PinWidget::wheelEvent(QWheelEvent *event)
     event->accept();
 }
 
-int PinWidget::getBorderWidth() const
+QSize PinWidget::framePadding() const
 {
-    FramelessWidget* frame = qobject_cast<FramelessWidget*>(this->parentWidget());
-    if (frame && frame->enableHightlight()) {
-        return 1;
+    if (const auto* frame = qobject_cast<FramelessWidget*>(parentWidget())) {
+        const QMargins margins = frame->contentsMargins();
+        return QSize(margins.left() + margins.right(), margins.top() + margins.bottom());
     }
-    return 0;
+    return QSize(0, 0);
+}
+
+QRectF PinWidget::imageDisplayRect() const
+{
+    return QRectF(QPointF(0, 0), pixmap_.deviceIndependentSize());
+}
+
+void PinWidget::syncOcrGeometry()
+{
+    if (ocrOverlay_) ocrOverlay_->setImageDisplayRect(imageDisplayRect());
+}
+
+void PinWidget::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    syncOcrGeometry();
 }
 
 void PinWidget::updateScaledPixmap(const QSize &targetSize)
@@ -336,11 +359,13 @@ void PinWidget::updateScaledPixmap(const QSize &targetSize)
         return;
     }
     
-    if (targetSize == originalPixmap_.size()) {
+    if (targetSize == originalPixmap_.deviceIndependentSize().toSize()) {
         pixmap_ = originalPixmap_;
     } else {
-        pixmap_ = originalPixmap_.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        pixmap_ = originalPixmap_.scaled((QSizeF(targetSize) * originalPixmap_.devicePixelRatio()).toSize(),
+                                         Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
+    syncOcrGeometry();
 }
 
 void PinWidget::connectDrawPanelTools()
@@ -348,6 +373,9 @@ void PinWidget::connectDrawPanelTools()
     if (!drawPanel_) {
         return;
     }
+    connect(drawPanel_->drawer(), &Drawer::interactionStarted, this, [this]() {
+        if (ocrOverlay_) ocrOverlay_->reset();
+    });
     connect(drawPanel_.get(), &DrawPanel::sigScanCode, this, &PinWidget::onScanCode);
     connect(drawPanel_.get(), &DrawPanel::sigOcr, this, &PinWidget::onOcr);
     connect(drawPanel_.get(), &DrawPanel::sigSmartMask, this, &PinWidget::onSmartMask);
@@ -367,6 +395,7 @@ QImage PinWidget::currentImage()
 
 void PinWidget::replacePixmap(const QPixmap& pixmap)
 {
+    if (ocrOverlay_) ocrOverlay_->reset();
     if (pixmap.isNull()) {
         return;
     }
@@ -379,9 +408,9 @@ void PinWidget::replacePixmap(const QPixmap& pixmap)
             pixmap_ = previousPixmap;
             originalPixmap_ = previousOriginal;
             currentScale_ = previousScale;
+            syncOcrGeometry();
             if (QWidget* parent = parentWidget()) {
-                const int border = getBorderWidth();
-                parent->resize(pixmap_.size() + QSize(border * 2, border * 2));
+                parent->resize(pixmap_.deviceIndependentSize().toSize() + framePadding());
             }
             drawPanel_->onReferRectChanged(QRect(mapToGlobal(QPoint(0, 0)), size()));
             update();
@@ -389,9 +418,9 @@ void PinWidget::replacePixmap(const QPixmap& pixmap)
     originalPixmap_ = pixmap;
     pixmap_ = pixmap;
     currentScale_ = 1.0;
+    syncOcrGeometry();
     if (QWidget* parent = parentWidget()) {
-        const int border = getBorderWidth();
-        parent->resize(pixmap.size() + QSize(border * 2, border * 2));
+        parent->resize(pixmap.deviceIndependentSize().toSize() + framePadding());
     }
     if (drawPanel_) {
         drawPanel_->onReferRectChanged(QRect(mapToGlobal(QPoint(0, 0)), size()));
@@ -438,30 +467,14 @@ void PinWidget::onScanCode()
 
 void PinWidget::onOcr()
 {
-    const PaddleOcrConfig config = windowManager_->setting()->paddleOcrConfig();
-    if (!config.enabled) {
-        notifyToolMessage(QCoreApplication::translate("App", "请先在设置 / 图片中启用 OCR"), true);
-        return;
-    }
-
     const QImage image = currentImage();
-    if (image.isNull()) {
-        notifyToolMessage(QCoreApplication::translate("App", "OCR 失败：贴图数据为空"), true);
-        return;
+    if (drawPanel_) {
+        drawPanel_->cancelChecked();
+        drawPanel_->clearToolMessage();
     }
-
-    notifyToolMessage(QCoreApplication::translate("App", "OCR 识别中…"), false);
-    auto* client = new PaddleOcrClient(this);
-    connect(client, &PaddleOcrClient::succeeded, this, [this, client](const QString& text) {
-        QApplication::clipboard()->setText(text);
-        notifyToolMessage(QCoreApplication::translate("App", "OCR 识别成功，文本已复制到剪切板") + QLatin1Char('\n') + text, false);
-        client->deleteLater();
-    });
-    connect(client, &PaddleOcrClient::failed, this, [this, client](const QString& error) {
-        notifyToolMessage(QCoreApplication::translate("App", "OCR 失败：%1").arg(error), true);
-        client->deleteLater();
-    });
-    client->recognize(Util::pixmap2ByteArray(QPixmap::fromImage(image)), config);
+    if (!ocrOverlay_) ocrOverlay_ = new OcrSelectionOverlay(this, true);
+    syncOcrGeometry();
+    ocrOverlay_->recognize(image, windowManager_->setting()->paddleOcrConfig());
 }
 
 void PinWidget::onSmartMask()
@@ -521,6 +534,7 @@ void PinWidget::onEnhance(int preset)
 
 void PinWidget::onDraw()
 {
+    if (ocrOverlay_) ocrOverlay_->reset();
     if (drawPanel_) {
         drawPanel_->drawer()->drawPixmap(pixmap_);
         drawPanel_.reset();
@@ -545,6 +559,10 @@ void PinWidget::onUndo()
 
 void PinWidget::onCopy()
 {
+    if (ocrOverlay_ && ocrOverlay_->isVisible()) {
+        ocrOverlay_->copySelection();
+        return;
+    }
     flush();
 	QClipboard* clipboard = QApplication::clipboard();
     clipboard->setPixmap(pixmap_);

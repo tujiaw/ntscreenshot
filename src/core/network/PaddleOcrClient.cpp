@@ -27,42 +27,6 @@ QString responseError(QNetworkReply* reply, const QJsonObject& object)
     return networkMessage.isEmpty() ? QCoreApplication::translate("App", "OCR 服务请求失败") : networkMessage;
 }
 
-void appendTextValues(const QJsonValue& value, QStringList& output)
-{
-    if (value.isObject()) {
-        const QJsonObject object = value.toObject();
-        const QJsonValue texts = object.value(QStringLiteral("rec_texts"));
-        if (texts.isArray()) {
-            for (const QJsonValue& item : texts.toArray()) {
-                const QString text = item.toString().trimmed();
-                if (!text.isEmpty()) output.push_back(text);
-            }
-        }
-        for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
-            if (it.key() != QStringLiteral("rec_texts")) appendTextValues(it.value(), output);
-        }
-    } else if (value.isArray()) {
-        for (const QJsonValue& item : value.toArray()) appendTextValues(item, output);
-    }
-}
-
-QString parseResultText(const QByteArray& content)
-{
-    QStringList texts;
-    const QList<QByteArray> lines = content.split('\n');
-    for (const QByteArray& rawLine : lines) {
-        const QByteArray line = rawLine.trimmed();
-        if (line.isEmpty()) continue;
-        QJsonParseError error;
-        const QJsonDocument document = QJsonDocument::fromJson(line, &error);
-        if (error.error == QJsonParseError::NoError) {
-            appendTextValues(document.isObject() ? QJsonValue(document.object())
-                                                  : QJsonValue(document.array()), texts);
-        }
-    }
-    return texts.join(QLatin1Char('\n'));
-}
-
 QNetworkRequest authorizedRequest(const QUrl& url, const QString& token)
 {
     QNetworkRequest request(url);
@@ -104,7 +68,7 @@ void PaddleOcrClient::recognize(const QByteArray& pngData, const PaddleOcrConfig
     };
     addTextPart("model", config_.model.toUtf8());
     addTextPart("optionalPayload",
-                R"({"useDocOrientationClassify":false,"useDocUnwarping":false,"useTextlineOrientation":false})");
+                R"({"useDocOrientationClassify":false,"useDocUnwarping":false,"useTextlineOrientation":false,"returnWordBox":true})");
 
     QHttpPart filePart;
     filePart.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("image/png"));
@@ -184,11 +148,11 @@ void PaddleOcrClient::fetchResult(const QUrl& url)
             reply->deleteLater();
             return fail(error);
         }
-        const QString text = parseResultText(body);
+        const OcrResult result = OcrResult::parse(body);
         reply->deleteLater();
-        if (text.isEmpty()) return fail(QCoreApplication::translate("App", "未识别到文字"));
+        if (result.lines.isEmpty()) return fail(QCoreApplication::translate("App", "未识别到文字"));
         finished_ = true;
-        emit succeeded(text);
+        emit succeeded(result);
     });
 }
 

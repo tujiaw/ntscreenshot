@@ -237,3 +237,16 @@ if(WIN32)
 endif()
 nt_add_qt_test(http_server_startup http_server_tests --integration)
 set_tests_properties(http_server_startup PROPERTIES SKIP_RETURN_CODE 77)
+
+add_executable(ocr_selection_tests
+    capture/OcrSelectionTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/OcrResult.cpp
+    ${NT_SOURCE_DIR}/core/network/PaddleOcrClient.cpp
+    ${NT_SOURCE_DIR}/modules/capture/annotation/OcrSelectionOverlay.cpp)
+target_include_directories(ocr_selection_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(ocr_selection_tests PRIVATE Qt6::Widgets Qt6::Network)
+if(MSVC)
+    target_compile_options(ocr_selection_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(ocr_text_selection ocr_selection_tests)
+set_tests_properties(ocr_text_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
