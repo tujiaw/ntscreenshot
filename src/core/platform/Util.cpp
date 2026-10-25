@@ -639,13 +639,29 @@ namespace Util
 
     QCursor multicolorCursor()
     {
+        return screenshotCursor(ScreenshotCursorStyle::Color);
+    }
+
+    QCursor screenshotCursor(ScreenshotCursorStyle style)
+    {
+        style = validatedCursorStyle(static_cast<int>(style));
+        if (style == ScreenshotCursorStyle::System) return QCursor(Qt::CrossCursor);
         const qreal scale = qMax(1.0, getScreenScaleFactor());
-        const QString key = QStringLiteral("nt-selection-crosshair:%1").arg(scale, 0, 'f', 3);
+        const QString key = QStringLiteral("nt-selection-crosshair:%1:%2")
+            .arg(static_cast<int>(style)).arg(scale, 0, 'f', 3);
         QPixmap pixmap;
         if (!QPixmapCache::find(key, &pixmap)) {
-            pixmap = CaptureCursor::crosshair(scale);
+            if (style == ScreenshotCursorStyle::Classic) {
+                const QPixmap original(QStringLiteral(":/images/cursor_classic.png"));
+                pixmap = original.scaled(qRound(original.width() * scale), qRound(original.height() * scale),
+                                         Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            } else {
+                pixmap = CaptureCursor::crosshair(scale, style == ScreenshotCursorStyle::Color);
+            }
             QPixmapCache::insert(key, pixmap);
         }
+        if (style == ScreenshotCursorStyle::Classic)
+            return QCursor(pixmap, qRound(15 * scale), qRound(23 * scale));
         return QCursor(pixmap, pixmap.width() / 2, pixmap.height() / 2);
     }
     double colorDistance(QColor e1, QColor e2)

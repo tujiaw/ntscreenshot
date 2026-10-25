@@ -31,6 +31,8 @@ static const QString KEY_LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION =
 static const QString KEY_AUTO_PIN       = "AUTO_PIN";
 static const QString KEY_PIN_NO_BORDER  = "PIN_NO_BORDER";
 static const QString KEY_RGB_COLOR      = "RGB_COLOR";
+static const QString KEY_SCREENSHOT_CURSOR = "SCREENSHOT/CURSOR_STYLE";
+static const QString KEY_SELECTION_BORDER_COLOR = "SCREENSHOT/SELECTION_BORDER_COLOR";
 static const QString KEY_OPENCV_MODE    = "OPENCV_MODE";
 static const QString KEY_AUTO_SAVE      = "AUTO_SAVE";
 static const QString KEY_AUTO_SAVE_PATH = "AUTO_SAVE_PATH";
@@ -131,6 +133,8 @@ void SettingModel::revertDefault()
     settings_.setValue(KEY_LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION,
                        LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION);
     setThemeMode(AppTheme::Dark);
+    setScreenshotCursorStyle(ScreenshotCursorStyle::Color);
+    setSelectionBorderColor(Style::DRAW_SELECTED_BORDER_COLOR);
 
     setPaddleOcrConfig({false, DEFAULT_OCR_JOB_URL, QString(), DEFAULT_OCR_MODEL});
     settings_.sync();
@@ -436,6 +440,29 @@ void SettingModel::setRgbColor(bool enable)
 bool SettingModel::rgbColor() const
 {
     return settings_.value(KEY_RGB_COLOR, true).toBool();
+}
+
+ScreenshotCursorStyle SettingModel::screenshotCursorStyle() const
+{
+    return validatedCursorStyle(settings_.value(KEY_SCREENSHOT_CURSOR, 0).toInt());
+}
+
+void SettingModel::setScreenshotCursorStyle(ScreenshotCursorStyle style)
+{
+    settings_.setValue(KEY_SCREENSHOT_CURSOR, static_cast<int>(validatedCursorStyle(static_cast<int>(style))));
+}
+
+QColor SettingModel::selectionBorderColor() const
+{
+    QColor color(settings_.value(KEY_SELECTION_BORDER_COLOR, Style::DRAW_SELECTED_BORDER_COLOR.name()).toString());
+    if (!color.isValid()) return Style::DRAW_SELECTED_BORDER_COLOR;
+    color.setAlpha(255);
+    return color;
+}
+
+void SettingModel::setSelectionBorderColor(const QColor& color)
+{
+    if (color.isValid()) settings_.setValue(KEY_SELECTION_BORDER_COLOR, color.name(QColor::HexRgb));
 }
 
 void SettingModel::setOpenCVMode(bool enable)

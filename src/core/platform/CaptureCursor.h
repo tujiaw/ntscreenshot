@@ -8,7 +8,7 @@ namespace CaptureCursor {
 
 // Render at the target physical DPI instead of scaling a small raster asset.
 // An odd canvas keeps the hotspot on the same central pixel at every scale.
-inline QPixmap crosshair(qreal scale)
+inline QPixmap crosshair(qreal scale, bool colored = true)
 {
     scale = qMax<qreal>(1.0, scale);
     const int radius = qCeil(13 * scale);
@@ -27,7 +27,7 @@ inline QPixmap crosshair(qreal scale)
     };
     arms(QColor("#202124"), 3);
     arms(Qt::white, 1);
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; colored && i < 4; ++i) {
         painter.setPen(QPen(tips[i], 2 * scale, Qt::SolidLine, Qt::FlatCap));
         painter.drawLine(directions[i] * (5 * scale), directions[i] * (11 * scale));
     }

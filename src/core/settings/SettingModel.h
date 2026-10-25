@@ -7,6 +7,7 @@
 #include <QStringList>
 #include "core/foundation/Constants.h"
 #include "core/theme/AppTheme.h"
+#include "core/platform/ScreenshotCursorStyle.h"
 
 struct PaddleOcrConfig {
     bool enabled = false;
@@ -78,6 +79,10 @@ public:
 
     void setRgbColor(bool enable);
     bool rgbColor() const;
+    ScreenshotCursorStyle screenshotCursorStyle() const;
+    void setScreenshotCursorStyle(ScreenshotCursorStyle style);
+    QColor selectionBorderColor() const;
+    void setSelectionBorderColor(const QColor& color);
 
     void setOpenCVMode(bool enable);
     bool openCVMode() const;

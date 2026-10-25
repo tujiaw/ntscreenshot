@@ -7,6 +7,7 @@
 #include <functional>
 #include <QtGui/qwindowdefs.h>
 #include "core/foundation/Constants.h"
+#include "ScreenshotCursorStyle.h"
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -58,6 +59,7 @@ namespace Util {
     QString md5Image(const QImage &image);
     const QPixmap& multicolorCursorPixmap(); // 彩色光标原始图（96 DPI 基准）
     QCursor multicolorCursor(); // 按当前屏幕 DPI 缩放后的彩色光标
+    QCursor screenshotCursor(ScreenshotCursorStyle style);
     double colorDistance(QColor e1, QColor e2); // 颜色相似度
     QColor colorOpposite(QColor clr); // 反色
     void setCurrentHwnd(WId hwnd);

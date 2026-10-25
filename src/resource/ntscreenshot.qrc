@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
+        <file>images/cursor_classic.png</file>
         <file>images/icon_window_close.png</file>
         <file>images/icon_window_maximize.png</file>
         <file>images/icon_window_minimize.png</file>

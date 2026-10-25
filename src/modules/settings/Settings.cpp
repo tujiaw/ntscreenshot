@@ -4,6 +4,7 @@
 #include "Settings.h"
 #include <QDebug>
 #include <QClipboard>
+#include <QColorDialog>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -40,11 +41,61 @@
 #include "core/theme/UiStyler.h"
 #include "core/settings/SettingModel.h"
 #include "core/platform/Util.h"
+#include "core/platform/CaptureCursor.h"
 #include "app/WindowManager.h"
 #include "shared/foundation/IgnorePatternMatcher.h"
 #include "modules/local_search/infrastructure/SearchIndexStore.h"
 
 namespace {
+QPixmap cursorPreviewPixmap(ScreenshotCursorStyle style)
+{
+    const QPixmap custom = Util::screenshotCursor(style).pixmap();
+    if (!custom.isNull()) return custom;
+#ifdef Q_OS_WIN
+    // Standard QCursor shapes have no Qt pixmap. Read the native cursor
+    // instead of substituting our custom black-and-white crosshair.
+    const HCURSOR native = LoadCursorW(nullptr, IDC_CROSS);
+    if (native) {
+        // Monochrome system cursors can use XOR pixels, which disappear when
+        // converted directly to an alpha icon. Composite through Windows first.
+        QImage backing(GetSystemMetrics(SM_CXCURSOR), GetSystemMetrics(SM_CYCURSOR), QImage::Format_RGB32);
+        const QColor background = ThemeManager::tokens().surfaceSubtle;
+        backing.fill(background);
+        const HBITMAP bitmap = backing.toHBITMAP();
+        const HDC dc = CreateCompatibleDC(nullptr);
+        if (bitmap && dc) {
+            const HGDIOBJ previous = SelectObject(dc, bitmap);
+            const bool drawn = DrawIconEx(dc, 0, 0, reinterpret_cast<HICON>(native),
+                                           backing.width(), backing.height(), 0, nullptr, DI_NORMAL);
+            SelectObject(dc, previous);
+            if (drawn) {
+                QImage rendered = QImage::fromHBITMAP(bitmap).convertToFormat(QImage::Format_RGB32)
+                    .convertToFormat(QImage::Format_ARGB32);
+                for (int y = 0; y < rendered.height(); ++y)
+                    for (int x = 0; x < rendered.width(); ++x)
+                        if (rendered.pixelColor(x, y) == background) rendered.setPixel(x, y, 0);
+                DeleteDC(dc);
+                DeleteObject(bitmap);
+                return QPixmap::fromImage(rendered);
+            }
+        }
+        if (dc) DeleteDC(dc);
+        if (bitmap) DeleteObject(bitmap);
+    }
+#endif
+    // A simple uninterrupted cross is the generic system-shape fallback.
+    const int size = Util::scaleSize(32);
+    QPixmap preview(size, size);
+    preview.fill(Qt::transparent);
+    QPainter painter(&preview);
+    painter.setPen(QPen(Qt::black, qMax(1, Util::scaleSize(1))));
+    const int center = size / 2;
+    const int margin = Util::scaleSize(6);
+    painter.drawLine(center, margin, center, size - margin - 1);
+    painter.drawLine(margin, center, size - margin - 1, center);
+    return preview;
+}
+
 QString keySequenceText(const QKeySequence &sequence)
 {
     return sequence.toString(QKeySequence::NativeText).trimmed();
@@ -140,6 +191,8 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     initTablePath();
     qInfo() << "Settings: initTablePath done";
     initThemeSelector();
+    initCursorSelector();
+    initSelectionBorderColor();
     qInfo() << "Settings: initThemeSelector done";
 
     initLocalSearchTab();
@@ -387,6 +440,12 @@ void Settings::readData()
 
     ui.rbRGB->setChecked(setting->rgbColor());
     ui.rbHexadecimal->setChecked(!setting->rgbColor());
+    {
+        const QSignalBlocker cursorBlocker(cbCursor_);
+        cbCursor_->setCurrentIndex(cbCursor_->findData(static_cast<int>(setting->screenshotCursorStyle())));
+    }
+    refreshCursorPreview();
+    refreshSelectionBorderColor();
 
     bool autoSave = false;
     QString autoSavePath;
@@ -803,6 +862,91 @@ void Settings::initThemeSelector()
     ui.verticalLayout_2->insertLayout(1, themeLayout);
 
     connect(cbTheme_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Settings::onThemeChanged);
+}
+
+void Settings::initCursorSelector()
+{
+    auto* row = new QHBoxLayout();
+    auto* label = new QLabel(QCoreApplication::translate("App", "截图光标"), this);
+    cbCursor_ = new QComboBox(this);
+    cbCursor_->setObjectName(QStringLiteral("screenshotCursorSelector"));
+    cbCursor_->setMinimumWidth(Util::scaleSize(160));
+    const QList<QPair<ScreenshotCursorStyle, QString>> options = {
+        {ScreenshotCursorStyle::Color, QCoreApplication::translate("App", "鲜彩十字")},
+        {ScreenshotCursorStyle::Classic, QCoreApplication::translate("App", "经典彩色")},
+        {ScreenshotCursorStyle::Contrast, QCoreApplication::translate("App", "黑白十字")},
+        {ScreenshotCursorStyle::System, QCoreApplication::translate("App", "系统十字")}
+    };
+    for (const auto& option : options) {
+        const QPixmap preview = cursorPreviewPixmap(option.first);
+        cbCursor_->addItem(QIcon(preview), option.second, static_cast<int>(option.first));
+    }
+    cursorPreview_ = new QLabel(this);
+    cursorPreview_->setObjectName(QStringLiteral("screenshotCursorPreview"));
+    cursorPreview_->setFixedSize(Util::scaleSize(64), Util::scaleSize(48));
+    cursorPreview_->setAlignment(Qt::AlignCenter);
+    auto* hint = new QLabel(QCoreApplication::translate("App", "移到预览上查看，下次截图生效"), this);
+    hint->setWordWrap(true);
+    row->addWidget(label);
+    row->addWidget(cbCursor_);
+    row->addWidget(cursorPreview_);
+    row->addWidget(hint);
+    row->addStretch();
+    ui.verticalLayout_2->insertLayout(2, row);
+    connect(cbCursor_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        if (index < 0) return;
+        windowManager_->setting()->setScreenshotCursorStyle(validatedCursorStyle(cbCursor_->itemData(index).toInt()));
+        refreshCursorPreview();
+    });
+}
+
+void Settings::refreshCursorPreview()
+{
+    if (!cbCursor_ || !cursorPreview_) return;
+    const auto style = validatedCursorStyle(cbCursor_->currentData().toInt());
+    const QCursor cursor = Util::screenshotCursor(style);
+    cursorPreview_->setCursor(cursor);
+    const QPixmap preview = cursorPreviewPixmap(style);
+    cursorPreview_->setPixmap(preview.scaled(cursorPreview_->size() - QSize(Util::scaleSize(8), Util::scaleSize(8)),
+                                             Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
+void Settings::initSelectionBorderColor()
+{
+    auto* row = new QHBoxLayout();
+    row->addWidget(new QLabel(QCoreApplication::translate("App", "框选边框颜色"), this));
+    selectionBorderColorButton_ = new QPushButton(this);
+    selectionBorderColorButton_->setObjectName(QStringLiteral("selectionBorderColorButton"));
+    selectionBorderColorButton_->setMinimumWidth(Util::scaleSize(140));
+    selectionBorderColorButton_->setToolTip(QCoreApplication::translate("App", "选择框选边框颜色"));
+    row->addWidget(selectionBorderColorButton_);
+    auto* reset = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
+    reset->setObjectName(QStringLiteral("resetSelectionBorderColorButton"));
+    row->addWidget(reset);
+    row->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
+    row->addStretch();
+    ui.verticalLayout_2->insertLayout(3, row);
+    connect(selectionBorderColorButton_, &QPushButton::clicked, this, [this] {
+        const QColor color = QColorDialog::getColor(windowManager_->setting()->selectionBorderColor(), this,
+            QCoreApplication::translate("App", "选择框选边框颜色"));
+        if (!color.isValid()) return;
+        windowManager_->setting()->setSelectionBorderColor(color);
+        refreshSelectionBorderColor();
+    });
+    connect(reset, &QPushButton::clicked, this, [this] {
+        windowManager_->setting()->setSelectionBorderColor(Style::DRAW_SELECTED_BORDER_COLOR);
+        refreshSelectionBorderColor();
+    });
+}
+
+void Settings::refreshSelectionBorderColor()
+{
+    if (!selectionBorderColorButton_) return;
+    const QColor color = windowManager_->setting()->selectionBorderColor();
+    QPixmap swatch(Util::scaleSize(18), Util::scaleSize(18));
+    swatch.fill(color);
+    selectionBorderColorButton_->setIcon(QIcon(swatch));
+    selectionBorderColorButton_->setText(color.name(QColor::HexRgb).toUpper());
 }
 
 void Settings::updateScreenshotGlobalKey()

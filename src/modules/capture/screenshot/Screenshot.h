@@ -5,6 +5,8 @@
 #include <QWidget>
 #include <QPolygon>
 #include <QElapsedTimer>
+#include <QColor>
+#include "core/platform/ScreenshotCursorStyle.h"
 
 class QMenu;
 class QTimer;
@@ -129,6 +131,8 @@ private:
     class IRectDetector* activeDetector() const;
 
     bool useOpenCVMode_;
+    ScreenshotCursorStyle cursorStyle_ = ScreenshotCursorStyle::Color;
+    QColor selectionBorderColor_;
 
     // 交互状态
     enum DIRECTION {

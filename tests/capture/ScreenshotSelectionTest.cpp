@@ -4,6 +4,7 @@
 #include "modules/capture/screenshot/Screenshot.h"
 #include "modules/capture/annotation/DrawPanel.h"
 #include "core/theme/ThemeManager.h"
+#include "core/settings/SettingModel.h"
 #include <QApplication>
 #include <QMouseEvent>
 #include <QPointer>
@@ -31,10 +32,40 @@ int runScreenshotSelectionTest(QApplication& app) {
     modules.initializeAll();
     ThemeManager::apply(AppTheme::Dark);
     QTimer::singleShot(0, &app, [&] {
+        const auto previousCursorStyle = manager.setting()->screenshotCursorStyle();
+        const QColor previousBorderColor = manager.setting()->selectionBorderColor();
+        const QColor testBorderColor(QStringLiteral("#AA44EE"));
+        bool cursorOptionsOkay = true;
+        for (auto style : {ScreenshotCursorStyle::Color, ScreenshotCursorStyle::Classic,
+                           ScreenshotCursorStyle::Contrast, ScreenshotCursorStyle::System}) {
+            manager.setting()->setScreenshotCursorStyle(style);
+            SettingModel reloaded(nullptr);
+            cursorOptionsOkay &= reloaded.screenshotCursorStyle() == style;
+            const QCursor cursor = Util::screenshotCursor(style);
+            cursorOptionsOkay &= style == ScreenshotCursorStyle::System
+                ? cursor.shape() == Qt::CrossCursor : !cursor.pixmap().isNull();
+            if (style == ScreenshotCursorStyle::Classic) {
+                const qreal scale = qMax(1.0, Util::getScreenScaleFactor());
+                cursorOptionsOkay &= cursor.pixmap().size() == QSize(qRound(29 * scale), qRound(45 * scale));
+                cursorOptionsOkay &= cursor.hotSpot() == QPoint(qRound(15 * scale), qRound(23 * scale));
+            }
+        }
+        manager.setting()->setScreenshotCursorStyle(ScreenshotCursorStyle::Classic);
+        manager.setting()->setSelectionBorderColor(testBorderColor);
+        {
+            SettingModel reloaded(nullptr);
+            cursorOptionsOkay &= reloaded.selectionBorderColor() == testBorderColor;
+            reloaded.setSelectionBorderColor(QColor());
+            cursorOptionsOkay &= reloaded.selectionBorderColor() == testBorderColor;
+        }
         manager.openWidget(WidgetID::SCREENSHOT);
         QPointer<ScreenshotWidget> screenshot;
         for(auto* w: QApplication::topLevelWidgets()) if(auto* s=qobject_cast<ScreenshotWidget*>(w)) screenshot=s;
+        manager.setting()->setScreenshotCursorStyle(previousCursorStyle);
+        manager.setting()->setSelectionBorderColor(previousBorderColor);
         if(!screenshot) { app.exit(1); return; }
+        cursorOptionsOkay &= screenshot->cursor().hotSpot() == Util::screenshotCursor(ScreenshotCursorStyle::Classic).hotSpot();
+        qInfo() << "Cursor styles, saved preference and classic hotspot:" << cursorOptionsOkay;
         int closeCount=0;
         QObject::connect(screenshot, &ScreenshotWidget::sigClose, &app, [&] { ++closeCount; });
         auto mouse=[&](QEvent::Type type, QPoint p, Qt::MouseButton button, Qt::MouseButtons held) {
@@ -47,7 +78,10 @@ int runScreenshotSelectionTest(QApplication& app) {
         QApplication::processEvents();
         auto* panel=screenshot ? screenshot->findChild<DrawPanel*>() : nullptr;
         qInfo() << "Selection release:" << "close count" << closeCount << "toolbar visible" << (panel && panel->isVisible());
-        bool okay=screenshot && screenshot->isVisible() && panel && panel->isVisible() && closeCount==0;
+        bool okay=cursorOptionsOkay && screenshot && screenshot->isVisible() && panel && panel->isVisible() && closeCount==0;
+        const QColor paintedBorder = screenshot->grab(QRect(430, 200, 1, 1)).toImage().pixelColor(0, 0);
+        okay &= paintedBorder == testBorderColor;
+        qInfo() << "Saved selection border color painted correctly:" << paintedBorder << testBorderColor;
 #ifdef Q_OS_WIN
         okay &= screenshot && GetPropW(reinterpret_cast<HWND>(screenshot->winId()), L"AutoBrowser.IgnoreTextSelection");
         const QString probePath = qEnvironmentVariable("NT_TEXT_SELECTION_POLICY_PROBE");

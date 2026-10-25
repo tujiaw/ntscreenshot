@@ -26,6 +26,10 @@ private:
 private:
     void initTablePath();
     void initThemeSelector();
+    void initCursorSelector();
+    void refreshCursorPreview();
+    void initSelectionBorderColor();
+    void refreshSelectionBorderColor();
     void updateScreenshotGlobalKey();
     void updatePinKey();
 
@@ -59,6 +63,9 @@ private:
     Ui::Settings ui;
     WindowManager* windowManager_ = nullptr;
     class QComboBox*   cbTheme_;
+    class QComboBox* cbCursor_ = nullptr;
+    class QLabel* cursorPreview_ = nullptr;
+    class QPushButton* selectionBorderColorButton_ = nullptr;
 
     class QListWidget* listLocalSearchRoots_ = nullptr;
     class QPlainTextEdit* teLocalSearchExcludes_ = nullptr;

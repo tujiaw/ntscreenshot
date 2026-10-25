@@ -2,6 +2,15 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>框选边框颜色</source><translation>Selection border color</translation></message>
+    <message><source>选择框选边框颜色</source><translation>Choose selection border color</translation></message>
+    <message><source>下次截图生效</source><translation>Applies to the next screenshot</translation></message>
+    <message><source>截图光标</source><translation>Screenshot cursor</translation></message>
+    <message><source>鲜彩十字</source><translation>Vivid crosshair</translation></message>
+    <message><source>经典彩色</source><translation>Classic multicolor</translation></message>
+    <message><source>黑白十字</source><translation>Black-and-white crosshair</translation></message>
+    <message><source>系统十字</source><translation>System crosshair</translation></message>
+    <message><source>移到预览上查看，下次截图生效</source><translation>Hover over the preview to try it. Applies to the next screenshot.</translation></message>
     <message><source>复制用户名</source><translation>Copy username</translation></message>
     <message><source>复制密码</source><translation>Copy password</translation></message>
     <message><source>复制网址</source><translation>Copy URL</translation></message>

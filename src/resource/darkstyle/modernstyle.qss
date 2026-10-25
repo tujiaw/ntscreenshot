@@ -323,6 +323,9 @@ QSlider::handle:vertical:hover { background: @ACCENT@; border-color: @ACCENT@; }
 QSlider::handle:vertical:pressed { background: @ACCENT_PRESSED@; border-color: @ACCENT_PRESSED@; }
 
 QWidget#DrawPanel { background: transparent; border: none; }
+QLabel#screenshotCursorPreview {
+    background: @SURFACE_SUBTLE@; border: 1px solid @BORDER@; border-radius: 8px;
+}
 QWidget#DrawPanel > QPushButton {
     min-width: 0px; min-height: 0px;
     padding: 0; background: transparent; border: 1px solid transparent; border-radius: 20px;

@@ -95,11 +95,14 @@ ScreenshotWidget::ScreenshotWidget(WindowManager* windowManager, QWidget *parent
     windowDetector_(std::make_unique<SystemWindowDetector>()),
     opencvDetector_(std::make_unique<OpenCVDetector>()),
     actionController_(std::make_shared<ScreenshotActionController>(windowManager_, this)),
-    useOpenCVMode_(false)
+    useOpenCVMode_(false),
+    selectionBorderColor_(Style::DRAW_SELECTED_BORDER_COLOR)
 {
     // 初始化时读取记住的模式
     if (windowManager_ && windowManager_->setting()) {
         useOpenCVMode_ = windowManager_->setting()->openCVMode();
+        cursorStyle_ = windowManager_->setting()->screenshotCursorStyle();
+        selectionBorderColor_ = windowManager_->setting()->selectionBorderColor();
     }
 
 	// 初始化鼠标
@@ -350,7 +353,7 @@ void ScreenshotWidget::onSelectedScreenPosChanged(int x, int y)
 
 void ScreenshotWidget::initCursor() 
 {
-    setCursor(Util::multicolorCursor());
+    setCursor(Util::screenshotCursor(cursorStyle_));
 }
 
 void ScreenshotWidget::initDrawPanel(void)
@@ -832,7 +835,7 @@ void ScreenshotWidget::paintEvent(QPaintEvent *) {
         if (!getEsthesiaRect().isEmpty()) {
             /// 绘制选区
             QPen pen = painter.pen();
-            pen.setColor(Style::AUTO_SELECTED_BORDER_COLOR);
+            pen.setColor(selectionBorderColor_);
             pen.setWidth(Style::AUTO_SELECTED_BORDER_WIDTH);
             painter.setPen(pen);
             int padding = Style::AUTO_SELECTED_BORDER_WIDTH / 2;
@@ -855,7 +858,7 @@ void ScreenshotWidget::paintEvent(QPaintEvent *) {
             }
             
             /// 绘制边框线
-            QPen pen(Style::DRAW_SELECTED_BORDER_COLOR, bw);
+            QPen pen(selectionBorderColor_, bw);
             painter.setPen(pen);
             painter.drawRect(currentRect_ - QMargins(bw/2, bw/2, bw/2, bw/2));
             
