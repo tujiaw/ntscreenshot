@@ -485,7 +485,7 @@ void PinWidget::onAutoCrop()
     QImage src = currentImage();
     QImage cropped = ImageUtil::AutoCropAdaptive(src);
     if (cropped.isNull() || cropped.size() == src.size()) {
-        notifyToolMessage(QCoreApplication::translate("App", "无需裁边"), true);
+        notifyToolMessage(QCoreApplication::translate("App", "未找到明确留白"), true);
         return;
     }
     replacePixmap(QPixmap::fromImage(cropped));

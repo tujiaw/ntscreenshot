@@ -39,6 +39,9 @@ int main(int argc, char *argv[])
     if (QCoreApplication::translate("App", "复制") != QStringLiteral("Copy")) {
         return 6;
     }
+    if (QCoreApplication::translate("App", "未找到明确留白") != QStringLiteral("No clear border found")) {
+        return 15;
+    }
     const std::pair<const char*, const char*> clipboardLabels[] = {
         {"剪切板", "Clipboard"}, {"收藏", "Favorites"}, {"取消收藏", "Remove from favorites"},
         {"搜索剪切板", "Search clipboard"}, {"搜索收藏", "Search favorites"},

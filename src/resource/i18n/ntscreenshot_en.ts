@@ -1066,8 +1066,8 @@ Please choose another key combination.</translation>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="488" />
       <location filename="../../modules/capture/screenshot/Screenshot.cpp" line="467" />
-      <source>无需裁边</source>
-      <translation>No border to crop</translation>
+      <source>未找到明确留白</source>
+      <translation>No clear border found</translation>
     </message>
     <message>
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="492" />

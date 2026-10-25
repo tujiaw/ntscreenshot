@@ -471,7 +471,7 @@ void ScreenshotWidget::initDrawPanel(void)
             QImage src = captureSelection().toImage();
             const QRect content = ImageUtil::DetectContentRectAdaptive(src);
             if (!content.isValid() || content.size() == src.size()) {
-                drawPanel_->showToolMessage(QCoreApplication::translate("App", "无需裁边"), true);
+                drawPanel_->showToolMessage(QCoreApplication::translate("App", "未找到明确留白"), true);
                 return;
             }
             QImage cropped = src.copy(content);

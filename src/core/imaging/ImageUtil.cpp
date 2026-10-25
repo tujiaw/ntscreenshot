@@ -160,85 +160,98 @@ QRect DetectContentRectAdaptive(const QImage& image)
         return fullRect;
     }
 
-    const QRgb corners[] = {
-        argb.pixel(0, 0), argb.pixel(width - 1, 0),
-        argb.pixel(0, height - 1), argb.pixel(width - 1, height - 1)
+    struct Edge {
+        int inset = 0;
+        QRgb background = 0;
+        bool transparent = false;
     };
-    const bool transparent = std::all_of(std::begin(corners), std::end(corners),
-        [](QRgb pixel) { return qAlpha(pixel) <= transparentThreshold; });
-    const bool opaque = std::all_of(std::begin(corners), std::end(corners),
-        [](QRgb pixel) { return qAlpha(pixel) >= opaqueThreshold; });
-    if (!transparent && !opaque) {
-        return fullRect;
-    }
-
-    const int red = (qRed(corners[0]) + qRed(corners[1]) + qRed(corners[2]) + qRed(corners[3])) / 4;
-    const int green = (qGreen(corners[0]) + qGreen(corners[1]) + qGreen(corners[2]) + qGreen(corners[3])) / 4;
-    const int blue = (qBlue(corners[0]) + qBlue(corners[1]) + qBlue(corners[2]) + qBlue(corners[3])) / 4;
-    auto matchesBorder = [&](QRgb pixel) {
-        return transparent ? qAlpha(pixel) <= transparentThreshold
-                           : qAlpha(pixel) >= opaqueThreshold &&
-                                 std::abs(qRed(pixel) - red) <= colorTolerance &&
-                                 std::abs(qGreen(pixel) - green) <= colorTolerance &&
-                                 std::abs(qBlue(pixel) - blue) <= colorTolerance;
-    };
-    if (opaque && !std::all_of(std::begin(corners), std::end(corners), matchesBorder)) {
-        return fullRect;
-    }
-
-    // Check each outer edge independently before treating any inward line as border.
-    auto rowMatches = [&](int y, int left, int right) {
-        const QRgb* row = reinterpret_cast<const QRgb*>(argb.constScanLine(y));
-        int mismatches = 0;
-        const int count = right - left + 1;
-        for (int x = left; x <= right; ++x) {
-            if (!matchesBorder(row[x]) && ++mismatches * 100 > count) {
-                return false;
+    // Estimate each edge from a thin band, rather than four potentially
+    // unrelated corner pixels. Bound the sample count for large screenshots.
+    auto detectEdge = [&](bool horizontal, bool reverse) {
+        Edge edge;
+        const int length = horizontal ? width : height;
+        const int depth = horizontal ? height : width;
+        auto pixelAt = [&](int along, int inward) {
+            const int position = reverse ? depth - 1 - inward : inward;
+            return horizontal ? argb.pixel(along, position) : argb.pixel(position, along);
+        };
+        std::vector<int> reds, greens, blues, alphas;
+        const int samples = std::min(length, 256);
+        const int band = std::min(depth, 3);
+        for (int inward = 0; inward < band; ++inward) {
+            for (int i = 0; i < samples; ++i) {
+                const QRgb pixel = pixelAt(i * (length - 1) / (samples - 1), inward);
+                reds.push_back(qRed(pixel));
+                greens.push_back(qGreen(pixel));
+                blues.push_back(qBlue(pixel));
+                alphas.push_back(qAlpha(pixel));
             }
         }
-        return true;
-    };
-    auto columnMatches = [&](int x, int top, int bottom) {
-        int mismatches = 0;
-        const int count = bottom - top + 1;
-        for (int y = top; y <= bottom; ++y) {
-            const QRgb* row = reinterpret_cast<const QRgb*>(argb.constScanLine(y));
-            if (!matchesBorder(row[x]) && ++mismatches * 100 > count) {
-                return false;
+        auto median = [](std::vector<int>& values) {
+            auto middle = values.begin() + values.size() / 2;
+            std::nth_element(values.begin(), middle, values.end());
+            return *middle;
+        };
+        edge.background = qRgb(median(reds), median(greens), median(blues));
+        const int alpha = median(alphas);
+        edge.transparent = alpha <= transparentThreshold;
+        if (!edge.transparent && alpha < opaqueThreshold) {
+            return edge;
+        }
+        auto matches = [&](QRgb pixel) {
+            return edge.transparent ? qAlpha(pixel) <= transparentThreshold
+                : qAlpha(pixel) >= opaqueThreshold &&
+                  std::abs(qRed(pixel) - qRed(edge.background)) <= colorTolerance &&
+                  std::abs(qGreen(pixel) - qGreen(edge.background)) <= colorTolerance &&
+                  std::abs(qBlue(pixel) - qBlue(edge.background)) <= colorTolerance;
+        };
+        int matchingSamples = 0;
+        for (int inward = 0; inward < band; ++inward) {
+            for (int i = 0; i < samples; ++i) {
+                if (matches(pixelAt(i * (length - 1) / (samples - 1), inward))) {
+                    ++matchingSamples;
+                }
             }
         }
-        return true;
+        if (matchingSamples * 100 < samples * band * 95) {
+            return edge;
+        }
+        for (int inward = 0; inward < depth; ++inward) {
+            for (int along = 0; along < length; ++along) {
+                // Even a small foreground mark stops this edge. A percentage
+                // allowance here can silently erase punctuation or thin lines.
+                if (!matches(pixelAt(along, inward))) {
+                    edge.inset = inward;
+                    return edge;
+                }
+            }
+        }
+        // Uniform image: no reliable content boundary.
+        return edge;
     };
-    if (!rowMatches(0, 0, width - 1) || !rowMatches(height - 1, 0, width - 1) ||
-        !columnMatches(0, 0, height - 1) || !columnMatches(width - 1, 0, height - 1)) {
-        return fullRect;
-    }
+    Edge top = detectEdge(true, false);
+    Edge bottom = detectEdge(true, true);
+    Edge left = detectEdge(false, false);
+    Edge right = detectEdge(false, true);
 
-    int top = 0;
-    while (top < height && rowMatches(top, 0, width - 1)) {
-        ++top;
-    }
-    if (top == height) { // Uniform image: no reliable content boundary.
-        return fullRect;
-    }
-    int bottom = height - 1;
-    while (bottom > top && rowMatches(bottom, 0, width - 1)) {
-        --bottom;
-    }
-    int left = 0;
-    while (left < width && columnMatches(left, top, bottom)) {
-        ++left;
-    }
-    if (left == width) {
-        return fullRect;
-    }
-    int right = width - 1;
-    while (right > left && columnMatches(right, top, bottom)) {
-        --right;
-    }
-
-    return QRect(QPoint(qMax(0, left - padding), qMax(0, top - padding)),
-                 QPoint(qMin(width - 1, right + padding), qMin(height - 1, bottom + padding)));
+    auto reconcile = [&](Edge& first, Edge& second, int dimension) {
+        if (first.inset <= padding || second.inset <= padding) return;
+        const bool sameBackground = first.transparent == second.transparent &&
+            (first.transparent ||
+             (std::abs(qRed(first.background) - qRed(second.background)) <= colorTolerance &&
+              std::abs(qGreen(first.background) - qGreen(second.background)) <= colorTolerance &&
+              std::abs(qBlue(first.background) - qBlue(second.background)) <= colorTolerance));
+        // Opposing solid panels are ambiguous, rather than two removable borders.
+        if (!sameBackground || first.inset + second.inset >= dimension) {
+            first.inset = second.inset = 0;
+        }
+    };
+    reconcile(top, bottom, height);
+    reconcile(left, right, width);
+    return fullRect.adjusted(std::max(0, left.inset - padding),
+                             std::max(0, top.inset - padding),
+                             -std::max(0, right.inset - padding),
+                             -std::max(0, bottom.inset - padding));
 }
 
 QImage AutoCropAdaptive(const QImage& image)

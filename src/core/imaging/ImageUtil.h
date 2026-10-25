@@ -21,8 +21,8 @@ QRect DetectContentRect(const QImage& image, int whiteThreshold = 245);
 // Crop to content rect; returns original if detection fails.
 QImage AutoCrop(const QImage& image, int whiteThreshold = 245);
 
-// Conservatively detect transparent or nearly uniform opaque borders.
-// Returns the full image rectangle when the border/content is uncertain.
+// Independently detect transparent or nearly uniform opaque borders on each edge.
+// Includes 2px padding; preserves edges whose border/content is uncertain.
 QRect DetectContentRectAdaptive(const QImage& image);
 QImage AutoCropAdaptive(const QImage& image);
 
