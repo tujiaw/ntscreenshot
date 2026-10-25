@@ -35,6 +35,7 @@
 #include "shared/ui/TextEdit.h"
 #include "core/foundation/Constants.h"
 #include "core/platform/Util.h"
+#include "core/platform/CaptureCursor.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -113,20 +114,9 @@ QCursor createMosaicCursor()
 
 QCursor createPolyLineCursor()
 {
-    const int size = std::max(DrawSettings::penWidth(), Util::scaleSize(6));
-    const int canvasSize = size + Util::scaleSize(4);
-
-    QPixmap pixmap(canvasSize, canvasSize);
-    pixmap.fill(Qt::transparent);
-
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setBrush(DrawSettings::currentColor());
-    painter.setPen(QPen(QColor(0, 0, 0, 100), Util::scaleSize(1) > 0 ? Util::scaleSize(1) : 1));
-    painter.drawEllipse(Util::scaleSize(2), Util::scaleSize(2), size - 1, size - 1);
-    painter.setPen(QPen(Qt::white, Util::scaleSize(1) > 0 ? Util::scaleSize(1) : 1));
-    painter.drawEllipse(Util::scaleSize(2), Util::scaleSize(2), size - 1, size - 1);
-    return QCursor(pixmap, canvasSize / 2, canvasSize / 2);
+    const QPixmap pixmap = CaptureCursor::brush(DrawSettings::penWidth(), DrawSettings::currentColor(),
+                                               Util::getScreenScaleFactor());
+    return QCursor(pixmap, pixmap.width() / 2, pixmap.height() / 2);
 }
 
 }
