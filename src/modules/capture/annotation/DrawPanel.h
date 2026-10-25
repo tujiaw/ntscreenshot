@@ -183,10 +183,13 @@ protected:
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
     SettingModel* settings_ = nullptr;
     double lastScaleFactor_ = -1.0;
+    bool aboveSelection_ = false;
     Q_DISABLE_COPY(DrawPanel)
     void applyCurrentStyle(DrawMode &mode) const;
     void uncheckOtherButtons(QAbstractButton *checkedButton);

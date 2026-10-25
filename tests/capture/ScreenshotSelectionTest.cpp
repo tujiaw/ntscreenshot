@@ -63,6 +63,61 @@ int runScreenshotSelectionTest(QApplication& app) {
         settle.exec();
         okay &= screenshot && screenshot->isVisible() && closeCount == 0;
         if (!okay) { manager.destroy(); app.exit(2); return; }
+        // The visual gap is transparent toolbar padding: it receives hover
+        // without forwarding it to the selection's cursor/resize handler.
+        const bool toolbarBelow = panel->y() > 549;
+        okay &= toolbarBelow ? panel->geometry().top() == 550
+                             : panel->geometry().bottom() == 199;
+        const QPoint bridgePoint(panel->width() / 2, toolbarBelow ? 0 : panel->height() - 1);
+        okay &= screenshot->childAt(panel->mapTo(screenshot, bridgePoint)) == panel;
+        okay &= panel->cursor().shape() == Qt::ArrowCursor;
+        const QCursor previousCursor = screenshot->cursor();
+        screenshot->setCursor(Qt::ForbiddenCursor);
+        QMouseEvent bridgeHover(QEvent::MouseMove, QPointF(bridgePoint),
+            QPointF(panel->mapToGlobal(bridgePoint)), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(panel, &bridgeHover);
+        okay &= bridgeHover.isAccepted() && screenshot->cursor().shape() == Qt::ForbiddenCursor;
+        screenshot->setCursor(previousCursor);
+        const QPoint selectionEdge(panel->geometry().center().x(), toolbarBelow ? 549 : 200);
+        QWidget* edgeTarget = screenshot->childAt(selectionEdge);
+        okay &= edgeTarget != panel && (!edgeTarget || !panel->isAncestorOf(edgeTarget));
+        const QRect bottomAnchor(200, Util::desktopLocalRect().height() - 50, 600, 40);
+        panel->onReferRectChanged(bottomAnchor);
+        okay &= panel->geometry().bottom() == bottomAnchor.top() - 1;
+        const QPoint upperBridge(panel->width() / 2, panel->height() - 1);
+        okay &= screenshot->childAt(panel->mapTo(screenshot, upperBridge)) == panel;
+        screenshot->moveDrawPanel();
+        qInfo() << "Continuous toolbar hover and accessible selection edge:" << okay;
+        // Expiring a result must restore the exact toolbar/settings height,
+        // even after Qt processes the queued layout and native resize events.
+        auto verifyResultExpiry = [&](DrawPanel* target) {
+          for (bool settingsOpen : {false, true}) {
+            if (settingsOpen) target->onColorBtnClicked();
+            QApplication::processEvents();
+            const int originalHeight = target->height();
+            for (int attempt = 0; attempt < 2; ++attempt) {
+                target->showToolMessage(QStringLiteral("OCR result\nFirst line\nSecond line"));
+                QApplication::processEvents();
+                okay &= target->height() > originalHeight;
+                auto* expiry = target->findChild<QTimer*>(QString(), Qt::FindDirectChildrenOnly);
+                okay &= expiry && QMetaObject::invokeMethod(expiry, "timeout", Qt::DirectConnection);
+                QEventLoop layoutSettle;
+                QTimer::singleShot(50, &layoutSettle, &QEventLoop::quit);
+                layoutSettle.exec();
+                qInfo() << "Expired result height:" << target->isWindow() << settingsOpen << originalHeight << target->height();
+                okay &= target->height() == originalHeight;
+            }
+            if (settingsOpen) target->onColorBtnClicked();
+          }
+        };
+        verifyResultExpiry(panel);
+        {
+            DrawPanel floating(nullptr, nullptr, screenshot);
+            floating.onReferRectChanged(QRect(screenshot->mapToGlobal(QPoint(200, 200)), QSize(600, 350)));
+            floating.show();
+            QApplication::processEvents();
+            verifyResultExpiry(&floating);
+        }
         const QPoint toolbarBeforeResize = panel->pos();
         mouse(QEvent::MouseMove,{799,375},Qt::NoButton,Qt::NoButton);
         mouse(QEvent::MouseButtonPress,{799,375},Qt::LeftButton,Qt::LeftButton);

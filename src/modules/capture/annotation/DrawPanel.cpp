@@ -141,11 +141,12 @@ DrawPanel::DrawPanel(SettingModel* settings, QWidget *parent, QWidget *drawWidge
         setAttribute(Qt::WA_TranslucentBackground);
         setAttribute(Qt::WA_ShowWithoutActivating);
     }
-    this->setCursor(Util::multicolorCursor());
+    setCursor(Qt::ArrowCursor);
+    setMouseTracking(true);
     setupButtonGroup();
     setupPanels();
     setupButtonsAndLayout(parent != nullptr);
-    this->setFixedHeight(Util::scaleSize(56));
+    this->setFixedHeight(Util::scaleSize(56) + 2);
 }
 
 void DrawPanel::setupButtonGroup()
@@ -311,7 +312,10 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     hLayout->addWidget(pbFinished);
 
     QVBoxLayout *mLayout = new QVBoxLayout(this);
-    mLayout->setContentsMargins(0, 0, 0, 0);
+    // The panel owns its height. Letting the layout also impose a native
+    // minimum size can preserve the previous result banner's height on Windows.
+    mLayout->setSizeConstraint(QLayout::SetNoConstraint);
+    mLayout->setContentsMargins(0, 2, 0, 0);
     mLayout->setSpacing(0);
     mLayout->addLayout(hLayout);
     auto* settingsRow = new QHBoxLayout();
@@ -367,11 +371,15 @@ void DrawPanel::applyCurrentStyle(DrawMode &mode) const
 void DrawPanel::refreshPanelHeight()
 {
     const int toolbarHeight = Util::scaleSize(56);
-    int height = toolbarHeight;
+    // Keep the existing 2px visual gap inside the toolbar's mouse region.
+    // Its window starts immediately outside the selection, never over its edge.
+    constexpr int bridge = 2;
+    int height = toolbarHeight + bridge;
     const bool hasDetails = (drawSettings_ && drawSettings_->isVisible())
         || (toolMessageLabel_ && toolMessageLabel_->isVisible());
     const int bottomPadding = hasDetails ? Util::scaleSize(12) : 0;
-    if (layout()) layout()->setContentsMargins(0, 0, 0, bottomPadding);
+    if (layout()) layout()->setContentsMargins(0, aboveSelection_ ? 0 : bridge,
+                                               0, bottomPadding + (aboveSelection_ ? bridge : 0));
     height += bottomPadding;
     if (drawSettings_ && drawSettings_->isVisible()) {
         height += drawSettings_->height();
@@ -389,6 +397,12 @@ void DrawPanel::refreshPanelHeight()
         if (width() < msgWidth + horizontalPadding) {
             setMinimumWidth(msgWidth + horizontalPadding);
         }
+    }
+    // Refresh the size hint before Windows handles the native resize request;
+    // otherwise its old minimum height can reject shrinking a floating panel.
+    if (layout()) {
+        layout()->invalidate();
+        layout()->activate();
     }
     setFixedHeight(height);
 }
@@ -423,9 +437,10 @@ void DrawPanel::showToolMessage(const QString& message, bool isError)
 
 void DrawPanel::clearToolMessage()
 {
-    if (!toolMessageLabel_ || !toolMessageLabel_->isVisible()) {
+    if (!toolMessageLabel_ || toolMessageLabel_->isHidden()) {
         return;
     }
+    if (toolMessageTimer_) toolMessageTimer_->stop();
     toolMessageLabel_->clear();
     toolMessageLabel_->setVisible(false);
     toolMessageLabel_->setToolTip(QString());
@@ -469,13 +484,20 @@ void DrawPanel::adjustPos()
     }
 
     int x = referRect_.x() + referRect_.width() - this->width();
-    int y = referRect_.y() + referRect_.height() + 2;
+    int y = referRect_.y() + referRect_.height();
+    bool above = false;
     const QRect screenRect = Util::desktopRect();
     if (x + this->width() > screenRect.width()) {
         x = screenRect.width() - this->width();
     }
     if (y + this->height() > screenRect.height()) {
-        y = referRect_.y() - this->height() - 2;
+        y = referRect_.y() - this->height();
+        above = true;
+    }
+    if (aboveSelection_ != above) {
+        aboveSelection_ = above;
+        refreshPanelHeight();
+        update();
     }
     x = qMax(x, 2);
     y = qMax(y, 2);
@@ -562,7 +584,8 @@ void DrawPanel::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::Antialiasing);
     const ThemeTokens& tokens = ThemeManager::tokens();
     const qreal inset = Util::scaleSize(4);
-    const QRectF surface = QRectF(rect()).adjusted(inset, inset, -inset, -inset);
+    const QRectF surface = QRectF(rect()).adjusted(inset, inset + (aboveSelection_ ? 0 : 2),
+                                                 -inset, -inset - (aboveSelection_ ? 2 : 0));
     const qreal radius = Util::scaleSize(24);
     painter.setPen(Qt::NoPen);
     QColor shadow = tokens.shadow;
@@ -588,6 +611,18 @@ void DrawPanel::hideEvent(QHideEvent *event)
 
 void DrawPanel::mouseReleaseEvent(QMouseEvent*event)
 {
+    event->accept();
+}
+
+void DrawPanel::mousePressEvent(QMouseEvent* event)
+{
+    event->accept();
+}
+
+void DrawPanel::mouseMoveEvent(QMouseEvent* event)
+{
+    // Transparent padding belongs to the toolbar too. Do not forward its
+    // hover events to the screenshot's selection/resize cursor handling.
     event->accept();
 }
 
