@@ -4,6 +4,25 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-27
+
+### Added
+
+- Added OCR text selection on pinned screenshots with a scanning animation and persistent corner indicators during selection.
+- Added configurable screenshot cursors, selection border colors and line styles, and magnifier crosshair colors.
+
+### Changed
+
+- Made general settings more compact with consistent label punctuation and aligned controls, placing startup, theme and language on one row and both capture shortcuts on another.
+- Grouped screenshot background opacity and pinned-image options together, separate from color settings.
+- Reduced annotation panel sizes and improved automatic border cropping with independent edge detection.
+
+### Fixed
+
+- Preserved text on the same OCR line when copying a selection.
+- Hid the screenshot overlay before composing clipboard images.
+- Improved annotation toolbar hover continuity and result message layout.
+
 ## [0.2.3] - 2026-10-24
 
 ### Changed
