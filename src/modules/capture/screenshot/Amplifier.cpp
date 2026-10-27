@@ -135,7 +135,7 @@ void AmplifierWidget::paintEvent(QPaintEvent *)
     /// 绘制十字
     // 使用通用DPI适配方法缩放画笔宽度
     int penWidth = Util::scaleSize(MULTIPLE);
-    painter.setPen(QPen(QColor(0, 180, 255, 180), penWidth));
+    painter.setPen(QPen(crossColor_, penWidth));
     /// 竖线;
     int penOffset = Util::scaleSize(MULTIPLE);
     painter.drawLine(QPoint((width() >> 1) + 1, 0), QPoint((width() >> 1) + 1, imageHeight_ - penOffset));

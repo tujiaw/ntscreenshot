@@ -83,6 +83,10 @@ public:
     void setScreenshotCursorStyle(ScreenshotCursorStyle style);
     QColor selectionBorderColor() const;
     void setSelectionBorderColor(const QColor& color);
+    Qt::PenStyle selectionBorderStyle() const;
+    void setSelectionBorderStyle(Qt::PenStyle style);
+    QColor amplifierCrossColor() const;
+    void setAmplifierCrossColor(const QColor& color);
 
     void setOpenCVMode(bool enable);
     bool openCVMode() const;

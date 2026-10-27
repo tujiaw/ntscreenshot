@@ -45,8 +45,31 @@ int runScreenshotSelectionTest(QApplication& app) {
     QTimer::singleShot(0, &app, [&] {
         const auto previousCursorStyle = manager.setting()->screenshotCursorStyle();
         const QColor previousBorderColor = manager.setting()->selectionBorderColor();
+        const auto previousBorderStyle = manager.setting()->selectionBorderStyle();
+        const QColor previousCrossColor = manager.setting()->amplifierCrossColor();
         const QColor testBorderColor(QStringLiteral("#AA44EE"));
         bool cursorOptionsOkay = true;
+        manager.setting()->setAmplifierCrossColor(QColor(QStringLiteral("#FF6633")));
+        {
+            SettingModel reloaded(nullptr);
+            const QColor expectedCrossColor(255, 102, 51, 180);
+            cursorOptionsOkay &= reloaded.amplifierCrossColor() == expectedCrossColor;
+            reloaded.setAmplifierCrossColor(QColor());
+            cursorOptionsOkay &= reloaded.amplifierCrossColor() == expectedCrossColor;
+        }
+        manager.setting()->setAmplifierCrossColor(previousCrossColor);
+        for (auto style : {Qt::SolidLine, Qt::DashLine, Qt::DotLine,
+                           Qt::DashDotLine, Qt::DashDotDotLine}) {
+            manager.setting()->setSelectionBorderStyle(style);
+            SettingModel reloaded(nullptr);
+            cursorOptionsOkay &= reloaded.selectionBorderStyle() == style;
+        }
+        for (auto invalid : {Qt::NoPen, Qt::CustomDashLine}) {
+            manager.setting()->setSelectionBorderStyle(invalid);
+            SettingModel reloaded(nullptr);
+            cursorOptionsOkay &= reloaded.selectionBorderStyle() == Qt::SolidLine;
+        }
+        manager.setting()->setSelectionBorderStyle(previousBorderStyle);
         for (auto style : {ScreenshotCursorStyle::Color, ScreenshotCursorStyle::Classic,
                            ScreenshotCursorStyle::Contrast, ScreenshotCursorStyle::System}) {
             manager.setting()->setScreenshotCursorStyle(style);

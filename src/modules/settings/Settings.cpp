@@ -193,6 +193,8 @@ Settings::Settings(WindowManager* windowManager, QWidget *parent)
     initThemeSelector();
     initCursorSelector();
     initSelectionBorderColor();
+    initAmplifierCrossColor();
+    arrangeGeneralSettings();
     qInfo() << "Settings: initThemeSelector done";
 
     initLocalSearchTab();
@@ -272,6 +274,126 @@ void Settings::keyPressEvent(QKeyEvent *event)
         return;
     }
     QDialog::keyPressEvent(event);
+}
+
+void Settings::arrangeGeneralSettings()
+{
+    auto widgetsInRow = [this](const char* name) {
+        QList<QWidget*> widgets;
+        auto* layout = findChild<QHBoxLayout*>(QLatin1String(name));
+        if (layout) {
+            for (int i = 0; i < layout->count(); ++i) {
+                if (auto* widget = layout->itemAt(i)->widget()) widgets.append(widget);
+            }
+        }
+        return widgets;
+    };
+    const auto theme = widgetsInRow("generalThemeRow");
+    const auto cursor = widgetsInRow("generalCursorRow");
+    const auto borderColor = widgetsInRow("generalBorderColorRow");
+    const auto borderStyle = widgetsInRow("generalBorderStyleRow");
+    const auto crossColor = widgetsInRow("generalCrossColorRow");
+
+    // Reuse the controls and their connections, replacing only the old row layouts.
+    std::function<void(QLayout*)> clearLayout = [&](QLayout* layout) {
+        while (auto* item = layout->takeAt(0)) {
+            if (auto* child = item->layout()) clearLayout(child);
+            delete item;
+        }
+    };
+    clearLayout(ui.verticalLayout_2);
+    ui.horizontalLayout_8->removeWidget(ui.label_8);
+    ui.horizontalLayout_8->setContentsMargins(0, 0, 0, 0);
+    ui.horizontalLayout_8->setSpacing(Util::scaleSize(12));
+    ui.label_8->setText(QCoreApplication::translate("App", "颜色格式"));
+    qobject_cast<QLabel*>(theme[0])->setText(QCoreApplication::translate("App", "主题"));
+    for (auto* label : {qobject_cast<QLabel*>(theme[0]), qobject_cast<QLabel*>(cursor[0]),
+                        qobject_cast<QLabel*>(borderColor[0]), qobject_cast<QLabel*>(borderStyle[0]),
+                        qobject_cast<QLabel*>(crossColor[0]), ui.label_8, ui.labelLanguage,
+                        ui.label, ui.label_2}) {
+        QString text = label->text().trimmed();
+        while (text.endsWith(QLatin1Char(':')) || text.endsWith(QChar(0xff1a))) text.chop(1);
+        label->setText(text + QCoreApplication::translate("App", "："));
+    }
+    ui.widget->setToolTip(QCoreApplication::translate("App", "颜色格式显示(C键复制颜色)："));
+    qobject_cast<QLabel*>(cursor[3])->setText(QCoreApplication::translate("App", "移到预览上查看"));
+    cursor[3]->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    borderColor[3]->hide();
+    crossColor[3]->hide();
+    borderStyle[3]->setStyleSheet(QStringLiteral("color: palette(mid);"));
+
+    auto* grid = new QGridLayout();
+    grid->setObjectName(QStringLiteral("generalSettingsGrid"));
+    grid->setHorizontalSpacing(Util::scaleSize(12));
+    grid->setVerticalSpacing(Util::scaleSize(6));
+    grid->setColumnStretch(3, 1);
+    const int controlWidth = Util::scaleSize(180);
+    for (QWidget* control : {static_cast<QWidget*>(cbCursor_),
+                            static_cast<QWidget*>(selectionBorderColorButton_),
+                            static_cast<QWidget*>(selectionBorderStyleCombo_),
+                            static_cast<QWidget*>(amplifierCrossColorButton_)}) {
+        control->setFixedWidth(controlWidth);
+    }
+    auto addRow = [grid](int row, const QList<QWidget*>& widgets) {
+        for (int column = 0; column < widgets.size(); ++column) {
+            grid->addWidget(widgets[column], row, column, Qt::AlignLeft | Qt::AlignVCenter);
+        }
+    };
+    auto* appearance = new QHBoxLayout();
+    appearance->setSpacing(Util::scaleSize(12));
+    appearance->addWidget(ui.cbAutoStart);
+    appearance->addSpacing(Util::scaleSize(12));
+    appearance->addWidget(theme[0]);
+    appearance->addWidget(cbTheme_);
+    appearance->addSpacing(Util::scaleSize(12));
+    appearance->addWidget(ui.labelLanguage);
+    appearance->addWidget(ui.cbLanguage);
+    appearance->addStretch();
+    for (auto* combo : {cbTheme_, ui.cbLanguage}) {
+        combo->setMinimumWidth(0);
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        combo->setFixedWidth(qMax(Util::scaleSize(76), combo->sizeHint().width() + Util::scaleSize(8)));
+    }
+    grid->addLayout(appearance, 0, 0, 1, 4);
+    addRow(1, cursor);
+    addRow(2, borderColor);
+    addRow(3, borderStyle);
+    addRow(4, crossColor);
+    grid->addWidget(ui.label_8, 5, 0, Qt::AlignLeft | Qt::AlignVCenter);
+    grid->addWidget(ui.widget, 5, 1, 1, 3);
+    auto* hotkeys = new QGridLayout();
+    hotkeys->setHorizontalSpacing(Util::scaleSize(12));
+    hotkeys->setColumnStretch(1, 1);
+    hotkeys->setColumnStretch(4, 1);
+    int labelWidth = 0;
+    for (auto* label : {theme[0], cursor[0], borderColor[0], borderStyle[0], crossColor[0],
+                        static_cast<QWidget*>(ui.label_8)}) {
+        labelWidth = qMax(labelWidth, label->sizeHint().width());
+    }
+    grid->setColumnMinimumWidth(0, labelWidth);
+    hotkeys->setColumnMinimumWidth(0, labelWidth);
+    ui.kseScreenshot->setMinimumWidth(Util::scaleSize(100));
+    ui.ksePin->setMinimumWidth(Util::scaleSize(100));
+    hotkeys->addWidget(ui.label, 0, 0);
+    hotkeys->addWidget(ui.kseScreenshot, 0, 1);
+    hotkeys->addWidget(ui.pbScreenshotStatus, 0, 2);
+    hotkeys->addWidget(ui.label_2, 0, 3);
+    hotkeys->addWidget(ui.ksePin, 0, 4);
+    hotkeys->addWidget(ui.pbPinStatus, 0, 5);
+    ui.labelTips->hide();
+    ui.kseScreenshot->setToolTip(ui.labelTips->toolTip());
+    ui.ksePin->setToolTip(ui.labelTips->toolTip());
+    grid->addLayout(hotkeys, 6, 0, 1, 4);
+    auto* pinOptions = new QHBoxLayout();
+    pinOptions->setSpacing(Util::scaleSize(20));
+    pinOptions->addWidget(ui.cbBackground);
+    pinOptions->addWidget(ui.hsBackgroundAlpha);
+    pinOptions->addWidget(ui.cbAutoPin);
+    pinOptions->addWidget(ui.cbPinNoBorder);
+    pinOptions->addStretch();
+    grid->addLayout(pinOptions, 7, 0, 1, 4);
+    ui.verticalLayout_2->addLayout(grid);
+    ui.verticalLayout_2->addStretch();
 }
 
 void Settings::applyModernLayout()
@@ -446,6 +568,7 @@ void Settings::readData()
     }
     refreshCursorPreview();
     refreshSelectionBorderColor();
+    refreshAmplifierCrossColor();
 
     bool autoSave = false;
     QString autoSavePath;
@@ -851,6 +974,7 @@ void Settings::initTablePath()
 void Settings::initThemeSelector()
 {
     QHBoxLayout *themeLayout = new QHBoxLayout();
+    themeLayout->setObjectName(QStringLiteral("generalThemeRow"));
     QLabel *themeLabel = new QLabel(QCoreApplication::translate("App", "皮肤:"), this);
     cbTheme_ = new QComboBox(this);
     cbTheme_->addItem(QCoreApplication::translate("App", "黑色"), static_cast<int>(AppTheme::Dark));
@@ -867,6 +991,7 @@ void Settings::initThemeSelector()
 void Settings::initCursorSelector()
 {
     auto* row = new QHBoxLayout();
+    row->setObjectName(QStringLiteral("generalCursorRow"));
     auto* label = new QLabel(QCoreApplication::translate("App", "截图光标"), this);
     cbCursor_ = new QComboBox(this);
     cbCursor_->setObjectName(QStringLiteral("screenshotCursorSelector"));
@@ -914,6 +1039,7 @@ void Settings::refreshCursorPreview()
 void Settings::initSelectionBorderColor()
 {
     auto* row = new QHBoxLayout();
+    row->setObjectName(QStringLiteral("generalBorderColorRow"));
     row->addWidget(new QLabel(QCoreApplication::translate("App", "框选边框颜色"), this));
     selectionBorderColorButton_ = new QPushButton(this);
     selectionBorderColorButton_->setObjectName(QStringLiteral("selectionBorderColorButton"));
@@ -926,6 +1052,31 @@ void Settings::initSelectionBorderColor()
     row->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
     row->addStretch();
     ui.verticalLayout_2->insertLayout(3, row);
+    auto* styleRow = new QHBoxLayout();
+    styleRow->setObjectName(QStringLiteral("generalBorderStyleRow"));
+    styleRow->addWidget(new QLabel(QCoreApplication::translate("App", "框选边框样式"), this));
+    selectionBorderStyleCombo_ = new QComboBox(this);
+    selectionBorderStyleCombo_->setObjectName(QStringLiteral("selectionBorderStyleCombo"));
+    selectionBorderStyleCombo_->setMinimumWidth(Util::scaleSize(140));
+    selectionBorderStyleCombo_->addItem(QCoreApplication::translate("App", "实线"), int(Qt::SolidLine));
+    selectionBorderStyleCombo_->addItem(QCoreApplication::translate("App", "虚线"), int(Qt::DashLine));
+    selectionBorderStyleCombo_->addItem(QCoreApplication::translate("App", "点线"), int(Qt::DotLine));
+    selectionBorderStyleCombo_->addItem(QCoreApplication::translate("App", "点划线"), int(Qt::DashDotLine));
+    selectionBorderStyleCombo_->addItem(QCoreApplication::translate("App", "双点划线"), int(Qt::DashDotDotLine));
+    styleRow->addWidget(selectionBorderStyleCombo_);
+    auto* resetStyle = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
+    styleRow->addWidget(resetStyle);
+    styleRow->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
+    styleRow->addStretch();
+    ui.verticalLayout_2->insertLayout(4, styleRow);
+    connect(selectionBorderStyleCombo_, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index < 0) return;
+        windowManager_->setting()->setSelectionBorderStyle(
+            static_cast<Qt::PenStyle>(selectionBorderStyleCombo_->itemData(index).toInt()));
+    });
+    connect(resetStyle, &QPushButton::clicked, this, [this] {
+        selectionBorderStyleCombo_->setCurrentIndex(selectionBorderStyleCombo_->findData(int(Qt::SolidLine)));
+    });
     connect(selectionBorderColorButton_, &QPushButton::clicked, this, [this] {
         const QColor color = QColorDialog::getColor(windowManager_->setting()->selectionBorderColor(), this,
             QCoreApplication::translate("App", "选择框选边框颜色"));
@@ -941,12 +1092,56 @@ void Settings::initSelectionBorderColor()
 
 void Settings::refreshSelectionBorderColor()
 {
+    if (selectionBorderStyleCombo_) {
+        const QSignalBlocker blocker(selectionBorderStyleCombo_);
+        selectionBorderStyleCombo_->setCurrentIndex(selectionBorderStyleCombo_->findData(
+            int(windowManager_->setting()->selectionBorderStyle())));
+    }
     if (!selectionBorderColorButton_) return;
     const QColor color = windowManager_->setting()->selectionBorderColor();
     QPixmap swatch(Util::scaleSize(18), Util::scaleSize(18));
     swatch.fill(color);
     selectionBorderColorButton_->setIcon(QIcon(swatch));
     selectionBorderColorButton_->setText(color.name(QColor::HexRgb).toUpper());
+}
+
+void Settings::initAmplifierCrossColor()
+{
+    auto* row = new QHBoxLayout();
+    row->setObjectName(QStringLiteral("generalCrossColorRow"));
+    row->addWidget(new QLabel(QCoreApplication::translate("App", "放大器十字颜色"), this));
+    amplifierCrossColorButton_ = new QPushButton(this);
+    amplifierCrossColorButton_->setObjectName(QStringLiteral("amplifierCrossColorButton"));
+    amplifierCrossColorButton_->setMinimumWidth(Util::scaleSize(140));
+    amplifierCrossColorButton_->setToolTip(QCoreApplication::translate("App", "选择放大器十字颜色"));
+    row->addWidget(amplifierCrossColorButton_);
+    auto* reset = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
+    reset->setObjectName(QStringLiteral("resetAmplifierCrossColorButton"));
+    row->addWidget(reset);
+    row->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
+    row->addStretch();
+    ui.verticalLayout_2->insertLayout(5, row);
+    connect(amplifierCrossColorButton_, &QPushButton::clicked, this, [this] {
+        const QColor color = QColorDialog::getColor(windowManager_->setting()->amplifierCrossColor(), this,
+            QCoreApplication::translate("App", "选择放大器十字颜色"));
+        if (!color.isValid()) return;
+        windowManager_->setting()->setAmplifierCrossColor(color);
+        refreshAmplifierCrossColor();
+    });
+    connect(reset, &QPushButton::clicked, this, [this] {
+        windowManager_->setting()->setAmplifierCrossColor(Style::AMPLIFIER_CROSS_COLOR);
+        refreshAmplifierCrossColor();
+    });
+}
+
+void Settings::refreshAmplifierCrossColor()
+{
+    if (!amplifierCrossColorButton_) return;
+    const QColor color = windowManager_->setting()->amplifierCrossColor();
+    QPixmap swatch(Util::scaleSize(18), Util::scaleSize(18));
+    swatch.fill(QColor(color.name(QColor::HexRgb)));
+    amplifierCrossColorButton_->setIcon(QIcon(swatch));
+    amplifierCrossColorButton_->setText(color.name(QColor::HexRgb).toUpper());
 }
 
 void Settings::updateScreenshotGlobalKey()

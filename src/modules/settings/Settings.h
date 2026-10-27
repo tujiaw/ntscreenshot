@@ -30,6 +30,8 @@ private:
     void refreshCursorPreview();
     void initSelectionBorderColor();
     void refreshSelectionBorderColor();
+    void initAmplifierCrossColor();
+    void refreshAmplifierCrossColor();
     void updateScreenshotGlobalKey();
     void updatePinKey();
 
@@ -56,6 +58,7 @@ private:
     void updateHttpPortWarning();
     void showHttpServerError(const QString& title, const QString& detail);
     void applyModernLayout();
+    void arrangeGeneralSettings();
     void loadLocalSearchSettings();
 
 private:
@@ -66,6 +69,8 @@ private:
     class QComboBox* cbCursor_ = nullptr;
     class QLabel* cursorPreview_ = nullptr;
     class QPushButton* selectionBorderColorButton_ = nullptr;
+    class QComboBox* selectionBorderStyleCombo_ = nullptr;
+    class QPushButton* amplifierCrossColorButton_ = nullptr;
 
     class QListWidget* listLocalSearchRoots_ = nullptr;
     class QPlainTextEdit* teLocalSearchExcludes_ = nullptr;

@@ -33,6 +33,8 @@ static const QString KEY_PIN_NO_BORDER  = "PIN_NO_BORDER";
 static const QString KEY_RGB_COLOR      = "RGB_COLOR";
 static const QString KEY_SCREENSHOT_CURSOR = "SCREENSHOT/CURSOR_STYLE";
 static const QString KEY_SELECTION_BORDER_COLOR = "SCREENSHOT/SELECTION_BORDER_COLOR";
+static const QString KEY_SELECTION_BORDER_STYLE = "SCREENSHOT/SELECTION_BORDER_STYLE";
+static const QString KEY_AMPLIFIER_CROSS_COLOR = "SCREENSHOT/AMPLIFIER_CROSS_COLOR";
 static const QString KEY_OPENCV_MODE    = "OPENCV_MODE";
 static const QString KEY_AUTO_SAVE      = "AUTO_SAVE";
 static const QString KEY_AUTO_SAVE_PATH = "AUTO_SAVE_PATH";
@@ -135,6 +137,8 @@ void SettingModel::revertDefault()
     setThemeMode(AppTheme::Dark);
     setScreenshotCursorStyle(ScreenshotCursorStyle::Color);
     setSelectionBorderColor(Style::DRAW_SELECTED_BORDER_COLOR);
+    setSelectionBorderStyle(Qt::SolidLine);
+    setAmplifierCrossColor(Style::AMPLIFIER_CROSS_COLOR);
 
     setPaddleOcrConfig({false, DEFAULT_OCR_JOB_URL, QString(), DEFAULT_OCR_MODEL});
     settings_.sync();
@@ -467,6 +471,32 @@ void SettingModel::setSelectionBorderColor(const QColor& color)
     settings_.setValue(KEY_SELECTION_BORDER_COLOR, color.name(QColor::HexRgb));
     const QColor current = selectionBorderColor();
     if (current != previous) emit selectionBorderColorChanged(current);
+}
+
+Qt::PenStyle SettingModel::selectionBorderStyle() const
+{
+    const int style = settings_.value(KEY_SELECTION_BORDER_STYLE, int(Qt::SolidLine)).toInt();
+    return style >= Qt::SolidLine && style <= Qt::DashDotDotLine
+        ? static_cast<Qt::PenStyle>(style) : Qt::SolidLine;
+}
+
+void SettingModel::setSelectionBorderStyle(Qt::PenStyle style)
+{
+    settings_.setValue(KEY_SELECTION_BORDER_STYLE,
+        int(style >= Qt::SolidLine && style <= Qt::DashDotDotLine ? style : Qt::SolidLine));
+}
+
+QColor SettingModel::amplifierCrossColor() const
+{
+    QColor color(settings_.value(KEY_AMPLIFIER_CROSS_COLOR, Style::AMPLIFIER_CROSS_COLOR.name()).toString());
+    if (!color.isValid()) return Style::AMPLIFIER_CROSS_COLOR;
+    color.setAlpha(Style::AMPLIFIER_CROSS_COLOR.alpha());
+    return color;
+}
+
+void SettingModel::setAmplifierCrossColor(const QColor& color)
+{
+    if (color.isValid()) settings_.setValue(KEY_AMPLIFIER_CROSS_COLOR, color.name(QColor::HexRgb));
 }
 
 void SettingModel::setOpenCVMode(bool enable)

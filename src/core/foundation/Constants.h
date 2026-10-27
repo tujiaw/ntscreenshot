@@ -27,6 +27,7 @@ namespace WidgetID {
 }
 
 namespace Style {
+    const QColor AMPLIFIER_CROSS_COLOR = QColor(0, 180, 255, 180);
     const QColor AUTO_SELECTED_BORDER_COLOR = QColor("#1AAD19"); //QColor(0, 175, 255);
 	const int AUTO_SELECTED_BORDER_WIDTH = 4;
     const QColor  DRAW_SELECTED_BORDER_COLOR = QColor("#1AAD19"); //QColor(0, 174, 255)

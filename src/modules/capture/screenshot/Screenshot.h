@@ -134,6 +134,7 @@ private:
     bool useOpenCVMode_;
     ScreenshotCursorStyle cursorStyle_ = ScreenshotCursorStyle::Color;
     QColor selectionBorderColor_;
+    Qt::PenStyle selectionBorderStyle_ = Qt::SolidLine;
 
     // 交互状态
     enum DIRECTION {

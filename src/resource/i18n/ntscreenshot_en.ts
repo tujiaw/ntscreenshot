@@ -2,6 +2,18 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>主题</source><translation>Theme</translation></message>
+    <message><source>：</source><translation>:</translation></message>
+    <message><source>移到预览上查看</source><translation>Hover over the preview to try it</translation></message>
+    <message><source>颜色格式</source><translation>Color format</translation></message>
+    <message><source>放大器十字颜色</source><translation>Magnifier crosshair color</translation></message>
+    <message><source>选择放大器十字颜色</source><translation>Choose magnifier crosshair color</translation></message>
+    <message><source>框选边框样式</source><translation>Selection border style</translation></message>
+    <message><source>实线</source><translation>Solid</translation></message>
+    <message><source>虚线</source><translation>Dashed</translation></message>
+    <message><source>点线</source><translation>Dotted</translation></message>
+    <message><source>点划线</source><translation>Dash-dot</translation></message>
+    <message><source>双点划线</source><translation>Dash-dot-dot</translation></message>
     <message><source>框选边框颜色</source><translation>Selection border color</translation></message>
     <message><source>选择框选边框颜色</source><translation>Choose selection border color</translation></message>
     <message><source>下次截图生效</source><translation>Applies to the next screenshot</translation></message>

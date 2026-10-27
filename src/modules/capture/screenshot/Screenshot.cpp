@@ -102,6 +102,7 @@ ScreenshotWidget::ScreenshotWidget(WindowManager* windowManager, QWidget *parent
         useOpenCVMode_ = windowManager_->setting()->openCVMode();
         cursorStyle_ = windowManager_->setting()->screenshotCursorStyle();
         selectionBorderColor_ = windowManager_->setting()->selectionBorderColor();
+        selectionBorderStyle_ = windowManager_->setting()->selectionBorderStyle();
     }
 
 	// 初始化鼠标
@@ -241,6 +242,7 @@ void ScreenshotWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 void ScreenshotWidget::initAmplifier(std::shared_ptr<QPixmap> originPainting)
 {
     amplifierTool_.reset(new AmplifierWidget(originPainting, this));
+    amplifierTool_->setCrossColor(windowManager_->setting()->amplifierCrossColor());
     connect(this, SIGNAL(sigCursorPosChanged(int, int)), amplifierTool_.get(), SLOT(onPositionChanged(int, int)));
 	amplifierTool_->setRgbColor(IS_RGB_COLOR);
     amplifierTool_->setOpenCVMode(useOpenCVMode_);
@@ -810,11 +812,10 @@ void ScreenshotWidget::paintEvent(QPaintEvent *) {
 
         if (!getEsthesiaRect().isEmpty()) {
             /// 绘制选区
-            QPen pen = painter.pen();
-            pen.setColor(selectionBorderColor_);
-            pen.setWidth(Style::AUTO_SELECTED_BORDER_WIDTH);
+            const int bw = Style::AUTO_SELECTED_BORDER_WIDTH;
+            QPen pen(selectionBorderColor_, bw, selectionBorderStyle_);
             painter.setPen(pen);
-            int padding = Style::AUTO_SELECTED_BORDER_WIDTH / 2;
+            const int padding = bw / 2;
             QRect borderRect = getEsthesiaRect() - QMargins(padding, padding, padding, padding);
             painter.drawRect(borderRect);
             QRect imageRect = borderRect - QMargins(padding, padding, padding, padding);
@@ -834,7 +835,7 @@ void ScreenshotWidget::paintEvent(QPaintEvent *) {
             }
             
             /// 绘制边框线
-            QPen pen(selectionBorderColor_, bw);
+            QPen pen(selectionBorderColor_, bw, selectionBorderStyle_);
             painter.setPen(pen);
             painter.drawRect(currentRect_ - QMargins(bw/2, bw/2, bw/2, bw/2));
             
