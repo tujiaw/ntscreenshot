@@ -53,6 +53,22 @@ int main(int argc, char** argv)
     CHECK(result.selectedText(0, 1) == QStringLiteral("hello world"));
     CHECK(result.selectedText(2, 0) == QStringLiteral("hello world\n你"));
     CHECK(result.selectedText(-1, 0).isEmpty());
+    // OCR may return separate blocks on the same visual row, in arbitrary order.
+    const auto splitRows = OcrResult::parse(R"({"rec_texts":["right","next","left"],
+        "rec_boxes":[[80,11,120,21],[10,30,50,40],[10,10,50,20]]})");
+    CHECK(splitRows.selectedText(0, 2) == QStringLiteral("left right\nnext"));
+    CHECK(splitRows.selectedText(2, 0) == QStringLiteral("left right\nnext"));
+    CHECK(splitRows.selectedText(0, 0) == QStringLiteral("right"));
+    const auto touchingRows = OcrResult::parse(R"({"rec_texts":["upper","lower"],
+        "rec_boxes":[[10,10,50,20],[70,19,110,29]]})");
+    CHECK(touchingRows.selectedText(0, 1) == QStringLiteral("upper\nlower"));
+    const auto splitWords = OcrResult::parse(R"({"rec_texts":["hello  world","你好"],
+        "rec_boxes":[[10,10,70,20],[90,8,120,22]],
+        "text_word":[["hello","world"],["你","好"]],
+        "text_word_boxes":[[[10,10,30,20],[40,10,70,20]],[[90,8,105,22],[105,8,120,22]]]})");
+    CHECK(splitWords.selectedText(0, 3) == QStringLiteral("hello  world 你好"));
+    CHECK(splitWords.selectedText(1, 2) == QStringLiteral("world 你"));
+    CHECK(splitWords.selectedText(2, 1) == QStringLiteral("world 你"));
     CHECK(OcrResult::parse("not json").spans.isEmpty());
     CHECK(OcrResult::parse(QJsonDocument::fromJson(fixture).toJson(QJsonDocument::Compact) + '\n' + QJsonDocument::fromJson(fixture).toJson(QJsonDocument::Compact)).spans.size() == 8);
     CHECK(OcrResult::parse(R"({"rec_texts":["line"],"rec_boxes":[[1,2,30,12]]})").spans.size() == 1);
@@ -120,6 +136,13 @@ int main(int argc, char** argv)
     mouse(overlay, QEvent::MouseButtonRelease, {3, 31}, Qt::LeftButton, Qt::NoButton);
     CHECK(overlay.selectedText().isEmpty());
     overlay.setImageDisplayRect(QRectF());
+    overlay.reset();
+
+    // Exercise the actual copy action with disjoint OCR blocks on one row.
+    overlay.setResult(splitRows, QSize(200, 120));
+    key(overlay, Qt::Key_A, Qt::ControlModifier);
+    key(overlay, Qt::Key_C, Qt::ControlModifier);
+    CHECK(QApplication::clipboard()->text() == QStringLiteral("left right\nnext"));
     overlay.reset();
 
     // Exercise the complete async job -> poll -> result path against a local mock.

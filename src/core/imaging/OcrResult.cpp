@@ -105,14 +105,60 @@ QString OcrResult::selectedText(int first, int last) const
 {
     if (first < 0 || last < 0 || first >= spans.size() || last >= spans.size()) return {};
     if (first > last) std::swap(first, last);
-    QStringList parts;
+    struct Fragment {
+        QString text;
+        QRectF bounds;
+    };
+    QVector<Fragment> fragments;
     for (int i = first; i <= last;) {
         const auto& begin = spans[i];
         int end = i;
         while (end < last && spans[end + 1].line == begin.line) ++end;
-        parts.push_back(lines[begin.line].mid(begin.start,
-            spans[end].start + spans[end].length - begin.start));
+        QRectF bounds = begin.polygon.boundingRect();
+        for (int j = i + 1; j <= end; ++j) bounds = bounds.united(spans[j].polygon.boundingRect());
+        fragments.push_back({lines[begin.line].mid(begin.start,
+            spans[end].start + spans[end].length - begin.start), bounds});
         i = end + 1;
+    }
+
+    // OCR block indices are not visual line numbers. Use vertical overlap to
+    // join separate blocks, allowing small differences in their baselines.
+    std::stable_sort(fragments.begin(), fragments.end(), [](const Fragment& a, const Fragment& b) {
+        return a.bounds.center().y() < b.bounds.center().y();
+    });
+    struct Row {
+        QRectF reference;
+        QVector<Fragment> fragments;
+    };
+    QVector<Row> rows;
+    for (const auto& fragment : fragments) {
+        int bestRow = -1;
+        qreal bestDistance = 0;
+        for (int i = 0; i < rows.size(); ++i) {
+            const auto& reference = rows[i].reference;
+            const qreal overlap = std::min(reference.bottom(), fragment.bounds.bottom())
+                - std::max(reference.top(), fragment.bounds.top());
+            const qreal distance = std::abs(reference.center().y() - fragment.bounds.center().y());
+            if (overlap > 0 && overlap >= std::min(reference.height(), fragment.bounds.height()) * 0.5
+                && distance <= std::max(reference.height(), fragment.bounds.height()) * 0.5
+                && (bestRow < 0 || distance < bestDistance)) {
+                bestRow = i;
+                bestDistance = distance;
+            }
+        }
+        // Keep a fixed reference so a chain of overlapping boxes cannot
+        // progressively pull adjacent lines into the same row.
+        if (bestRow < 0) rows.push_back({fragment.bounds, {fragment}});
+        else rows[bestRow].fragments.push_back(fragment);
+    }
+    QStringList parts;
+    for (auto& row : rows) {
+        std::stable_sort(row.fragments.begin(), row.fragments.end(), [](const Fragment& a, const Fragment& b) {
+            return a.bounds.left() < b.bounds.left();
+        });
+        QStringList blocks;
+        for (const auto& fragment : row.fragments) blocks.push_back(fragment.text);
+        parts.push_back(blocks.join(QLatin1Char(' ')));
     }
     return parts.join(QLatin1Char('\n'));
 }
