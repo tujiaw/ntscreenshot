@@ -250,6 +250,7 @@ void OcrSelectionOverlay::paintEvent(QPaintEvent*)
     const QRectF display = imageDisplayRect();
     painter.setClipRect(display);
     if (isRecognizing()) {
+        painter.save();
         painter.translate(display.topLeft());
         painter.fillRect(QRectF(QPointF(0, 0), display.size()), QColor(8, 18, 36, 30));
         const qreal progress = (scanElapsed_.elapsed() % 1800) / 1800.0;
@@ -263,13 +264,7 @@ void OcrSelectionOverlay::paintEvent(QPaintEvent*)
         painter.drawLine(QPointF(0, y), QPointF(display.width(), y));
         painter.setPen(QPen(QColor(150, 225, 255, 240), 2));
         painter.drawLine(QPointF(0, y), QPointF(display.width(), y));
-        painter.setPen(QPen(QColor(85, 175, 255, 220), 2));
-        const qreal corner = std::min({20.0, display.width() / 4.0, display.height() / 4.0});
-        for (const QPointF& point : {QPointF(2, 2), QPointF(display.width() - 2, 2),
-                                     QPointF(2, display.height() - 2), QPointF(display.width() - 2, display.height() - 2)}) {
-            painter.drawLine(point, point + QPointF(point.x() < display.width() / 2.0 ? corner : -corner, 0));
-            painter.drawLine(point, point + QPointF(0, point.y() < display.height() / 2.0 ? corner : -corner));
-        }
+        painter.restore();
     } else if (anchor_ >= 0 && extent_ >= 0 && !imageSize_.isEmpty()) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(45, 125, 230, 90));
@@ -282,6 +277,16 @@ void OcrSelectionOverlay::paintEvent(QPaintEvent*)
             painter.drawPolygon(selectedLinePolygon(result_, i, end, transform));
             i = end + 1;
         }
+    }
+
+    // Keep the OCR corners visible throughout text selection as a mode indicator.
+    painter.translate(display.topLeft());
+    painter.setPen(QPen(QColor(85, 175, 255, 220), 2));
+    const qreal corner = std::min({20.0, display.width() / 4.0, display.height() / 4.0});
+    for (const QPointF& point : {QPointF(2, 2), QPointF(display.width() - 2, 2),
+                                 QPointF(2, display.height() - 2), QPointF(display.width() - 2, display.height() - 2)}) {
+        painter.drawLine(point, point + QPointF(point.x() < display.width() / 2.0 ? corner : -corner, 0));
+        painter.drawLine(point, point + QPointF(0, point.y() < display.height() / 2.0 ? corner : -corner));
     }
 }
 
