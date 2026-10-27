@@ -44,6 +44,12 @@
 #include <opencv2/opencv.hpp>
 
 namespace {
+constexpr int ToolbarButtonSize = 32;
+constexpr int ToolbarIconSize = 18;
+constexpr int ToolbarHeight = 44;
+constexpr int CopyButtonMinWidth = 72;
+constexpr int CopyButtonContentPadding = 42;
+
 class AnnotationButton : public QPushButton
 {
 public:
@@ -140,7 +146,7 @@ DrawPanel::DrawPanel(SettingModel* settings, QWidget *parent, QWidget *drawWidge
     setupButtonGroup();
     setupPanels();
     setupButtonsAndLayout(parent != nullptr);
-    this->setFixedHeight(Util::scaleSize(56) + 2);
+    this->setFixedHeight(Util::scaleSize(ToolbarHeight) + 2);
 }
 
 void DrawPanel::setupButtonGroup()
@@ -154,8 +160,8 @@ void DrawPanel::setupButtonGroup()
 void DrawPanel::setupPanels()
 {
     // 使用通用DPI适配方法调整按钮大小
-    const int btnSize = Util::scaleSize(40);
-    const int iconSize = Util::scaleSize(20);
+    const int btnSize = Util::scaleSize(ToolbarButtonSize);
+    const int iconSize = Util::scaleSize(ToolbarIconSize);
 
     pbFont_ = new AnnotationButton(AnnotationIcon::icon("color.png"), "", this);
     pbFont_->setCheckable(true);
@@ -192,8 +198,8 @@ void DrawPanel::setupPanels()
 void DrawPanel::setupButtonsAndLayout(bool hasParent)
 {
     // 使用通用DPI适配方法计算尺寸
-    const int btnSize = Util::scaleSize(40);
-    const int iconSize = Util::scaleSize(20);
+    const int btnSize = Util::scaleSize(ToolbarButtonSize);
+    const int iconSize = Util::scaleSize(ToolbarIconSize);
 
     auto createSeparator = [this, btnSize]() -> QFrame* {
         auto* separator = new QFrame(this);
@@ -296,8 +302,8 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     btns_.push_back(qMakePair(pbMosaic, mosaicMode));
 
     QHBoxLayout *hLayout = new QHBoxLayout();
-    hLayout->setContentsMargins(Util::scaleSize(12), Util::scaleSize(8),
-                                Util::scaleSize(12), Util::scaleSize(8));
+    hLayout->setContentsMargins(Util::scaleSize(8), Util::scaleSize(6),
+                                Util::scaleSize(8), Util::scaleSize(6));
     hLayout->setSpacing(Util::scaleSize(2));
     hLayout->addWidget(pbFont_);
     // Keep every drawing tool together, including mosaic.
@@ -335,7 +341,7 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
         button->setAccessibleName(button->toolTip());
         button->ensurePolished();
         const int buttonWidth = button == pbFinished
-            ? qMax(Util::scaleSize(88), button->fontMetrics().horizontalAdvance(button->text()) + Util::scaleSize(52))
+            ? qMax(Util::scaleSize(CopyButtonMinWidth), button->fontMetrics().horizontalAdvance(button->text()) + Util::scaleSize(CopyButtonContentPadding))
             : btnSize;
         button->setFixedSize(buttonWidth, btnSize);
     }
@@ -370,7 +376,7 @@ void DrawPanel::applyCurrentStyle(DrawMode &mode) const
 
 void DrawPanel::refreshPanelHeight()
 {
-    const int toolbarHeight = Util::scaleSize(56);
+    const int toolbarHeight = Util::scaleSize(ToolbarHeight);
     // Keep the existing 2px visual gap inside the toolbar's mouse region.
     // Its window starts immediately outside the selection, never over its edge.
     constexpr int bridge = 2;
@@ -468,14 +474,14 @@ void DrawPanel::adjustPos()
     if (qAbs(currentScale - lastScaleFactor) > 0.01) {
         lastScaleFactor = currentScale;
         
-        const int btnSize = Util::scaleSize(40);
-        const int iconSize = Util::scaleSize(20);
+        const int btnSize = Util::scaleSize(ToolbarButtonSize);
+        const int iconSize = Util::scaleSize(ToolbarIconSize);
         
         QList<QPushButton*> btns = this->findChildren<QPushButton*>();
         for (QPushButton* btn : btns) {
             if (btn->parent() == this) {
                 const int buttonWidth = btn->objectName() == QStringLiteral("DrawPanelCopyButton")
-                    ? qMax(Util::scaleSize(88), btn->fontMetrics().horizontalAdvance(btn->text()) + Util::scaleSize(52))
+                    ? qMax(Util::scaleSize(CopyButtonMinWidth), btn->fontMetrics().horizontalAdvance(btn->text()) + Util::scaleSize(CopyButtonContentPadding))
                     : btnSize;
                 btn->setFixedSize(buttonWidth, btnSize);
                 if (!btn->icon().isNull()) {
@@ -598,7 +604,7 @@ void DrawPanel::paintEvent(QPaintEvent *event)
     const qreal inset = Util::scaleSize(4);
     const QRectF surface = QRectF(rect()).adjusted(inset, inset + (aboveSelection_ ? 0 : 2),
                                                  -inset, -inset - (aboveSelection_ ? 2 : 0));
-    const qreal radius = Util::scaleSize(24);
+    const qreal radius = Util::scaleSize(18);
     painter.setPen(Qt::NoPen);
     QColor shadow = tokens.shadow;
     shadow.setAlpha(tokens.theme == AppTheme::Dark ? 50 : 14);
