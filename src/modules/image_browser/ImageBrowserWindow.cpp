@@ -954,9 +954,16 @@ void ImageBrowserWindow::loadImage(const QString& path) {
         updateActions();
     });
 }
-void ImageBrowserWindow::stopMovie() {
+void ImageBrowserWindow::stopMovie(bool releaseImmediately) {
     resumeMovie_ = false;
-    if (movie_) { movie_->stop(); movie_->deleteLater(); movie_ = nullptr; }
+    if (!movie_) return;
+    auto* movie = movie_;
+    movie_ = nullptr;
+    movie->stop();
+    // QMovie::stop() keeps its image reader (and file handle) open. Deletion
+    // needs synchronous release; movie error callbacks must defer destruction.
+    if (releaseImmediately) delete movie;
+    else movie->deleteLater();
 }
 void ImageBrowserWindow::freezeFrame(std::function<void()> after) {
     if (!movie_ || movie_->currentImage().isNull()) return;
@@ -1229,15 +1236,17 @@ void ImageBrowserWindow::deleteImage() {
         if (row + 1 < model_->rowCount()) next = model_->pathAt(row + 1);
         else if (row > 0) next = model_->pathAt(row - 1);
     }
+    const bool hadMovie = movie_ != nullptr;
+    stopMovie(true);
     QString error;
     if (!QFile::moveToTrash(path, &error)) {
+        if (hadMovie) loadImage(path);
         QMessageBox::warning(this, tr("删除图片"), tr("无法删除「%1」。\n%2").arg(
             name, error.isEmpty() ? tr("文件可能正被占用。") : error));
         return;
     }
     // 先清空文档再刷新，否则 listingReady 会把这个已经不存在的路径又选中一次。
     loadGeneration_->store(++imageVersion_);
-    stopMovie();
     document_ = {};
     displayedSize_ = {};
     animationSource_ = false;

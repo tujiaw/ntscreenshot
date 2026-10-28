@@ -12,6 +12,7 @@ public:
 
 signals:
     void sigClose();
+    void sigScreenshotCompleted(const QPixmap &pixmap);
 
 public slots:
     void onUploadRequested(const QPixmap &pixmap);

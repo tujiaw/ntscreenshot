@@ -2,6 +2,7 @@
 #include "app/ModuleRegistry.h"
 #include "modules/capture/CaptureModule.h"
 #include "modules/capture/screenshot/Screenshot.h"
+#include "modules/capture/screenshot/ScreenshotActionController.h"
 #include "modules/capture/annotation/DrawPanel.h"
 #include "core/theme/ThemeManager.h"
 #include "core/settings/SettingModel.h"
@@ -26,10 +27,96 @@
 #include <QEnterEvent>
 #include <QPainter>
 #include <QWheelEvent>
+#include <QTemporaryDir>
+#include <QFile>
+#include "shared/ui/TipsWidget.h"
 #include "core/platform/Util.h"
 #include "shared/ui/FramelessWidget.h"
 
+static int runScreenshotAutoSaveTest(QApplication& app) {
+    app.setApplicationName(QStringLiteral("ntscreenshot-auto-save-test"));
+    app.setQuitOnLastWindowClosed(false);
+    QTemporaryDir temporary;
+    if (!temporary.isValid()) return 1;
+    WindowManager manager;
+    CaptureModule capture(&manager);
+    const QString directory = temporary.path() + QStringLiteral("/截图/nested");
+    QPixmap image(32, 24);
+    image.fill(Qt::magenta);
+    QPainter painter(&image);
+    painter.fillRect(5, 6, 9, 8, Qt::green);
+    painter.end();
+    bool okay = true;
+    auto check = [&](bool condition, const char* message) {
+        if (!condition) qWarning() << "Auto-save test failed:" << message;
+        okay &= condition;
+    };
+    auto flush = [] {
+        QApplication::processEvents();
+        QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    };
+    auto complete = [&](bool sticker = false, bool cancel = false, bool nullImage = false) {
+        capture.openScreenshot();
+        ScreenshotActionController* controller = nullptr;
+        for (QWidget* widget : QApplication::topLevelWidgets()) {
+            if (auto* screenshot = qobject_cast<ScreenshotWidget*>(widget))
+                controller = screenshot->findChild<ScreenshotActionController*>();
+        }
+        check(controller != nullptr, "action controller exists");
+        if (!controller) return;
+        if (cancel) controller->sigClose();
+        else if (sticker) controller->onStickerRequested(image, QPoint(10, 10));
+        else controller->onSaveToClipboardRequested(nullImage ? QPixmap() : image);
+        flush();
+    };
+    auto images = [&] { return QDir(directory).entryList({QStringLiteral("*.png")}, QDir::Files); };
+    manager.setting()->setAutoSaveImage(false, directory);
+    complete();
+    check(!QDir(directory).exists(), "disabled does not create a directory");
+    manager.setting()->setAutoSaveImage(true, directory);
+    complete();
+    check(images().size() == 1, "completion creates missing directories and a PNG");
+    check(QApplication::clipboard()->pixmap().toImage() == image.toImage(), "clipboard preserved");
+    complete();
+    complete(true);
+    check(images().size() == 3, "rapid captures and sticker create separate files");
+    for (const QString& name : images()) {
+        check(QImage(QDir(directory).filePath(name)).convertToFormat(QImage::Format_ARGB32)
+            == image.toImage().convertToFormat(QImage::Format_ARGB32), "saved pixels preserve annotations");
+    }
+    complete(false, true);
+    complete(false, false, true);
+    capture.closeScreenshot();
+    flush();
+    check(images().size() == 3, "cancel and empty image do not save");
+    const QString blocked = temporary.path() + QStringLiteral("/blocked");
+    QFile file(blocked);
+    check(file.open(QIODevice::WriteOnly), "create blocked directory fixture");
+    file.write("unchanged");
+    file.close();
+    manager.setting()->setAutoSaveImage(true, blocked + QStringLiteral("/child"));
+    complete();
+    bool failureVisible = false;
+    for (QWidget* widget : QApplication::topLevelWidgets()) {
+        if (auto* tip = qobject_cast<TipsWidget*>(widget)) {
+            failureVisible |= tip->isVisible() && tip->text().contains(blocked);
+            tip->close();
+        }
+    }
+    check(failureVisible, "failure is visible to the user");
+    check(QApplication::clipboard()->pixmap().toImage() == image.toImage(), "failure preserves clipboard");
+    check(file.open(QIODevice::ReadOnly) && file.readAll() == "unchanged", "failure does not damage existing files");
+    manager.setting()->setAutoSaveImage(false, directory);
+    for (PinWidget* pin : PinWidget::getAllSticker()) pin->parentWidget()->close();
+    capture.shutdown();
+    flush();
+    qInfo() << "Screenshot auto-save workflow:" << okay;
+    return okay ? 0 : 2;
+}
+
 int runScreenshotSelectionTest(QApplication& app) {
+    if (qEnvironmentVariableIsSet("NTSCREENSHOT_AUTO_SAVE_TEST"))
+        return runScreenshotAutoSaveTest(app);
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));
     app.setQuitOnLastWindowClosed(false);
     QSettings clean(Util::getConfigPath(), QSettings::IniFormat);

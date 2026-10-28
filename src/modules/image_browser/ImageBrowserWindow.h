@@ -64,7 +64,7 @@ private:
     void renderColor();
     void resizeImage();
     void freezeFrame(std::function<void()> after = {});
-    void stopMovie();
+    void stopMovie(bool releaseImmediately = false);
     void screenshotDirectory();
     void updateStatus();
     void toggleFullscreen();

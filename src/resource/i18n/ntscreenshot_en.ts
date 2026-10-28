@@ -2,6 +2,10 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>截图自动保存失败：%1
+%2</source><translation>Screenshot auto-save failed: %1
+%2</translation></message>
+    <message><source>无法创建保存目录</source><translation>Could not create the save directory</translation></message>
     <message><source>主题</source><translation>Theme</translation></message>
     <message><source>：</source><translation>:</translation></message>
     <message><source>移到预览上查看</source><translation>Hover over the preview to try it</translation></message>

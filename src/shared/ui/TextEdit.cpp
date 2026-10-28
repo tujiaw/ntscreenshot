@@ -1,6 +1,8 @@
 #include "TextEdit.h"
 #include <QTextDocument>
 #include <QKeyEvent>
+#include <QTextCursor>
+#include <QtMath>
 
 const int PADDING = 6;
 const int BASE_WIDTH = 50;
@@ -15,32 +17,23 @@ TextEdit::TextEdit(QWidget *parent)
     connect(this, &QTextEdit::textChanged, this, &TextEdit::onTextChanged);
     this->setFixedSize(BASE_WIDTH, BASE_HEIGHT);
     this->setLineWrapMode(QTextEdit::NoWrap);
-    this->document()->setDocumentMargin(0);
+    this->document()->setDocumentMargin(PADDING);
 }
 
 void TextEdit::onTextChanged()
 {
-    QFontMetrics fm = this->fontMetrics();
-    QStringList strList = this->toPlainText().split("\n");
-    int maxTextWidth = 0;
-    int maxTextHeight = 0;
-    for (const QString &line : strList) {
-        int w = fm.horizontalAdvance(line);
-        if (w > maxTextWidth) {
-            maxTextWidth = w;
-        }
-        maxTextHeight += fm.height() + 2;
-    }
-
-    int w = PADDING * 2 + maxTextWidth;
-    int h = PADDING * 2 + maxTextHeight;
+    // Document dimensions already include the same padding used to lay out
+    // the caret and text, including an empty line and mixed-font input.
+    const int w = qCeil(document()->idealWidth()) + 2 * frameWidth() + cursorWidth();
+    const int h = qCeil(document()->size().height()) + 2 * frameWidth();
     this->setFixedWidth(qMax(w, BASE_WIDTH));
     this->setFixedHeight(qMax(h, BASE_HEIGHT));
 }
 
 QPoint TextEdit::startCursorPoint()
 {
-    return viewport()->mapTo(parentWidget(), QPoint(0, 0));
+    const QTextCursor first(document());
+    return viewport()->mapTo(parentWidget(), cursorRect(first).topLeft());
 }
 
 void TextEdit::setStyle(const QFont &font, const QColor &color)
@@ -59,6 +52,8 @@ void TextEdit::setStyle(const QFont &font, const QColor &color)
     this->setFont(font);
     this->document()->setDefaultFont(font);
     this->setCurrentFont(font);
+    this->ensurePolished();
+    onTextChanged();
 }
 
 void TextEdit::keyPressEvent(QKeyEvent *e)

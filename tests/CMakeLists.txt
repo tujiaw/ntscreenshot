@@ -46,6 +46,15 @@ add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
     "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
     $<TARGET_FILE:ntscreenshot>)
 set_tests_properties(screenshot_selection_release PROPERTIES TIMEOUT 30)
+add_test(NAME screenshot_auto_save COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_SELECTION_TEST=1"
+    "NTSCREENSHOT_AUTO_SAVE_TEST=1"
+    "QT_FORCE_STDERR_LOGGING=1"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(screenshot_auto_save PROPERTIES TIMEOUT 30
+    RUN_SERIAL TRUE)
 
 add_test(NAME image_browser_workflow COMMAND ${CMAKE_COMMAND} -E env
     "NTSCREENSHOT_IMAGE_BROWSER_TEST=1"
@@ -89,6 +98,17 @@ add_executable(selection_keyboard_tests capture/SelectionKeyboardTest.cpp)
 target_include_directories(selection_keyboard_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(selection_keyboard_tests PRIVATE Qt6::Core)
 nt_add_qt_test(selection_keyboard selection_keyboard_tests)
+
+add_executable(text_edit_tests
+    capture/TextEditTest.cpp
+    ${NT_SOURCE_DIR}/shared/ui/TextEdit.cpp)
+target_include_directories(text_edit_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(text_edit_tests PRIVATE Qt6::Widgets)
+if(MSVC)
+    target_compile_options(text_edit_tests PRIVATE /utf-8)
+endif()
+nt_add_qt_test(screenshot_text_edit text_edit_tests)
+set_tests_properties(screenshot_text_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(favorite_sync_state_tests
     clipboard/FavoriteSyncStateTest.cpp

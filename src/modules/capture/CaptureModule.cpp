@@ -7,8 +7,14 @@
 #include "modules/capture/pin/PinWidget.h"
 #include "modules/capture/screenshot/Screenshot.h"
 #include "app/WindowManager.h"
+#include "shared/ui/TipsWidget.h"
 
 #include <QDebug>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QImageWriter>
+#include <QSaveFile>
 
 CaptureModule::CaptureModule(WindowManager* windowManager)
     : windowManager_(windowManager)
@@ -157,13 +163,52 @@ int CaptureModule::stickerCount() const
 
 void CaptureModule::saveScreenshot(const QPixmap& pixmap) const
 {
-    if (!settings_) {
+    if (!settings_ || pixmap.isNull()) {
         return;
     }
     bool autoSave = false;
     QString directory;
     settings_->getAutoSaveImage(autoSave, directory);
-    if (autoSave) {
-        pixmap.save(directory + "/" + Util::pixmapName());
+    if (!autoSave) {
+        return;
+    }
+
+    auto reportFailure = [](const QString& path, const QString& reason) {
+        qWarning() << "Screenshot auto-save failed:" << path << reason;
+        const QString message =
+            QCoreApplication::translate("App", "截图自动保存失败：%1\n%2").arg(path, reason);
+        // popup(nullptr) adopts the active screenshot window, which is about
+        // to close. Keep this notification independent of that window.
+        auto* tip = new TipsWidget(nullptr);
+        tip->setText(message.simplified());
+        tip->setToolTip(message);
+        tip->autoClose(5);
+        tip->show();
+    };
+    if (directory.trimmed().isEmpty() || !QDir().mkpath(directory)) {
+        reportFailure(directory, QCoreApplication::translate("App", "无法创建保存目录"));
+        return;
+    }
+
+    const QDir outputDir(directory);
+    const QString baseName = QFileInfo(Util::pixmapName()).completeBaseName();
+    QString filePath = outputDir.filePath(baseName + QStringLiteral(".png"));
+    for (int suffix = 1; QFileInfo::exists(filePath); ++suffix) {
+        filePath = outputDir.filePath(baseName + QStringLiteral("_%1.png").arg(suffix));
+    }
+
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        reportFailure(filePath, file.errorString());
+        return;
+    }
+    QImageWriter writer(&file, "PNG");
+    if (!writer.write(pixmap.toImage())) {
+        file.cancelWriting();
+        reportFailure(filePath, writer.errorString());
+        return;
+    }
+    if (!file.commit()) {
+        reportFailure(filePath, file.errorString());
     }
 }

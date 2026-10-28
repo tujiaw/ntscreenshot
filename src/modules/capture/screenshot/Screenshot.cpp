@@ -166,6 +166,8 @@ ScreenshotWidget::ScreenshotWidget(WindowManager* windowManager, QWidget *parent
 
     // 连接 ActionController 的关闭信号
     connect(actionController_.get(), &ScreenshotActionController::sigClose, this, &ScreenshotWidget::sigClose);
+    connect(actionController_.get(), &ScreenshotActionController::sigScreenshotCompleted,
+            this, &ScreenshotWidget::sigSaveScreenshot);
 
 	qDebug() << "ScreenshotWidget init";
 }

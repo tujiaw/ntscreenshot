@@ -1075,6 +1075,57 @@ int runImageBrowserTest(QApplication& app) {
     window->close();
     check(waitUntil([&] { return window.isNull(); }), "close releases window");
 
+    // Deleting the currently decoded GIF must release QMovie's Windows file
+    // handle before moving it to the recycle bin, even when playback is paused.
+    {
+        QTemporaryDir deletionDirectory;
+        check(deletionDirectory.isValid(), "GIF deletion directory");
+        const QString neighbor = QDir(deletionDirectory.path()).filePath("neighbor.png");
+        check(source.save(neighbor), "GIF deletion neighbor fixture");
+        QPointer<ImageBrowserWindow> deletionWindow = new ImageBrowserWindow(&settings, &loader);
+        deletionWindow->show();
+        for (bool paused : {false, true}) {
+            const QString target = QDir(deletionDirectory.path()).filePath(paused ? "paused.gif" : "playing.gif");
+            check(QFile::copy(gif, target), "GIF deletion fixture");
+            drop(deletionWindow, {QUrl::fromLocalFile(target)});
+            check(waitUntil([&] {
+                auto* control = action(deletionWindow, QStringLiteral("播放／暂停"));
+                auto* images = deletionWindow->findChild<QListView*>();
+                return control->isVisible() && control->isEnabled() && images->isEnabled();
+            }), "GIF ready for deletion");
+            QPointer<QMovie> movie = deletionWindow->findChildren<QMovie*>().last();
+            if (paused) trigger(deletionWindow, QStringLiteral("播放／暂停"));
+            const QMovie::MovieState state = paused ? QMovie::Paused : QMovie::Running;
+            check(movie && movie->state() == state, "GIF playback state before deletion");
+            cancelPrompt();
+            trigger(deletionWindow, QStringLiteral("删除图片"));
+            check(QFileInfo::exists(target) && movie && movie->state() == state,
+                  "cancel GIF deletion preserves file and playback state");
+            QTimer confirmation;
+            confirmation.setInterval(10);
+            QObject::connect(&confirmation, &QTimer::timeout, &app, [&] {
+                if (auto* dialog = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+                    if (auto* yes = dialog->button(QMessageBox::Yes)) yes->click();
+                    else {
+                        check(false, "GIF deletion does not report a file-in-use warning");
+                        dialog->accept();
+                    }
+                }
+            });
+            confirmation.start();
+            trigger(deletionWindow, QStringLiteral("删除图片"));
+            confirmation.stop();
+            check(!QFileInfo::exists(target) && movie.isNull(), "GIF deletion releases reader and removes file");
+            check(waitUntil([&] {
+                auto* images = deletionWindow->findChild<QListView*>();
+                return images->isEnabled() && images->model()->rowCount() == 1
+                    && deletionWindow->windowTitle().startsWith("neighbor.png");
+            }), "GIF deletion selects neighboring image");
+        }
+        deletionWindow->close();
+        check(waitUntil([&] { return deletionWindow.isNull(); }), "GIF deletion window closes");
+    }
+
     const QString screenshots = qEnvironmentVariable("NTSCREENSHOT_IMAGE_BROWSER_QA_DIR");
     if (!screenshots.isEmpty()) {
         QDir().mkpath(screenshots);
