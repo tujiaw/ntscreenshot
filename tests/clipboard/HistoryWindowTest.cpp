@@ -6,6 +6,8 @@
 #include "core/platform/native/WinClipboard.h"
 #include <QApplication>
 #include <QClipboard>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QKeyEvent>
 #include <QButtonGroup>
 #include <QDir>
@@ -27,6 +29,14 @@
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr, "Failed line %d: %s\n", __LINE__, #x); return 1; } } while (false)
 
 int runFavoriteSyncControllerTest(QApplication& app, const QString& previewDir);
+
+class ClipboardUrlRecorder : public QObject {
+    Q_OBJECT
+public:
+    QUrl openedUrl;
+public slots:
+    void record(const QUrl& url) { openedUrl = url; }
+};
 
 int runFavoriteAccountManagerRegression() {
     auto* clipboard = QApplication::clipboard();
@@ -299,9 +309,10 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
             for (auto* action : menu->actions()) {
                 if (action->text() == QCoreApplication::translate("App", "复制用户名")) username = action;
                 if (action->text() == QCoreApplication::translate("App", "复制密码")) password = action;
-                if (action->text() == QCoreApplication::translate("App", "复制网址")) url = action;
+                if (action->text() == QCoreApplication::translate("App", "打开网址")) url = action;
             }
             valid = bool(username) == fieldsExpected && bool(password) == fieldsExpected && bool(url) == fieldsExpected;
+            if (fieldsExpected) valid = valid && menu->actions().indexOf(url) < menu->actions().indexOf(username);
             auto* selected = choose ? (QString::fromUtf8(choose) == QStringLiteral("username") ? username : QString::fromUtf8(choose) == QStringLiteral("password") ? password : url) : nullptr;
             if (selected) {
                 menu->setActiveAction(selected);
@@ -318,7 +329,13 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     CHECK(list->item(0)->toolTip().isEmpty());
     CHECK(inspectMenu(true, "username")); CHECK(QApplication::clipboard()->text() == QStringLiteral("admin"));
     CHECK(inspectMenu(true, "password")); CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
-    CHECK(inspectMenu(true, "url")); CHECK(QApplication::clipboard()->text() == QStringLiteral("https://example.com/login?next=%2Fhome&a=1"));
+    ClipboardUrlRecorder urls;
+    QDesktopServices::setUrlHandler(QStringLiteral("https"), &urls, "record");
+    const bool openMenuValid = inspectMenu(true, "url");
+    QDesktopServices::unsetUrlHandler(QStringLiteral("https"));
+    CHECK(openMenuValid);
+    CHECK(urls.openedUrl == QUrl(QStringLiteral("https://example.com/login?next=%2Fhome&a=1")));
+    CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
     if (!previewDir.isEmpty()) {
         ClipItem account; account.favorite = true;
         account.text = QStringLiteral("演示账号\n用户名：admin@example.com\n密码：demo-password");
@@ -539,3 +556,5 @@ int runClipboardWindowTest(QApplication& app) {
     CHECK(runClipboardPreviewRegression(app, previewDir) == 0);
     return runFavoriteSyncControllerTest(app, previewDir);
 }
+
+#include "HistoryWindowTest.moc"

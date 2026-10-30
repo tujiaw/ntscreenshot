@@ -14,6 +14,7 @@
 #include <QSignalBlocker>
 #include <QCloseEvent>
 #include <QCursor>
+#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QHash>
 #include <QHideEvent>
@@ -34,6 +35,7 @@
 #include <QTextLayout>
 #include <QTextOption>
 #include <QVBoxLayout>
+#include <QUrl>
 
 namespace {
 
@@ -905,10 +907,10 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
         ? ParseFavoriteAccount(contextItem.text) : FavoriteAccountFields{};
     QAction* copyUsername = nullptr;
     QAction* copyPassword = nullptr;
-    QAction* copyUrl = nullptr;
+    QAction* openUrl = nullptr;
+    if (!account.url.isEmpty()) openUrl = menu.addAction(QCoreApplication::translate("App", "打开网址"));
     if (!account.username.isEmpty()) copyUsername = menu.addAction(QCoreApplication::translate("App", "复制用户名"));
     if (!account.password.isEmpty()) copyPassword = menu.addAction(QCoreApplication::translate("App", "复制密码"));
-    if (!account.url.isEmpty()) copyUrl = menu.addAction(QCoreApplication::translate("App", "复制网址"));
     QAction* previewAction = menu.addAction(QCoreApplication::translate("App", "预览"));
     previewAction->setShortcut(QKeySequence(Qt::Key_Space));
     QAction* deleteAction = nullptr;
@@ -925,8 +927,11 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
         QApplication::clipboard()->setText(account.username);
     } else if (copyPassword && selected == copyPassword) {
         QApplication::clipboard()->setText(account.password);
-    } else if (copyUrl && selected == copyUrl) {
-        QApplication::clipboard()->setText(account.url);
+    } else if (openUrl && selected == openUrl) {
+        const QString address = account.url.contains(QStringLiteral("://"))
+            ? account.url : QStringLiteral("https://") + account.url;
+        if (!QDesktopServices::openUrl(QUrl(address, QUrl::StrictMode)))
+            ShowHint(QCoreApplication::translate("App", "无法打开网址"));
     } else if (selected == favoriteAction && toggleFavorite_) {
         const auto& items = history_->Items();
         const auto found = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
