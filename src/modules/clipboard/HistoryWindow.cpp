@@ -45,6 +45,22 @@ constexpr int kTimeWidth = 40;
 constexpr int kFavoriteRole = Qt::UserRole + 1;
 constexpr int kContentRole = Qt::UserRole + 2;
 constexpr int kViewRole = Qt::UserRole + 3;
+constexpr int kAccountRole = Qt::UserRole + 4;
+
+void DrawAccountKey(QPainter& painter, const QRectF& rect, const QColor& color)
+{
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.translate(rect.topLeft());
+    painter.scale(rect.width() / 16.0, rect.height() / 16.0);
+    painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(QPointF(5, 5), 3.2, 3.2);
+    painter.drawLine(QPointF(7.3, 7.3), QPointF(13.8, 13.8));
+    painter.drawLine(QPointF(10, 10), QPointF(12, 8));
+    painter.drawLine(QPointF(12, 12), QPointF(14, 10));
+    painter.restore();
+}
 
 void DrawStar(QPainter& painter, const QRectF& rect, const QColor& color, bool filled)
 {
@@ -159,7 +175,7 @@ public:
 
     void setHistory(const ClipboardHistory* history) {
         if (history_ != history) {
-            markerItems_.clear(); favoriteMarkers_.clear(); sizeCache_.clear();
+            markerItems_.clear(); favoriteMarkers_.clear(); accountMarkers_.clear(); sizeCache_.clear();
         }
         history_ = history;
     }
@@ -174,8 +190,15 @@ public:
         markerItems_ = items; // QString/QByteArray share storage; no image/text payload copies.
         sizeCache_.clear();
         favoriteMarkers_.assign(items.size(), false);
+        accountMarkers_.assign(items.size(), false);
         for (size_t i = 0; i < items.size(); ++i) {
-            if (items[i].favorite) continue;
+            if (items[i].favorite) {
+                if (items[i].kind == ClipKind::Text) {
+                    const auto account = ParseFavoriteAccount(items[i].text);
+                    accountMarkers_[i] = !account.username.isEmpty() && !account.password.isEmpty();
+                }
+                continue;
+            }
             for (const auto& saved : items) {
                 if (!saved.favorite || saved.kind != items[i].kind) continue;
                 if (SameForMarker(saved, items[i])) { favoriteMarkers_[i] = true; break; }
@@ -187,6 +210,10 @@ public:
         return index < favoriteMarkers_.size() && favoriteMarkers_[index];
     }
 
+    bool AccountMarked(size_t index) const {
+        return index < accountMarkers_.size() && accountMarkers_[index];
+    }
+
     void setBackgroundAlpha(int alpha) { backgroundAlpha_ = alpha; }
 
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
@@ -194,9 +221,10 @@ public:
         const int width = view ? view->viewport()->width() : s(HistoryWindow::kPopupWidth);
         const int historyIndex = index.data(Qt::UserRole).toInt();
         const bool marked = index.data(kFavoriteRole).toBool();
+        const bool account = index.data(kAccountRole).toBool();
         const auto cached = sizeCache_.constFind(historyIndex);
         if (cached != sizeCache_.constEnd() && cached->width == width && cached->row == index.row()
-            && cached->font == option.font && cached->marked == marked) return cached->size;
+            && cached->font == option.font && cached->marked == marked && cached->account == account) return cached->size;
         int lineCount = 1;
         if (history_ && historyIndex >= 0 && historyIndex < static_cast<int>(history_->Items().size())) {
             const ClipItem& item = history_->Items()[static_cast<size_t>(historyIndex)];
@@ -204,17 +232,18 @@ public:
                 lineCount = kMaxPreviewLines;
             } else {
                 QTextLayout layout(PreviewText(item.text), option.font);
-                lineCount = LayoutPreview(layout, ContentWidth(width, option.font, index.row(), index.data(kFavoriteRole).toBool())).lines;
+                lineCount = LayoutPreview(layout, ContentWidth(width, option.font, index.row(), marked, account)).lines;
             }
         }
         const QSize result(width, lineCount * QFontMetrics(option.font).height() + s(10));
-        sizeCache_.insert(historyIndex, {width, index.row(), option.font, marked, result});
+        sizeCache_.insert(historyIndex, {width, index.row(), option.font, marked, account, result});
         return result;
     }
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override {
         painter->save();
+        painter->setClipRect(option.rect, Qt::IntersectClip);
         painter->setRenderHint(QPainter::Antialiasing, true);
         painter->setRenderHint(QPainter::TextAntialiasing, true);
 
@@ -252,19 +281,26 @@ public:
                           numberText);
 
         const QRect timeRect(rowRect.right() - s(kTimeWidth), rowRect.top() + s(5),
-                             s(kTimeWidth - 6), rowRect.height() - s(10));
+                             s(kTimeWidth - 6), QFontMetrics(option.font).height());
         painter->setPen(secondary);
-        painter->drawText(timeRect, Qt::AlignBottom | Qt::AlignRight,
+        painter->drawText(timeRect, Qt::AlignVCenter | Qt::AlignRight,
                           TimeUtil::FormatRelativeTime(item.capturedAt));
 
         const bool favoriteMarker = index.data(kFavoriteRole).toBool();
+        const bool accountMarker = index.data(kAccountRole).toBool();
+        int markerRight = timeRect.left() - s(6);
+        const int markerTop = timeRect.top() + (timeRect.height() - s(12)) / 2;
         if (favoriteMarker) {
-            DrawStar(*painter, QRectF(timeRect.left() - s(18), rowRect.center().y() - s(6), s(12), s(12)), tokens.accent, true);
+            DrawStar(*painter, QRectF(markerRight - s(12), markerTop, s(12), s(12)), tokens.accent, true);
+            markerRight -= s(18);
+        }
+        if (accountMarker) {
+            DrawAccountKey(*painter, QRectF(markerRight - s(12), markerTop, s(12), s(12)), tokens.accent);
         }
 
         const int contentOffset = ContentOffset(option.font, index.row());
         const QRect contentRect(rowRect.left() + contentOffset, rowRect.top() + s(5),
-                                ContentWidth(rowRect.width(), option.font, index.row(), favoriteMarker),
+                                ContentWidth(rowRect.width(), option.font, index.row(), favoriteMarker, accountMarker),
                                 rowRect.height() - s(10));
         if (item.kind == ClipKind::Image) {
             DrawImage(painter, contentRect, item, historyIndex);
@@ -295,8 +331,10 @@ private:
         return s(2) + numberWidth + gap;
     }
 
-    int ContentWidth(int rowWidth, const QFont& font, int historyIndex, bool favoriteMarker = false) const {
-        return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8 + (favoriteMarker ? 18 : 0)));
+    int ContentWidth(int rowWidth, const QFont& font, int historyIndex,
+                     bool favoriteMarker = false, bool accountMarker = false) const {
+        const int markerWidth = (int(favoriteMarker) + int(accountMarker)) * 18;
+        return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8 + markerWidth));
     }
 
     static QString PreviewText(QString text) {
@@ -389,7 +427,7 @@ private:
         QPixmap pixmap;
         QByteArray source;
     };
-    struct RowSize { int width; int row; QFont font; bool marked; QSize size; };
+    struct RowSize { int width; int row; QFont font; bool marked; bool account; QSize size; };
     struct ImageFingerprint { QByteArray source; QSize size; QByteArray digest; };
 
     ImageFingerprint Fingerprint(const ClipItem& item) {
@@ -415,6 +453,7 @@ private:
 
     std::vector<ClipItem> markerItems_;
     std::vector<bool> favoriteMarkers_;
+    std::vector<bool> accountMarkers_;
     QCache<quintptr, ImageFingerprint> imageFingerprints_{32768}; // KiB, retained encoded bytes.
     const ClipboardHistory* history_ = nullptr;
     qreal scaleFactor_ = 1.0;
@@ -764,6 +803,8 @@ void HistoryWindow::BuildList() {
         row->setData(Qt::UserRole, static_cast<int>(i));
         const bool marked = !favorites && delegate->FavoriteMarked(i);
         row->setData(kFavoriteRole, marked);
+        const bool account = favorites && delegate->AccountMarked(i);
+        row->setData(kAccountRole, account);
         row->setData(kContentRole, item.kind == ClipKind::Text ? QVariant(item.text) : QVariant(item.data));
         row->setData(kViewRole, favorites);
         if (restoreSelection && row->data(kContentRole).metaType() == selectedContent.metaType()
@@ -1101,6 +1142,10 @@ void HistoryWindow::changeEvent(QEvent* event) {
 
 void HistoryWindow::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    if (list_) {
+        // Recompute wrapped row heights after the child layout adopts the new width.
+        QTimer::singleShot(0, list_, &QListWidget::doItemsLayout);
+    }
     if (resizeGrip_) {
         resizeGrip_->move(width() - resizeGrip_->width(),
                           height() - resizeGrip_->height());

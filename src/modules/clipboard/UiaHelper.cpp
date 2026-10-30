@@ -2,6 +2,7 @@
 
 #include <OleAuto.h>
 #include <comutil.h>
+#include <utility>
 
 namespace {
 
@@ -43,6 +44,57 @@ bool UiaHelper::Initialize() {
         return false;
     }
     return true;
+}
+
+Microsoft::WRL::ComPtr<IUIAutomationElement> UiaHelper::FocusedElement(HWND targetWindow) {
+    Microsoft::WRL::ComPtr<IUIAutomationElement> element;
+    if (!automation_ || !targetWindow || GetForegroundWindow() != targetWindow ||
+        FAILED(automation_->GetFocusedElement(&element)) || !element) return {};
+    // Browser fields can live in a renderer process. Verify window ancestry
+    // rather than requiring the field and browser window to share a process.
+    Microsoft::WRL::ComPtr<IUIAutomationElement> root;
+    Microsoft::WRL::ComPtr<IUIAutomationTreeWalker> walker;
+    if (FAILED(automation_->ElementFromHandle(targetWindow, &root)) || !root ||
+        FAILED(automation_->get_RawViewWalker(&walker)) || !walker) return {};
+    auto current = element;
+    for (int depth = 0; current && depth < 64; ++depth) {
+        BOOL same = FALSE;
+        if (FAILED(automation_->CompareElements(root.Get(), current.Get(), &same))) return {};
+        if (same) return GetForegroundWindow() == targetWindow ? element : nullptr;
+        Microsoft::WRL::ComPtr<IUIAutomationElement> parent;
+        if (FAILED(walker->GetParentElement(current.Get(), &parent))) return {};
+        current = std::move(parent);
+    }
+    return {};
+}
+
+bool UiaHelper::FocusedInputIsWritable(HWND targetWindow, IUIAutomationElement* previousFocus) {
+    auto element = FocusedElement(targetWindow);
+    if (!element || !previousFocus) return false;
+    BOOL same = TRUE, enabled = FALSE, focused = FALSE, offscreen = TRUE;
+    CONTROLTYPEID type = 0;
+    if (FAILED(automation_->CompareElements(previousFocus, element.Get(), &same)) || same ||
+        FAILED(element->get_CurrentIsEnabled(&enabled)) || !enabled ||
+        FAILED(element->get_CurrentHasKeyboardFocus(&focused)) || !focused ||
+        FAILED(element->get_CurrentIsOffscreen(&offscreen)) || offscreen ||
+        FAILED(element->get_CurrentControlType(&type)) ||
+        (type != UIA_EditControlTypeId && type != UIA_DocumentControlTypeId)) return false;
+
+    Microsoft::WRL::ComPtr<IUIAutomationValuePattern> value;
+    if (SUCCEEDED(element->GetCurrentPatternAs(UIA_ValuePatternId, IID_PPV_ARGS(&value))) && value) {
+        BOOL readOnly = TRUE;
+        return SUCCEEDED(value->get_CurrentIsReadOnly(&readOnly)) && !readOnly;
+    }
+    Microsoft::WRL::ComPtr<IUIAutomationTextPattern> text;
+    Microsoft::WRL::ComPtr<IUIAutomationTextRange> range;
+    if (FAILED(element->GetCurrentPatternAs(UIA_TextPatternId, IID_PPV_ARGS(&text))) || !text ||
+        FAILED(text->get_DocumentRange(&range)) || !range) return false;
+    VARIANT readOnly;
+    VariantInit(&readOnly);
+    const HRESULT result = range->GetAttributeValue(UIA_IsReadOnlyAttributeId, &readOnly);
+    const bool writable = SUCCEEDED(result) && readOnly.vt == VT_BOOL && readOnly.boolVal == VARIANT_FALSE;
+    VariantClear(&readOnly);
+    return writable;
 }
 
 std::vector<ControlInfo> UiaHelper::EnumerateEditableControls(HWND targetWindow) {

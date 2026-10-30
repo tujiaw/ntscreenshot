@@ -85,6 +85,23 @@ void SendShiftInsert() {
     SendInput(4, inputs, sizeof(INPUT));
 }
 
+bool SendTab() {
+    INPUT inputs[8] = {};
+    UINT count = 0;
+    const WORD modifiers[] = {VK_CONTROL, VK_MENU, VK_SHIFT};
+    bool down[3] = {};
+    for (int i = 0; i < 3; ++i) {
+        down[i] = KeyIsDown(modifiers[i]);
+        if (down[i]) PushKey(inputs, count, modifiers[i], KEYEVENTF_KEYUP);
+    }
+    PushKey(inputs, count, VK_TAB);
+    PushKey(inputs, count, VK_TAB, KEYEVENTF_KEYUP);
+    for (int i = 0; i < 3; ++i) {
+        if (down[i]) PushKey(inputs, count, modifiers[i]);
+    }
+    return SendInput(count, inputs, sizeof(INPUT)) == count;
+}
+
 void SendPasteForHotkey(UINT) {
     const bool ctrlDown = KeyIsDown(VK_CONTROL);
     const bool altDown = KeyIsDown(VK_MENU);

@@ -18,6 +18,7 @@ bool SetImage(const QImage& image, int maxEdge);
 // Paste simulation (mirrors wtl_clipboard's SendInput logic).
 void SendShiftInsert();
 void SendPasteForHotkey(UINT releaseModifiers);
+bool SendTab();
 
 // Restore focus to the previously captured target window before pasting.
 void RestoreFocus(HWND targetWindow, HWND targetFocusWindow);

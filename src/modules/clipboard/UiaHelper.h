@@ -25,6 +25,8 @@ public:
     bool Initialize();
     std::vector<ControlInfo> EnumerateEditableControls(HWND targetWindow);
     bool FillControlValue(IUIAutomationElement* element, const QString& text);
+    Microsoft::WRL::ComPtr<IUIAutomationElement> FocusedElement(HWND targetWindow);
+    bool FocusedInputIsWritable(HWND targetWindow, IUIAutomationElement* previousFocus);
     QString LastError() const { return lastError_; }
 
 private:

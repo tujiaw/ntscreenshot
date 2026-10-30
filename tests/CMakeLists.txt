@@ -120,6 +120,14 @@ if(MSVC)
 endif()
 nt_add_qt_test(favorite_sync_state favorite_sync_state_tests)
 
+add_executable(favorite_account_fill_tests
+    clipboard/FavoriteAccountFillControllerTest.cpp
+    ${NT_SOURCE_DIR}/modules/clipboard/FavoriteAccountFillController.cpp)
+target_include_directories(favorite_account_fill_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(favorite_account_fill_tests PRIVATE Qt6::Core)
+nt_add_qt_test(favorite_account_fill favorite_account_fill_tests)
+set_tests_properties(favorite_account_fill PROPERTIES TIMEOUT 15)
+
 add_executable(draw_settings_layout_tests
     capture/DrawSettingsLayoutTest.cpp
     ${NT_SOURCE_DIR}/modules/capture/annotation/DrawSettings.cpp)

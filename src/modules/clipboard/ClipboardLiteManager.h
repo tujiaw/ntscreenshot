@@ -9,6 +9,9 @@
 #include "Constants.h"
 #include "HistoryWindow.h"
 #include "FavoriteSyncController.h"
+#include "FavoriteAccountFillController.h"
+#include "UiaHelper.h"
+#include <QMimeData>
 #include <QPointer>
 
 
@@ -52,6 +55,9 @@ private slots:
     void onSyncTimer();
 
 private:
+#ifdef NT_BUILD_CLIPBOARD_WINDOW_TEST
+    friend int runFavoriteAccountManagerRegression();
+#endif
     enum class CaptureResult { Failed, Captured, IgnoredOwnChange };
 
     // Clipboard capture
@@ -62,7 +68,11 @@ private:
     void CaptureTargetFromForeground();
 
     // Paste
-    void BeginPaste(size_t index, bool keepPopupReady, UINT releaseModifiers = 0, UINT triggerKey = 0);
+    void BeginPaste(size_t index, bool keepPopupReady, UINT releaseModifiers = 0, UINT triggerKey = 0,
+                    bool fillFavoriteAccount = false);
+    bool PasteFavoritePassword(const QString& password);
+    void RestoreAccountClipboard();
+    bool AccountTargetActive() const;
     void RestoreTargetFocus();
     bool SetClipboardItem(const ClipItem& item);
 
@@ -127,6 +137,14 @@ private:
     AsyncRunner aiFillRunner_;
 
     QTimer* pasteTimer_ = nullptr;
+    std::unique_ptr<FavoriteAccountFillController> accountFill_;
+    UiaHelper accountUia_;
+    Microsoft::WRL::ComPtr<IUIAutomationElement> accountUsernameElement_;
+    std::unique_ptr<QMimeData> accountClipboardBackup_;
+    DWORD accountClipboardSequence_ = 0;
+    QString accountClipboardText_;
+    QString pendingAccountPassword_;
+    HWND accountTargetWindow_ = nullptr;
     QTimer* retryCaptureTimer_ = nullptr;
     QTimer* pollTimer_ = nullptr;
     QTimer* trackTimer_ = nullptr;

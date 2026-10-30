@@ -2,6 +2,8 @@
 #include "modules/clipboard/FavoriteSyncController.h"
 #include "modules/clipboard/FavoriteSyncPage.h"
 #include "modules/clipboard/FavoriteAccountParser.h"
+#include "modules/clipboard/ClipboardLiteManager.h"
+#include "core/platform/native/WinClipboard.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QKeyEvent>
@@ -25,6 +27,53 @@
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr, "Failed line %d: %s\n", __LINE__, #x); return 1; } } while (false)
 
 int runFavoriteSyncControllerTest(QApplication& app, const QString& previewDir);
+
+int runFavoriteAccountManagerRegression() {
+    auto* clipboard = QApplication::clipboard();
+    auto original = std::make_unique<QMimeData>();
+    if (const auto* contents = clipboard->mimeData()) {
+        for (const auto& format : contents->formats()) original->setData(format, contents->data(format));
+        if (contents->hasImage()) original->setImageData(contents->imageData());
+    }
+    ClipboardLiteManager manager;
+    manager.pasteTimer_ = new QTimer(&manager);
+    manager.accountFill_ = std::make_unique<FavoriteAccountFillController>(FavoriteAccountFillController::Actions{
+        []() { return false; }, []() { return false; }, []() { return false; },
+        [](const QString&) { return false; }, [&]() { manager.RestoreAccountClipboard(); }
+    });
+    manager.history_.AddText(QStringLiteral("username: account-user password: account-password"));
+    manager.history_.ToggleFavorite(0);
+    auto* rich = new QMimeData;
+    rich->setText(QStringLiteral("original text"));
+    rich->setHtml(QStringLiteral("<b>original text</b>"));
+    rich->setData(QStringLiteral("application/x-account-fill-test"), QByteArray("custom content"));
+    clipboard->setMimeData(rich);
+    manager.BeginPaste(0, true, 0, 0, true);
+    CHECK(manager.accountFill_->Busy() && clipboard->text() == QStringLiteral("account-user"));
+    const DWORD sequence = WinClipboard::ClipboardSequence();
+    manager.BeginPaste(0, true, 0, 0, true);
+    CHECK(WinClipboard::ClipboardSequence() == sequence); // Duplicate activation is ignored.
+    manager.accountFill_->Cancel();
+    CHECK(clipboard->text() == QStringLiteral("original text"));
+    CHECK(clipboard->mimeData()->html() == QStringLiteral("<b>original text</b>"));
+    CHECK(clipboard->mimeData()->data(QStringLiteral("application/x-account-fill-test")) == QByteArray("custom content"));
+    CHECK(manager.pendingAccountPassword_.isEmpty());
+
+    manager.BeginPaste(0, true, 0, 0, true);
+    clipboard->setText(QStringLiteral("new user copy"));
+    manager.accountFill_->Cancel();
+    CHECK(clipboard->text() == QStringLiteral("new user copy")); // Never overwrite a later user copy.
+
+    QImage image(8, 8, QImage::Format_ARGB32); image.fill(Qt::red);
+    clipboard->setImage(image);
+    manager.BeginPaste(0, true, 0, 0, true);
+    CHECK(manager.PasteFavoritePassword(QStringLiteral("must-not-be-written")) == false);
+    CHECK(clipboard->text() == QStringLiteral("account-user")); // No active destination, no password write.
+    manager.accountFill_->Cancel();
+    CHECK(clipboard->image() == image);
+    clipboard->setMimeData(original.release());
+    return 0;
+}
 
 int runClipboardSwitchBenchmark(QApplication& app) {
     ClipboardHistory history;
@@ -177,7 +226,7 @@ int runClipboardPreviewRegression(QApplication& app, const QString& previewDir) 
     return 0;
 }
 
-int runFavoriteAccountRegression(QApplication& app) {
+int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     struct Example { const char* input; const char* username; const char* password; const char* url = ""; };
     const Example examples[] = {
         {"用户名：xyz\n密码：dfdf", "xyz", "dfdf"},
@@ -263,10 +312,49 @@ int runFavoriteAccountRegression(QApplication& app) {
         return valid;
     };
     CHECK(inspectMenu(false, nullptr)); // A starred ordinary history row must not expose the fields.
+    CHECK(!list->item(0)->data(Qt::UserRole + 4).toBool());
     views->button(1)->click();
+    CHECK(list->item(0)->data(Qt::UserRole + 4).toBool());
+    CHECK(list->item(0)->toolTip().isEmpty());
     CHECK(inspectMenu(true, "username")); CHECK(QApplication::clipboard()->text() == QStringLiteral("admin"));
     CHECK(inspectMenu(true, "password")); CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
     CHECK(inspectMenu(true, "url")); CHECK(QApplication::clipboard()->text() == QStringLiteral("https://example.com/login?next=%2Fhome&a=1"));
+    if (!previewDir.isEmpty()) {
+        ClipItem account; account.favorite = true;
+        account.text = QStringLiteral("演示账号\n用户名：admin@example.com\n密码：demo-password");
+        ClipItem singleLine = account;
+        singleLine.text = QStringLiteral("用户名：demo 密码：123456");
+        ClipItem note; note.favorite = true;
+        note.text = QStringLiteral("项目备注：这是一条普通收藏，用于对比账号标识的位置和长文本换行效果。");
+        ClipItem partial = account; partial.text = QStringLiteral("用户名：仅有用户名，不显示账号标识");
+        ClipItem marked = note; marked.favorite = false;
+        ClipItem ordinary; ordinary.text = QStringLiteral("普通剪切板记录\n多行内容的时间和星标统一与首行对齐");
+        history.ReplaceItems({account, singleLine, note, partial, marked, ordinary});
+        window.Refresh();
+        const auto settleLayout = [&]() {
+            app.processEvents();
+            QEventLoop loop;
+            QTimer::singleShot(120, &loop, &QEventLoop::quit);
+            loop.exec(); // QListView::Adjust schedules row relayout after resizing.
+        };
+        CHECK(list->count() == 4 && list->item(0)->data(Qt::UserRole + 4).toBool());
+        CHECK(list->item(1)->data(Qt::UserRole + 4).toBool());
+        CHECK(!list->item(2)->data(Qt::UserRole + 4).toBool() && !list->item(3)->data(Qt::UserRole + 4).toBool());
+        for (const auto theme : {AppTheme::Dark, AppTheme::Light}) {
+            ThemeManager::apply(theme);
+            const QString suffix = theme == AppTheme::Dark ? QStringLiteral("dark") : QStringLiteral("light");
+            window.resize(340, 360); views->button(1)->click(); settleLayout();
+            CHECK(window.grab().save(previewDir + QStringLiteral("/account-badges-") + suffix + QStringLiteral(".png")));
+            window.resize(HistoryWindow::kMinimumWidth, 360); settleLayout();
+            for (int row = 0; row < list->count(); ++row) {
+                CHECK(list->visualItemRect(list->item(row)).height() == list->sizeHintForRow(row));
+            }
+            CHECK(window.grab().save(previewDir + QStringLiteral("/account-badges-narrow-") + suffix + QStringLiteral(".png")));
+            views->button(0)->click(); settleLayout();
+            CHECK(window.grab().save(previewDir + QStringLiteral("/favorite-badges-") + suffix + QStringLiteral(".png")));
+        }
+        ThemeManager::apply(AppTheme::Dark);
+    }
     return 0;
 }
 
@@ -445,7 +533,8 @@ int runClipboardWindowTest(QApplication& app) {
         window.SetSyncPage(new QWidget);
     }
     qputenv("LOCALAPPDATA", originalLocalAppData);
-    CHECK(runFavoriteAccountRegression(app) == 0);
+    CHECK(runFavoriteAccountRegression(app, previewDir) == 0);
+    CHECK(runFavoriteAccountManagerRegression() == 0);
     CHECK(runClipboardCacheRegression(app) == 0);
     CHECK(runClipboardPreviewRegression(app, previewDir) == 0);
     return runFavoriteSyncControllerTest(app, previewDir);

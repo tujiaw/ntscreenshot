@@ -9,6 +9,7 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteSyncController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteSyncPage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteAccountParser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FavoriteAccountFillController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HistoryWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LlmClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UiaHelper.cpp

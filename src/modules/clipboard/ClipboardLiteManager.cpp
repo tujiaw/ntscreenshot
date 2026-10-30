@@ -2,6 +2,7 @@
 
 #include "AiFillSettingsDialog.h"
 #include "FavoriteSyncPage.h"
+#include "FavoriteAccountParser.h"
 #include "HotkeyOptions.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/platform/Util.h"
@@ -9,6 +10,7 @@
 #include "core/theme/MenuCheckMark.h"
 
 #include <QBuffer>
+#include <QApplication>
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QCursor>
@@ -20,6 +22,7 @@
 #include <QTimer>
 
 #include <limits>
+#include <utility>
 
 namespace {
 
@@ -52,6 +55,14 @@ void ClipboardLiteManager::initialize()
     pasteTimer_ = new QTimer(this);
     pasteTimer_->setSingleShot(true);
     connect(pasteTimer_, &QTimer::timeout, this, &ClipboardLiteManager::onPasteTimer);
+
+    accountFill_ = std::make_unique<FavoriteAccountFillController>(FavoriteAccountFillController::Actions{
+        [this]() { return AccountTargetActive(); },
+        [this]() { return accountUia_.FocusedInputIsWritable(accountTargetWindow_, accountUsernameElement_.Get()); },
+        []() { return WinClipboard::SendTab(); },
+        [this](const QString& password) { return PasteFavoritePassword(password); },
+        [this]() { RestoreAccountClipboard(); }
+    });
 
     retryCaptureTimer_ = new QTimer(this);
     retryCaptureTimer_->setSingleShot(true);
@@ -98,6 +109,11 @@ void ClipboardLiteManager::shutdown()
     if (!initialized_) {
         return;
     }
+    pasteTimer_->stop();
+    accountFill_->Cancel();
+    pendingPasteReady_ = false;
+    pendingAccountPassword_.clear();
+    accountTargetWindow_ = nullptr;
     SyncHistoryStore();
     delete favoriteSync_;
     favoriteSync_ = nullptr;
@@ -267,26 +283,97 @@ void ClipboardLiteManager::CaptureTargetFromForeground() {
 // ── Paste ─────────────────────────────────────────────────────────
 
 void ClipboardLiteManager::BeginPaste(size_t index, bool keepPopupReady,
-                                       UINT releaseModifiers, UINT triggerKey) {
+                                       UINT releaseModifiers, UINT triggerKey, bool fillFavoriteAccount) {
+    if (accountFill_->Busy()) return;
     const auto& items = history_.Items();
     if (index >= items.size()) {
         return;
     }
 
+    pasteTimer_->stop();
+    pendingPasteReady_ = false;
+    pendingAccountPassword_.clear();
+    accountTargetWindow_ = nullptr;
     pendingClipboardItem_ = items[index];
+    if (fillFavoriteAccount && pendingClipboardItem_.favorite && pendingClipboardItem_.kind == ClipKind::Text) {
+        const auto account = ParseFavoriteAccount(pendingClipboardItem_.text);
+        if (!account.username.isEmpty() && !account.password.isEmpty()) {
+            if (!accountFill_->Reserve()) return;
+            const QMimeData* original = QApplication::clipboard()->mimeData();
+            accountClipboardBackup_ = std::make_unique<QMimeData>();
+            if (original) {
+                for (const auto& format : original->formats())
+                    accountClipboardBackup_->setData(format, original->data(format));
+                if (original->hasImage()) accountClipboardBackup_->setImageData(original->imageData());
+            }
+            accountTargetWindow_ = targetWindow_;
+            pendingClipboardItem_.text = account.username;
+            pendingAccountPassword_ = account.password;
+        }
+    }
     suppressNextCapture_ = true;
     pendingClipboardSequence_ = 0;
     if (!SetClipboardItem(pendingClipboardItem_)) {
         suppressNextCapture_ = false;
+        pendingAccountPassword_.clear();
+        accountFill_->Cancel();
         return;
     }
     pendingClipboardSequence_ = WinClipboard::ClipboardSequence();
+    if (accountFill_->Busy()) {
+        accountClipboardSequence_ = pendingClipboardSequence_;
+        accountClipboardText_ = pendingClipboardItem_.text;
+    }
 
     pendingPasteReady_ = true;
     pendingKeepPopupVisible_ = keepPopupReady;
     pendingPasteReleaseModifiers_ = releaseModifiers;
     pendingPasteTriggerKey_ = triggerKey;
     pasteTimer_->start(triggerKey != 0 ? 15 : (keepPopupReady ? 180 : 400));
+}
+
+bool ClipboardLiteManager::AccountTargetActive() const {
+    return accountTargetWindow_ && ::IsWindow(accountTargetWindow_) &&
+           ::GetForegroundWindow() == accountTargetWindow_ && accountClipboardSequence_ != 0 &&
+           WinClipboard::ClipboardSequence() == accountClipboardSequence_ &&
+           QApplication::clipboard()->text() == accountClipboardText_;
+}
+
+bool ClipboardLiteManager::PasteFavoritePassword(const QString& password) {
+    if (!AccountTargetActive()) return false;
+    pendingClipboardItem_ = ClipItem{};
+    pendingClipboardItem_.text = password;
+    suppressNextCapture_ = true;
+    pendingClipboardSequence_ = 0;
+    if (!SetClipboardItem(pendingClipboardItem_)) {
+        suppressNextCapture_ = false;
+        return false;
+    }
+    pendingClipboardSequence_ = WinClipboard::ClipboardSequence();
+    accountClipboardSequence_ = pendingClipboardSequence_;
+    accountClipboardText_ = password;
+    if (!AccountTargetActive()) return false;
+    WinClipboard::SendPasteForHotkey(0);
+    return true;
+}
+
+void ClipboardLiteManager::RestoreAccountClipboard() {
+    // A copy made by the user during filling takes precedence over our backup.
+    if (accountClipboardBackup_ && accountClipboardSequence_ != 0 &&
+        WinClipboard::ClipboardSequence() == accountClipboardSequence_ &&
+        QApplication::clipboard()->text() == accountClipboardText_) {
+        suppressNextCapture_ = true;
+        pendingClipboardSequence_ = 0;
+        QApplication::clipboard()->setMimeData(accountClipboardBackup_.release());
+        pendingClipboardSequence_ = WinClipboard::ClipboardSequence();
+        lastClipboardSequence_ = pendingClipboardSequence_;
+    }
+    accountClipboardBackup_.reset();
+    accountUsernameElement_.Reset();
+    accountClipboardSequence_ = 0;
+    accountClipboardText_.clear();
+    accountTargetWindow_ = nullptr;
+    pendingAccountPassword_.clear();
 }
 
 void ClipboardLiteManager::RestoreTargetFocus() {
@@ -799,7 +886,7 @@ void ClipboardLiteManager::ShowHistory(bool activate) {
 }
 
 void ClipboardLiteManager::EnsurePopup() {
-    auto paste = [this](size_t index) { BeginPaste(index, true); };
+    auto paste = [this](size_t index) { BeginPaste(index, true, 0, 0, true); };
     auto remove = [this](size_t index) {
         const bool favorite = index < history_.Items().size() && history_.Items()[index].favorite;
         if (history_.RemoveAt(index)) {
@@ -858,8 +945,29 @@ void ClipboardLiteManager::onPasteTimer() {
     pendingPasteReady_ = false;
     const bool keepPopupVisible = pendingKeepPopupVisible_;
     pendingKeepPopupVisible_ = false;
+    if (accountFill_->Busy() &&
+        (targetWindow_ != accountTargetWindow_ || !accountClipboardSequence_ ||
+         WinClipboard::ClipboardSequence() != accountClipboardSequence_)) {
+        pendingAccountPassword_.clear();
+        accountFill_->Cancel();
+        return;
+    }
     RestoreTargetFocus();
+    if (accountFill_->Busy()) {
+        if (!AccountTargetActive()) {
+            accountFill_->Cancel();
+            return;
+        }
+        if (accountUia_.Initialize()) accountUsernameElement_ = accountUia_.FocusedElement(accountTargetWindow_);
+        if (!AccountTargetActive()) {
+            accountFill_->Cancel();
+            return;
+        }
+    }
     WinClipboard::SendPasteForHotkey(pendingPasteReleaseModifiers_);
+    if (!pendingAccountPassword_.isEmpty()) {
+        accountFill_->UsernamePasted(std::exchange(pendingAccountPassword_, QString()));
+    }
     pendingPasteReleaseModifiers_ = 0;
     pendingPasteTriggerKey_ = 0;
     if (!keepPopupVisible && popup_ && popup_->IsPopupVisible()) {
