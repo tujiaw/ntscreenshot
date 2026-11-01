@@ -2,6 +2,7 @@ target_sources(ntscreenshot PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/foundation/AsyncRunner.h
     ${CMAKE_CURRENT_SOURCE_DIR}/modules/IToolModule.h
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/CodeScanner.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/imaging/QrCodeGenerator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ImageEnhance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ImageMatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imaging/ScrollStitcher.cpp

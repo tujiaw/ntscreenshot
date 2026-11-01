@@ -375,7 +375,7 @@ QLabel#settingsStatusTip { color: @TEXT_SECONDARY@; font-size: 12px; }
 QLabel#settingsStatusTip[status="success"] { color: @SUCCESS@; }
 QLabel#settingsStatusTip[status="error"] { color: @DANGER@; }
 QWidget#httpServerPage { background: transparent; }
-QLabel#httpServerHint {
+QLabel#httpServerHint, QLabel#labelPaddleOcrHint {
     color: @TEXT_SECONDARY@;
     font-size: 12px;
 }

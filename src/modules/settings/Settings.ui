@@ -478,11 +478,25 @@
         </property>
         <layout class="QFormLayout" name="formLayoutPaddleOcr">
          <item row="0" column="0" colspan="2">
-          <widget class="QCheckBox" name="cbPaddleOcrEnabled">
-           <property name="text">
-            <string>启用 OCR</string>
-           </property>
-          </widget>
+          <layout class="QVBoxLayout" name="verticalLayoutPaddleOcrEnable">
+           <item>
+            <widget class="QCheckBox" name="cbPaddleOcrEnabled">
+             <property name="text">
+              <string>启用 OCR</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="labelPaddleOcrHint">
+             <property name="text">
+              <string>启用后，点击截图或贴图工具栏中“进入选字模式”图标（四角框内的 T），进入选字模式。拖选图片上的文字，按 Ctrl+C 复制；按 Esc 退出。</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="labelPaddleOcrUrl">

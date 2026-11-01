@@ -185,6 +185,7 @@ nt_add_qt_test(long_screenshot_stitcher scroll_stitcher_tests)
 
 add_executable(code_scanner_tests
     imaging/CodeScannerTest.cpp
+    ${NT_SOURCE_DIR}/core/imaging/QrCodeGenerator.cpp
     ${NT_SOURCE_DIR}/core/imaging/CodeScanner.cpp)
 target_include_directories(code_scanner_tests PRIVATE ${NT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(code_scanner_tests PRIVATE Qt6::Core Qt6::Gui ${OpenCV_LIBS})
@@ -195,6 +196,7 @@ if(WIN32)
     add_test(NAME qr_code_decode
         COMMAND ${CMAKE_COMMAND} -E env
             "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+            "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
             $<TARGET_FILE:code_scanner_tests>)
 else()
     add_test(NAME qr_code_decode COMMAND code_scanner_tests)

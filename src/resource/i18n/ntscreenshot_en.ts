@@ -2,6 +2,14 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>生成二维码</source><translation>Generate QR Code</translation></message>
+    <message><source>没有可生成二维码的文字</source><translation>No text is available to generate a QR code</translation></message>
+    <message><source>文字过长，请缩短后再生成二维码</source><translation>Text is too long. Shorten it before generating a QR code.</translation></message>
+    <message><source>二维码生成失败，请尝试缩短文字</source><translation>Could not generate the QR code. Try shortening the text.</translation></message>
+    <message><source>二维码保存失败：%1</source><translation>Could not save the QR code: %1</translation></message>
+    <message><source>二维码正在生成，请稍候</source><translation>A QR code is being generated. Please wait.</translation></message>
+    <message><source>请先设置截图保存目录</source><translation>Choose a screenshot save directory in Settings first</translation></message>
+    <message><source>正在生成二维码…</source><translation>Generating QR code…</translation></message>
     <message><source>截图自动保存失败：%1
 %2</source><translation>Screenshot auto-save failed: %1
 %2</translation></message>
@@ -1917,6 +1925,10 @@ Copied to clipboard</translation>
       <location filename="../../modules/settings/Settings.ui" line="499" />
       <source>启用 OCR</source>
       <translation>Enable OCR</translation>
+    </message>
+    <message>
+      <source>启用后，点击截图或贴图工具栏中“进入选字模式”图标（四角框内的 T），进入选字模式。拖选图片上的文字，按 Ctrl+C 复制；按 Esc 退出。</source>
+      <translation>After enabling OCR, click the "Select text" icon (a T inside four corner brackets) in the screenshot or pinned image toolbar. Drag to select text in the image, press Ctrl+C to copy, and press Esc to exit.</translation>
     </message>
     <message>
       <location filename="../../modules/settings/Settings.ui" line="506" />

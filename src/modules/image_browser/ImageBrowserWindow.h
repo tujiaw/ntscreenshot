@@ -28,6 +28,7 @@ class ImageBrowserWindow final : public QMainWindow {
 public:
     ImageBrowserWindow(SettingModel* settings, ImageLoader* loader);
     ~ImageBrowserWindow() override;
+    void openImage(const QString& path);
 
 protected:
     void closeEvent(QCloseEvent*) override;

@@ -20,6 +20,7 @@ public:
     void setModuleRegistry(ModuleRegistry* modules);
     void destroy();
     void openWidget(const QString& id);
+    void openImage(const QString& path);
     void openLongScreenshotWidget(const QRect& captureRect, std::shared_ptr<QPixmap> originScreen);
     void openGifRecorderWidget(const QRect& captureRect);
 

@@ -332,6 +332,10 @@ $configureArgs = @(
   '-B', (Quote-Cmd $buildDir),
   '-G', 'Ninja',
   ('-DCMAKE_BUILD_TYPE={0}' -f $Config),
+  # Reset the runtime output directory on every configure. A cached value (e.g. left
+  # behind by an ad-hoc verification build) would otherwise redirect ntscreenshot.exe
+  # to a subdirectory, because reusing an existing build dir keeps the old cache.
+  '-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=',
   ('-DCMAKE_PREFIX_PATH={0}' -f (Quote-Cmd (To-CMakePath $qtRoot)))
 )
 if ($openCvRoot) {
@@ -384,6 +388,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $exePath = Join-Path $buildDir 'ntscreenshot.exe'
+if (-not (Test-Path $exePath)) {
+  throw "Build reported success but the executable is missing: $exePath"
+}
 Write-Host '==> Build finished'
 Write-Host "    Output   : $exePath"
 if ($Deploy -or $Package -or $Installer) {

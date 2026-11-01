@@ -23,4 +23,8 @@ void ImageBrowserModule::shutdown() {
     if (qApp) qApp->removeEventFilter(this);
     if (window_) { delete window_.data(); window_.clear(); }
 }
+void ImageBrowserModule::openImage(const QString& path) {
+    open();
+    window_->openImage(path);
+}
 } // namespace ImageBrowser

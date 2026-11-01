@@ -5,6 +5,8 @@
 #include "FavoriteAccountParser.h"
 #include "HotkeyOptions.h"
 #include "core/imaging/ImageUtil.h"
+#include "core/imaging/QrCodeGenerator.h"
+#include "core/settings/SettingModel.h"
 #include "core/platform/Util.h"
 #include "core/platform/native/WinClipboard.h"
 #include "core/theme/MenuCheckMark.h"
@@ -40,6 +42,9 @@ constexpr int kMaxHistoryValues[] = {20, 50, 100, 200};
 constexpr int kBackgroundTransparencyValues[] = {0, 20, 40, 80};
 
 } // namespace
+
+ClipboardLiteManager::ClipboardLiteManager(SettingModel* settings, QWidget* parent)
+    : QWidget(parent), applicationSettings_(settings) {}
 
 void ClipboardLiteManager::initialize()
 {
@@ -109,6 +114,7 @@ void ClipboardLiteManager::shutdown()
     if (!initialized_) {
         return;
     }
+    qrCodeRunner_.cancel();
     pasteTimer_->stop();
     accountFill_->Cancel();
     pendingPasteReady_ = false;
@@ -873,6 +879,30 @@ void ClipboardLiteManager::ShowAiFillSettingsDialog() {
 
 // ── Popup ────────────────────────────────────────────────────────
 
+void ClipboardLiteManager::GenerateQrCode(const QString& text) {
+    if (qrCodeRunner_.busy()) {
+        ShowHintMessage(QCoreApplication::translate("App", "二维码正在生成，请稍候"));
+        return;
+    }
+    if (!applicationSettings_) {
+        ShowHintMessage(QCoreApplication::translate("App", "请先设置截图保存目录"));
+        return;
+    }
+    bool autoSave = false;
+    QString directory;
+    applicationSettings_->getAutoSaveImage(autoSave, directory);
+    struct Result { QString path; QString error; };
+    auto result = std::make_shared<Result>();
+    ShowHintMessage(QCoreApplication::translate("App", "正在生成二维码…"));
+    qrCodeRunner_.start([text, directory, result]() {
+        result->path = QrCodeGenerator::save(text, directory, &result->error);
+    }, [this, result]() {
+        if (result->path.isEmpty()) { ShowHintMessage(result->error); return; }
+        if (popup_) popup_->HidePopup();
+        emit qrCodeGenerated(result->path);
+    });
+}
+
 void ClipboardLiteManager::ShowHistory(bool activate) {
     EnsurePopup();
     popup_->ShowPopup(activate);
@@ -916,6 +946,7 @@ void ClipboardLiteManager::EnsurePopup() {
     }
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
+    connect(popup_, &HistoryWindow::qrCodeRequested, this, &ClipboardLiteManager::GenerateQrCode);
     if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
     if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
     popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);

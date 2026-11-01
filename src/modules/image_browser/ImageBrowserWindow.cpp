@@ -822,6 +822,16 @@ void ImageBrowserWindow::layoutControlBar() {
     controlLevel_ = level;
 }
 
+void ImageBrowserWindow::openImage(const QString& path) {
+    if (busy_ || rendering_ || colorPending_ || colorRendering_) {
+        deferredActions_.append([this, path] { openImage(path); });
+        return;
+    }
+    if (!discardOrSave()) return;
+    const QFileInfo info(path);
+    openDirectory(info.absolutePath(), info.absoluteFilePath());
+}
+
 void ImageBrowserWindow::screenshotDirectory() {
     bool enabled = false;
     QString path;

@@ -24,6 +24,8 @@
 #include <memory>
 #include <vector>
 
+class SettingModel;
+
 // Self-contained clipboard history manager, ported from wtl_clipboard to Qt.
 // Owns global hotkeys, clipboard capture, paste simulation, persistence and
 // AI Fill orchestration. It does NOT own a tray icon: the host application's
@@ -33,6 +35,7 @@ class ClipboardLiteManager : public QWidget, public IToolModule {
     Q_OBJECT
 
 public:
+    explicit ClipboardLiteManager(SettingModel* settings = nullptr, QWidget* parent = nullptr);
     QString id() const override { return QStringLiteral("clipboard"); }
     void initialize() override;
     void shutdown() override;
@@ -43,6 +46,7 @@ public:
 
 signals:
     void wakeHotkeyChanged(const QString& hotkey);
+    void qrCodeGenerated(const QString& path);
 
 protected:
     bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
@@ -57,6 +61,7 @@ private slots:
 private:
 #ifdef NT_BUILD_CLIPBOARD_WINDOW_TEST
     friend int runFavoriteAccountManagerRegression();
+    friend int runClipboardQrCodeRegression();
 #endif
     enum class CaptureResult { Failed, Captured, IgnoredOwnChange };
 
@@ -116,6 +121,7 @@ private:
 
     // AI Fill
     void StartAiFill(size_t index);
+    void GenerateQrCode(const QString& text);
     void OnAiFillWorkerDone();
     void ShowAiFillSettingsDialog();
 
@@ -135,6 +141,8 @@ private:
     AiFillSettings aiFillSettings_;
     std::unique_ptr<AiFillController> aiFillController_;
     AsyncRunner aiFillRunner_;
+    AsyncRunner qrCodeRunner_;
+    SettingModel* applicationSettings_ = nullptr;
 
     QTimer* pasteTimer_ = nullptr;
     std::unique_ptr<FavoriteAccountFillController> accountFill_;

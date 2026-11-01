@@ -81,6 +81,13 @@ void WindowManager::openWidget(const QString& id)
     }
 }
 
+void WindowManager::openImage(const QString& path)
+{
+    if (modules_) {
+        if (auto* browser = modules_->module<ImageBrowser::ImageBrowserModule>()) browser->openImage(path);
+    }
+}
+
 void WindowManager::openLongScreenshotWidget(const QRect& captureRect,
                                              std::shared_ptr<QPixmap> originScreen)
 {

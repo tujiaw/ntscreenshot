@@ -17,6 +17,7 @@ public:
     void initialize() override;
     void shutdown() override;
     void open();
+    void openImage(const QString& path);
 
 protected:
     bool eventFilter(QObject* object, QEvent* event) override;

@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 	WindowManager windowManager;
     qInfo() << "main: WindowManager created, registering modules...";
 	ModuleRegistry modules;
-	auto* clipboard = modules.emplaceModule<ClipboardLiteManager>();
+	auto* clipboard = modules.emplaceModule<ClipboardLiteManager>(windowManager.setting());
     qInfo() << "main: registered ClipboardLiteManager";
 	modules.emplaceModule<CaptureModule>(&windowManager);
     qInfo() << "main: registered CaptureModule";
@@ -146,6 +146,7 @@ int main(int argc, char *argv[])
 	modules.emplaceModule<ShellModule>(&windowManager, clipboard);
     qInfo() << "main: registered ShellModule, total modules =" << modules.moduleIds().size();
 	windowManager.setModuleRegistry(&modules);
+    QObject::connect(clipboard, &ClipboardLiteManager::qrCodeGenerated, &windowManager, &WindowManager::openImage);
 	QObject::connect(&windowManager, &WindowManager::sigSettingChanged,
 	                 localSearch, &LocalSearchModule::applySettings);
 	CDarkStyle::assign(windowManager.setting()->themeMode());

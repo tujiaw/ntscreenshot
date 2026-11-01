@@ -4,6 +4,11 @@
 #include "modules/clipboard/FavoriteAccountParser.h"
 #include "modules/clipboard/ClipboardLiteManager.h"
 #include "core/platform/native/WinClipboard.h"
+#include "core/settings/SettingModel.h"
+#include "core/imaging/CodeScanner.h"
+#include "modules/image_browser/ImageBrowserModule.h"
+#include "modules/image_browser/ImageBrowserWindow.h"
+#include "modules/image_browser/ImageDirectoryModel.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -23,6 +28,9 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QEventLoop>
+#include <QThread>
+#include <QListView>
+#include <QFileInfo>
 #include "core/theme/ThemeManager.h"
 #include <cstdio>
 
@@ -375,6 +383,86 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     return 0;
 }
 
+int runClipboardQrCodeRegression() {
+    ClipboardHistory history;
+    ClipItem saved; saved.favorite = true; saved.text = QStringLiteral("收藏二维码\nhttps://example.com/?a=1&b=2");
+    ClipItem ordinary; ordinary.text = QStringLiteral("历史二维码：完整文字 😀");
+    ClipItem image; image.kind = ClipKind::Image;
+    history.ReplaceItems({saved, ordinary, image});
+    HistoryWindow window(1.0);
+    window.Configure(&history, {}, {}, {}, {}, {}, {}, false);
+    window.Refresh(); window.show(); qApp->processEvents();
+    auto* views = window.findChild<QButtonGroup*>(QStringLiteral("clipViewGroup"));
+    auto* list = window.findChild<QListWidget*>(QStringLiteral("clipList"));
+    QString requestedText;
+    QObject::connect(&window, &HistoryWindow::qrCodeRequested, &window,
+                     [&](const QString& text) { requestedText = text; });
+    const auto choose = [&](bool enabled) {
+        bool valid = false;
+        QTimer::singleShot(0, &window, [&]() {
+            auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+            if (!menu) return;
+            auto* selected = menu->findChild<QAction*>(QStringLiteral("clipGenerateQrAction"));
+            valid = selected && selected->isEnabled() == enabled && selected->menu() == nullptr;
+            if (!valid || !enabled) { menu->close(); return; }
+            menu->setActiveAction(selected);
+            QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier); qApp->sendEvent(menu, &enter);
+        });
+        list->customContextMenuRequested(list->visualItemRect(list->currentItem()).center());
+        return valid;
+    };
+    CHECK(choose(true));
+    CHECK(requestedText == ordinary.text);
+    views->button(1)->click();
+    CHECK(choose(true));
+    CHECK(requestedText == saved.text);
+    views->button(0)->click(); list->setCurrentRow(1);
+    requestedText.clear();
+    CHECK(choose(false)); CHECK(requestedText.isEmpty());
+    window.hide();
+
+    QTemporaryDir output; CHECK(output.isValid());
+    SettingModel settings(nullptr);
+    bool previousEnabled = false; QString previousDirectory;
+    settings.getAutoSaveImage(previousEnabled, previousDirectory);
+    struct Restore { SettingModel& settings; bool enabled; QString path;
+        ~Restore() { settings.setAutoSaveImage(enabled, path); }
+    } restore{settings, previousEnabled, previousDirectory};
+    settings.setAutoSaveImage(false, output.path()); // QR saving must also work with screenshot autosave off.
+    QImage old(32, 32, QImage::Format_RGB32); old.fill(Qt::blue);
+    CHECK(old.save(output.filePath(QStringLiteral("old.png"))));
+    ImageBrowser::ImageBrowserModule browser(&settings); browser.initialize(); browser.open();
+    ImageBrowser::ImageBrowserWindow* opened = nullptr;
+    for (auto* widget : QApplication::topLevelWidgets()) {
+        if ((opened = qobject_cast<ImageBrowser::ImageBrowserWindow*>(widget))) break;
+    }
+    CHECK(opened);
+    const auto wait = [](const std::function<bool()>& done) {
+        QElapsedTimer timer; timer.start();
+        while (!done() && timer.elapsed() < 10000) {
+            qApp->processEvents(QEventLoop::AllEvents, 10); QThread::msleep(1);
+        }
+        return done();
+    };
+    CHECK(wait([&]() { return opened->windowTitle().startsWith(QStringLiteral("old.png")); }));
+    ClipboardLiteManager manager(&settings);
+    QString generated;
+    QObject::connect(&manager, &ClipboardLiteManager::qrCodeGenerated, &browser, [&](const QString& path) {
+        generated = path; browser.openImage(path);
+    });
+    manager.GenerateQrCode(ordinary.text);
+    CHECK(wait([&]() { return !generated.isEmpty() && opened->windowTitle().startsWith(QFileInfo(generated).fileName()); }));
+    CHECK(QFileInfo(generated).absolutePath() == output.path());
+    CHECK(QFileInfo(generated).suffix() == QStringLiteral("jpg"));
+    auto* images = opened->findChild<QListView*>();
+    auto* model = qobject_cast<ImageBrowser::ImageDirectoryModel*>(images->model());
+    CHECK(model && model->pathAt(images->currentIndex().row()) == generated);
+    const auto decoded = CodeScanner::scan(QImage(generated));
+    CHECK(!decoded.isEmpty() && decoded.first().text == ordinary.text);
+    browser.shutdown();
+    return 0;
+}
+
 int runClipboardWindowTest(QApplication& app) {
     // The offscreen plugin does not enumerate installed Windows fonts reliably.
     // Load the same UI font explicitly so Chinese preview QA is representative.
@@ -552,6 +640,7 @@ int runClipboardWindowTest(QApplication& app) {
     qputenv("LOCALAPPDATA", originalLocalAppData);
     CHECK(runFavoriteAccountRegression(app, previewDir) == 0);
     CHECK(runFavoriteAccountManagerRegression() == 0);
+    CHECK(runClipboardQrCodeRegression() == 0);
     CHECK(runClipboardCacheRegression(app) == 0);
     CHECK(runClipboardPreviewRegression(app, previewDir) == 0);
     return runFavoriteSyncControllerTest(app, previewDir);

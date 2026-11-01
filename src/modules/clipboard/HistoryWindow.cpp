@@ -911,6 +911,9 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
     if (!account.url.isEmpty()) openUrl = menu.addAction(QCoreApplication::translate("App", "打开网址"));
     if (!account.username.isEmpty()) copyUsername = menu.addAction(QCoreApplication::translate("App", "复制用户名"));
     if (!account.password.isEmpty()) copyPassword = menu.addAction(QCoreApplication::translate("App", "复制密码"));
+    auto* generateQr = menu.addAction(QCoreApplication::translate("App", "生成二维码"));
+    generateQr->setObjectName(QStringLiteral("clipGenerateQrAction"));
+    generateQr->setEnabled(isText && !contextItem.text.isEmpty());
     QAction* previewAction = menu.addAction(QCoreApplication::translate("App", "预览"));
     previewAction->setShortcut(QKeySequence(Qt::Key_Space));
     QAction* deleteAction = nullptr;
@@ -932,6 +935,8 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
             ? account.url : QStringLiteral("https://") + account.url;
         if (!QDesktopServices::openUrl(QUrl(address, QUrl::StrictMode)))
             ShowHint(QCoreApplication::translate("App", "无法打开网址"));
+    } else if (selected == generateQr) {
+        emit qrCodeRequested(contextItem.text);
     } else if (selected == favoriteAction && toggleFavorite_) {
         const auto& items = history_->Items();
         const auto found = std::find_if(items.begin(), items.end(), [&](const ClipItem& item) {
