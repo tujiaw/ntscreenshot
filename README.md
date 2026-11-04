@@ -12,11 +12,30 @@
 [![Release](https://img.shields.io/github/v/release/tujiaw/ntscreenshot?include_prereleases)](https://github.com/tujiaw/ntscreenshot/releases)
 [![GitHub stars](https://img.shields.io/github/stars/tujiaw/ntscreenshot)](https://github.com/tujiaw/ntscreenshot/stargazers)
 
-**[Download the Windows installer](https://github.com/tujiaw/ntscreenshot/releases/latest)** · [Portable ZIP](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip) · [FAQ](#faq) · [Build from source](docs/building.en.md)
+**[Download the Windows installer](https://github.com/tujiaw/ntscreenshot/releases/latest)** · [Portable ZIP](https://github.com/tujiaw/ntscreenshot/releases/latest/download/ntscreenshot-x64-Release.zip) · [Quick start](#30-second-start) · [FAQ](#faq) · [Build from source](docs/building.en.md)
 
 Install `ntscreenshot-VERSION-x64-Setup.exe` for the current user without administrator privileges. The default location is `%LocalAppData%\Programs\ntscreenshot`; Start menu shortcuts are included and the desktop shortcut is optional. Upgrading and uninstalling preserve settings and favorites.
 
 Alternatively, extract `ntscreenshot-x64-Release.zip` and run `ntscreenshot.exe` without installation. If a release has no assets yet, follow the [build guide](docs/building.en.md).
+
+## 30-second start
+
+1. Launch the app, find it in the tray, and confirm hotkeys in Settings.
+2. `F5` to capture: drag a region, annotate from the toolbar, then copy, save, or pin.
+3. `F6` to pin a clipboard image; `Ctrl+Alt+I` to open the image browser.
+4. Enable OCR only if needed, using your own service credentials.
+
+| Hotkey | Action |
+| --- | --- |
+| `F5` | Screenshot |
+| `F6` | Pin |
+| `Alt+Space` | Local search (default; tries `Ctrl+Alt+Space` if occupied) |
+| `Ctrl+Alt+I` | Image browser |
+| `Ctrl+Alt+S` | Settings |
+
+Change hotkeys if they clash with a game or another app.
+
+Capture, pin, and search hotkeys are configurable. Image browser and Settings shortcuts are fixed and require successful registration.
 
 ## Features
 
@@ -32,17 +51,11 @@ Press `F5` to select a region. Window snapping, pixel-level tweaks, a magnifier,
 
 ### Image browser and editor
 
-Format conversion includes single-page PDF export using Qt, without extra libraries. Settings change with the selected format: output dimensions with aspect-ratio locking, color/grayscale, JPEG/WebP quality, PNG lossless compression, and PDF image-sized/A4 pages with automatic/portrait/landscape orientation and margins. PDF export retains the source image and undo history.
+Browse thumbnails, zoom and pan, or drop an image / folder to open it. Click **Edit** for nine tool groups: crop / rotate, annotations, perspective correction, mosaic, watermarks, stickers, filters, color adjustment, and background removal. Undo, redo, copy, and Save As keep the workflow in one window.
 
-Open **Image Browser** from the tray to browse the configured screenshot directory. Small images open at actual size; larger images fit with margins. The status bar shows pixel dimensions, file size, position, and zoom. Choose or drop a directory, drop an image to locate it, and browse with thumbnails, zoom, and pan. Crop, rotate, flip, resize, undo, and redo are available, with all actions also accessible from the context menu. F11 toggles full screen and Esc exits it. `Ctrl+S` saves a new PNG/JPEG; overwriting the source requires explicit confirmation. Format conversion supports PNG, JPEG, BMP, WebP, and ICO when their Qt plugins are installed. ICO offers 16/24/32/48/64/128/256 px sizes, preserving aspect ratio and centering with transparent padding in a single-size icon.
+![Image browser and editing tools](docs/assets/image-editor.png)
 
-The tray provides fixed global shortcuts: `Ctrl+Alt+I` for the image browser and `Ctrl+Alt+S` for settings, displayed beside each menu item when registered.
-
-Click **Edit** at the top left to open a floating panel. Nine tool buttons stay at the top, with the selected tool's settings directly below: crop/rotate, annotations, perspective correction, mosaic, watermarks, stickers, filters, color adjustment, and background removal. Choose a rectangle, ellipse or arrow and drag directly on the image; release to commit, or click to place text. Esc cancels the current stroke. Mosaic activates a circular brush immediately, with three effect preview buttons for pixel blocks, Gaussian blur and solid cover. The selected button is highlighted and the cover preview follows the chosen color; adjust brush diameter in screen pixels (consistent across image sizes and zoom levels), block size or blur radius, and cover color. Release to finish each stroke, Esc to cancel, and undo each stroke separately. Watermarks offer corner, center, tiled and custom-area layouts with opacity, font size, color and margin controls; stickers import local images. For crop, stickers or custom watermarks, click **Select area**, drag on the image, and press Enter or **Apply selection** to confirm; press Esc or **Cancel selection** to cancel. Switching tools cancels an uncommitted selection. The panel stays open while the image fits beside it, and details scroll in smaller windows. Perspective correction takes the original image's four corner coordinates. Filters include grayscale, sepia, invert, Gaussian blur, median denoise, sharpening, Canny edges, Otsu binarization and automatic contrast; color adjustment provides brightness, contrast, saturation, temperature, tint and opacity, with sliders, numeric inputs and reset. Color values apply automatically with 100 ms throttling, and consecutive adjustments share one undo step. Image processing leaves unrelated toolbar buttons and their styles unchanged; actions requested during rendering run after the latest result is ready. GrabCut background removal takes a subject rectangle with some background outside it, supports iteration and feather settings, and preserves original dimensions and subject alpha. Its analysis image is bounded to a 1280 px longest side; complex hair or transparent objects may need another selection. Save transparent results as PNG. Edits support undo, redo, copy, and save, using the existing Qt/OpenCV dependencies.
-
-On Windows, use the top-right **More** menu to set the current image as the desktop or lock screen background, including unsaved edits. A persistent image copy is saved with transparent areas filled white, so moving or deleting the original does not affect the copy. System errors are shown if setting the background fails.
-
-Play or pause GIFs and use **Edit current frame** to export a static image. Animated WebP depends on the installed Qt image plugin, with a message when unsupported. Browsing is nonrecursive; images above 72 megapixels use a restricted preview.
+Convert to PNG, JPEG, BMP, WebP or ICO when their Qt plugins are available, or export a single-page PDF. Save transparent cutouts as PNG. Play or pause GIFs and edit the current frame. See the [image browser guide](docs/image-browser.en.md) for controls, export options, and limits.
 
 ### Local search
 
@@ -53,7 +66,7 @@ One box for local apps, files, folders, and browser bookmarks. Arrow keys select
 ### Pinning and productivity
 
 - `F6` pins a clipboard image on the desktop, with multi-pin and border options
-- Local clipboard history
+- Local clipboard history and favorites; optional clipboard AI form filling
 - Optional cross-device favorites sync with GitHub sign-in and a shared hosted service. No server or storage setup is needed by users. [Service guide](cloud/clipboard-sync/README.md)
 
 ### Settings
@@ -62,27 +75,10 @@ Open Settings from the tray. Startup, light / dark theme, capture / pin hotkeys,
 
 ![Settings](settings.png)
 
-### AI 对话与划词 / AI chat and text selection
+### AI chat and text selection
 
-这两项功能已迁移至独立项目 [auto-browser](https://github.com/tujiaw/auto-browser)。截图包不再包含浏览器内核；配置与聊天记录的导入方式见 [迁移说明](docs/ai-migration.md)。
+AI chat, the embedded browser, and text selection have moved to [auto-browser](https://github.com/tujiaw/auto-browser). This app no longer bundles a browser engine. See the [migration guide](docs/ai-migration.md) for configuration and chat history imports.
 
-## 30-second start
-
-1. Launch the app, find it in the tray, and confirm hotkeys in Settings.
-2. `F5` to capture: drag a region, annotate from the toolbar, then copy, save, or pin.
-3. `F6` to pin.
-4. Enable OCR only if needed, using your own service credentials.
-
-| Hotkey | Action |
-| --- | --- |
-| `F5` | Screenshot |
-| `F6` | Pin |
-
-Change hotkeys if they clash with a game or another app.
-
-## Why ntscreenshot
-
-The built-in snipping tool is fine for a quick copy. It does not pin images, stitch long pages, or search local files. Commercial tools are polished, but they are often closed-source or subscription-based. ntscreenshot puts the daily workflow in one open-source tray app, and keeps data on your machine by default.
 
 ## Platforms
 
@@ -99,7 +95,7 @@ The built-in snipping tool is fine for a quick copy. It does not pin images, sti
 - Antivirus flags, dead hotkeys, no window after launch: [FAQ](docs/faq.en.md)
 - OCR / AI / where data lives: [FAQ](docs/faq.en.md) · [Privacy](PRIVACY.en.md)
 
-Capture, pinning, clipboard history, and local search run offline by default. Text or images leave the machine only when you enable and invoke a network feature. See [Privacy](PRIVACY.en.md).
+Capture, pinning, clipboard history, and local search run offline by default. Text or images leave the machine only when you enable and invoke a network feature. Favorites sync is off by default; ordinary clipboard history is not uploaded. Cloud favorites currently do not use end-to-end encryption. See [Privacy](PRIVACY.en.md).
 
 ## Docs
 

@@ -3,6 +3,7 @@
 面向使用者：
 
 - [常见问题](faq.md) · [FAQ (English)](faq.en.md)
+- [图片浏览与编辑](image-browser.md) · [Image browser and editor](image-browser.en.md)
 - [隐私说明](../PRIVACY.md) · [Privacy](../PRIVACY.en.md)
 
 面向开发者：
