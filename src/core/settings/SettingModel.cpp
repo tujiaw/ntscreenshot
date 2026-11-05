@@ -121,7 +121,7 @@ SettingModel::~SettingModel() {}
 void SettingModel::revertDefault()
 {
     setAutoStart(false);
-    setUiLanguage(QStringLiteral("en"));
+    setUiLanguage(QStringLiteral("zh"));
     setScreenshotGlobalKey("F5");
     setPinGlobalKey("F6");
 
@@ -134,7 +134,7 @@ void SettingModel::revertDefault()
     setLocalSearchExcludePatterns(defaultLocalSearchExcludePatterns());
     settings_.setValue(KEY_LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION,
                        LOCAL_SEARCH_EXCLUDES_DEFAULT_VERSION);
-    setThemeMode(AppTheme::Dark);
+    setThemeMode(AppTheme::Light);
     setScreenshotCursorStyle(ScreenshotCursorStyle::Color);
     setSelectionBorderColor(Style::DRAW_SELECTED_BORDER_COLOR);
     setSelectionBorderStyle(Qt::SolidLine);
@@ -205,7 +205,7 @@ bool SettingModel::autoStart() const
 
 QString SettingModel::uiLanguage() const
 {
-    const QString language = settings_.value(KEY_UI_LANGUAGE, QStringLiteral("en")).toString();
+    const QString language = settings_.value(KEY_UI_LANGUAGE, QStringLiteral("zh")).toString();
     return language == QStringLiteral("zh") ? language : QStringLiteral("en");
 }
 
@@ -550,7 +550,7 @@ void SettingModel::setThemeMode(AppTheme themeMode)
 
 AppTheme SettingModel::themeMode() const
 {
-    return appThemeFromSettingValue(settings_.value(KEY_THEME_MODE, QStringLiteral("dark")).toString());
+    return appThemeFromSettingValue(settings_.value(KEY_THEME_MODE, QStringLiteral("light")).toString());
 }
 
 // --------------------------------------------------------------------------

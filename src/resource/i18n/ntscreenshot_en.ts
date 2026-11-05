@@ -1882,8 +1882,7 @@ Copied to clipboard</translation>
     <message>
       <location filename="../../modules/settings/Settings.ui" line="329" />
       <source>RGB</source>
-      <translation type="unfinished">
-      </translation>
+      <translation>RGB</translation>
     </message>
     <message>
       <location filename="../../modules/settings/Settings.ui" line="336" />

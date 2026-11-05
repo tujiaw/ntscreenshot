@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     // Install the translator before any settings defaults or UI labels are created.
     QTranslator englishTranslator;
     QSettings languageSettings(Util::getConfigPath(), QSettings::IniFormat);
-    if (languageSettings.value(QStringLiteral("UI_LANGUAGE"), QStringLiteral("en")).toString()
+    if (languageSettings.value(QStringLiteral("UI_LANGUAGE"), QStringLiteral("zh")).toString()
         != QStringLiteral("zh")) {
         if (englishTranslator.load(QStringLiteral(":/i18n/ntscreenshot_en.qm"))) {
             a.installTranslator(&englishTranslator);

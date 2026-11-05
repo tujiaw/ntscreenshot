@@ -4,6 +4,23 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-05
+
+### Added
+
+- Added QR code tools and favorite-account autofill with account badges and browser shortcuts.
+
+### Changed
+
+- Default to Chinese and the light theme for new installations and when restoring defaults.
+- Aligned settings controls, tightened spacing, separated capture shortcuts, and removed redundant screenshot hints.
+- Refreshed the bilingual README and application screenshots.
+
+### Fixed
+
+- Prevented English settings labels and controls from being squeezed or clipped, and restored the missing RGB label.
+- Fixed screenshot auto-save, GIF deletion, and text caret alignment.
+
 ## [0.2.4] - 2026-10-27
 
 ### Added
