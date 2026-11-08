@@ -936,9 +936,18 @@ void ClipboardLiteManager::EnsurePopup() {
     auto aiFill = [this](size_t index) { StartAiFill(index); };
     auto moved = [this](const QPoint& position) { SavePopupPosition(position); };
     auto resized = [this](const QSize& size) { SavePopupSize(size); };
+    auto edit = [this](size_t index, const QString& text) {
+        if (index >= history_.Items().size()) return;
+        const bool favorite = history_.Items()[index].favorite;
+        if (history_.UpdateText(index, text)) {
+            MarkHistoryDirty(favorite);
+            SyncHistoryStore();
+            if (popup_) popup_->RefreshItemText(index);
+        }
+    };
     const bool configured = aiFillSettings_.IsConfigured();
     if (popup_) {
-        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);
+        popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite, edit);
         popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
         popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
         popup_->SetBackgroundTransparency(backgroundTransparency_);
@@ -949,7 +958,7 @@ void ClipboardLiteManager::EnsurePopup() {
     connect(popup_, &HistoryWindow::qrCodeRequested, this, &ClipboardLiteManager::GenerateQrCode);
     if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
     if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
-    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite);
+    popup_->Configure(&history_, paste, remove, close, aiFill, moved, resized, configured, toggleFavorite, edit);
     popup_->SetSavedPosition(popupPosition_, hasPopupPosition_);
     popup_->SetSavedSize(popupSize_, hasPopupSize_, popupScaleFactor_);
     popup_->SetBackgroundTransparency(backgroundTransparency_);

@@ -20,11 +20,14 @@
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QPushButton>
+#include <QToolButton>
 #include <QFontDatabase>
 #include <QElapsedTimer>
 #include <QBuffer>
 #include <QScrollBar>
+#include <QScreen>
 #include <QPlainTextEdit>
+#include <QTextCursor>
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QEventLoop>
@@ -208,39 +211,127 @@ int runClipboardPreviewRegression(QApplication& app, const QString& previewDir) 
     HistoryWindow window(1.0); window.Configure(&history, {}, {}, {}, {}, {}, {}, false);
     window.Refresh(); window.show(); window.activateWindow(); app.processEvents();
     auto* list = window.findChild<QListWidget*>(QStringLiteral("clipList"));
+    auto* search = window.findChild<QLineEdit*>(QStringLiteral("clipSearchEdit"));
+    const QRect baseGeometry = window.geometry();
     QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+
+    // Space opens the preview overlay inside the same popup window.
     app.sendEvent(list, &space); app.processEvents();
     auto* preview = window.findChild<QWidget*>(QStringLiteral("clipboardPreviewWindow"));
-    CHECK(preview && preview->isWindow() && preview->isVisible());
+    CHECK(preview && !preview->isWindow() && preview->isVisible());
+    // The window never resizes: the preview overlays the list area instead.
+    CHECK(window.geometry() == baseGeometry);
+    CHECK(!list->isVisible());
+    // The header stays at the top and is not covered by the preview, so it
+    // remains draggable and its controls stay usable.
+    CHECK(search && search->isVisible());
+    CHECK(preview->mapTo(&window, QPoint(0, 0)).y() > search->mapTo(&window, QPoint(0, 0)).y());
     auto* text = preview->findChild<QPlainTextEdit*>(QStringLiteral("clipboardPreviewText"));
     auto* canvas = preview->findChild<QGraphicsView*>(QStringLiteral("clipboardPreviewImage"));
     CHECK(text && canvas && text->isReadOnly() && text->toPlainText() == first.text);
-    if (!previewDir.isEmpty()) CHECK(preview->grab().save(previewDir + QStringLiteral("/preview-text.png")));
+    if (!previewDir.isEmpty()) CHECK(window.grab().save(previewDir + QStringLiteral("/preview-text.png")));
+
+    // Image entries render in the same overlay.
     list->setCurrentRow(1); app.processEvents();
     CHECK(canvas->isVisible() && !text->isVisible() && canvas->scene()->items().size() == 1);
-    if (!previewDir.isEmpty()) CHECK(preview->grab().save(previewDir + QStringLiteral("/preview-image.png")));
+    if (!previewDir.isEmpty()) CHECK(window.grab().save(previewDir + QStringLiteral("/preview-image.png")));
     QKeyEvent next(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
     app.sendEvent(canvas->viewport(), &next); app.processEvents();
     CHECK(list->currentRow() == 2 && text->isVisible() && text->toPlainText() == third.text);
+
+    // Space toggles the preview closed and reveals the list again.
     app.sendEvent(list, &space); app.processEvents();
+    CHECK(!preview->isVisible() && list->isVisible());
+    CHECK(window.geometry() == baseGeometry);
     CHECK(window.findChildren<QWidget*>(QStringLiteral("clipboardPreviewWindow")).size() == 1);
-    const auto settleFocus = [&]() { QEventLoop loop; QTimer::singleShot(80, &loop, &QEventLoop::quit); loop.exec(); };
-    preview->activateWindow(); app.processEvents(); settleFocus(); CHECK(preview->isVisible());
-    window.activateWindow(); app.processEvents(); settleFocus(); CHECK(preview->isVisible());
-    QWidget outside; outside.show(); outside.activateWindow(); app.processEvents(); settleFocus();
-    CHECK(!preview->isVisible()); outside.hide();
-    window.activateWindow(); app.processEvents(); app.sendEvent(list, &space); app.processEvents();
-    CHECK(preview->isVisible());
-    QEvent deactivate(QEvent::ApplicationDeactivate); app.sendEvent(&app, &deactivate);
-    CHECK(!preview->isVisible());
+
+    // Space opens it again (one pane, not a new window).
     app.sendEvent(list, &space); app.processEvents();
-    CHECK(preview->isVisible() && window.findChild<QWidget*>(QStringLiteral("clipboardPreviewWindow")) == preview);
-    history.ReplaceItems({}); window.Refresh(); CHECK(!preview->isVisible());
-    history.AddText("reopened"); window.Refresh(); app.sendEvent(list, &space); app.processEvents();
-    CHECK(preview->isVisible() && text->toPlainText() == QStringLiteral("reopened"));
+    CHECK(preview->isVisible() && !preview->isWindow() && !list->isVisible());
+
+    // Escape inside the pane closes the preview but keeps the popup open.
     QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
-    app.sendEvent(text, &escape); CHECK(!preview->isVisible() && window.isVisible());
-    app.sendEvent(list, &space); window.hide(); CHECK(!preview->isVisible());
+    app.sendEvent(text, &escape); app.processEvents();
+    CHECK(!preview->isVisible() && window.isVisible() && list->isVisible());
+
+    // An empty list hides the pane as well.
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible());
+    history.ReplaceItems({}); window.Refresh(); app.processEvents();
+    CHECK(!preview->isVisible());
+
+    history.AddText(QStringLiteral("reopened")); window.Refresh();
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible() && text->toPlainText() == QStringLiteral("reopened"));
+
+    // Hiding the popup also hides the pane.
+    window.hide();
+    CHECK(!preview->isVisible());
+    window.show(); app.processEvents();
+    CHECK(!preview->isVisible() && list->isVisible());
+    return 0;
+}
+
+int runClipboardTextEditRegression(QApplication& app) {
+    ClipboardHistory history;
+    history.AddText(QStringLiteral("edit me"));
+    history.AddText(QStringLiteral("other")); // items: [other, edit me]
+    HistoryWindow window(1.0);
+    size_t editedIndex = size_t(-1);
+    window.Configure(&history, {}, {}, {}, {}, {}, {}, false, {},
+        [&](size_t index, const QString& text) {
+            if (history.UpdateText(index, text)) editedIndex = index;
+        });
+    window.Refresh(); window.show(); window.activateWindow(); app.processEvents();
+    auto* list = window.findChild<QListWidget*>(QStringLiteral("clipList"));
+    QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    list->setCurrentRow(1); // "edit me"
+    app.sendEvent(list, &space); app.processEvents();
+    auto* preview = window.findChild<QWidget*>(QStringLiteral("clipboardPreviewWindow"));
+    auto* text = preview ? preview->findChild<QPlainTextEdit*>(QStringLiteral("clipboardPreviewText")) : nullptr;
+    auto* editButton = preview ? preview->findChild<QToolButton*>(QStringLiteral("clipPreviewEditButton")) : nullptr;
+    auto* backButton = preview ? preview->findChild<QToolButton*>(QStringLiteral("clipPreviewBackButton")) : nullptr;
+    CHECK(preview && text && editButton && backButton);
+    // Read-only by default.
+    CHECK(text->isReadOnly() && text->toPlainText() == QStringLiteral("edit me"));
+    CHECK(editButton->isVisible() && backButton->isVisible());
+    CHECK(editButton->text() == QCoreApplication::translate("App", "编辑"));
+
+    // Enter edit mode: the button becomes "保存".
+    editButton->click(); app.processEvents();
+    CHECK(!text->isReadOnly() && editButton->text() == QCoreApplication::translate("App", "保存"));
+
+    // Space now types a space instead of closing the pane.
+    text->moveCursor(QTextCursor::End);
+    QKeyEvent spaceKey(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+    app.sendEvent(text, &spaceKey); app.processEvents();
+    CHECK(preview->isVisible() && text->toPlainText() == QStringLiteral("edit me "));
+
+    // Save: the edit commits and the preview returns to the list.
+    text->setPlainText(QStringLiteral("edited content"));
+    app.processEvents();
+    editButton->click(); app.processEvents(); // "保存"
+    CHECK(!preview->isVisible());
+    CHECK(editedIndex == size_t(1));
+    CHECK(history.Items()[1].text == QStringLiteral("edited content"));
+
+    // The back button closes the preview and returns to the list.
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible());
+    backButton->click(); app.processEvents();
+    CHECK(!preview->isVisible());
+
+    // Navigating to another row first commits a pending edit.
+    history.AddText(QStringLiteral("third"));
+    window.Refresh();
+    list->setCurrentRow(2); // "edited content" is items[2] after the insert
+    app.sendEvent(list, &space); app.processEvents();
+    CHECK(preview->isVisible());
+    editButton->click(); app.processEvents();
+    text->setPlainText(QStringLiteral("edited again"));
+    app.processEvents();
+    list->setCurrentRow(0); app.processEvents();
+    CHECK(history.Items()[2].text == QStringLiteral("edited again"));
     return 0;
 }
 
@@ -643,6 +734,7 @@ int runClipboardWindowTest(QApplication& app) {
     CHECK(runClipboardQrCodeRegression() == 0);
     CHECK(runClipboardCacheRegression(app) == 0);
     CHECK(runClipboardPreviewRegression(app, previewDir) == 0);
+    CHECK(runClipboardTextEditRegression(app) == 0);
     return runFavoriteSyncControllerTest(app, previewDir);
 }
 

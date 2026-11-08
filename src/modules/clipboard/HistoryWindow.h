@@ -29,6 +29,7 @@ public:
     using AiFillCallback = std::function<void(size_t)>;
     using MoveCallback = std::function<void(const QPoint&)>;
     using ResizeCallback = std::function<void(const QSize&)>;
+    using EditCallback = std::function<void(size_t, const QString&)>;
 
     explicit HistoryWindow(qreal scaleFactor, QWidget* parent = nullptr);
 
@@ -40,7 +41,8 @@ public:
                    MoveCallback moved,
                    ResizeCallback resized,
                    bool aiConfigured,
-                   DeleteCallback toggleFavorite = {});
+                   DeleteCallback toggleFavorite = {},
+                   EditCallback edit = {});
     void SetSavedPosition(const QPoint& position, bool available);
     void SetBackgroundTransparency(int percent);
     void SetSavedSize(const QSize& size, bool available, qreal savedScaleFactor = 1.0);
@@ -48,6 +50,7 @@ public:
     void ShowPopup(bool activate = false);
     void HidePopup();
     void Refresh();
+    void RefreshItemText(size_t index);
     void ShowHint(const QString& text, int timeoutMs = 2400);
     bool IsPopupVisible() const;
     size_t HistoryIndexForRow(int row) const;
@@ -81,8 +84,14 @@ private:
     void DeleteSelected();
     void AiFillSelected();
     void ToggleFavoriteSelected();
-    void PreviewSelected();
+    void TogglePreview();
+    void ShowPreview();
+    void HidePreview();
+    void UpdatePreview();
     void PreviewItem(const ClipItem& item);
+    void EnsurePreview();
+    void CommitPendingEdit();
+    void ApplyPreviewTheme();
     void BuildList();
     void ShowContextMenu(const QPoint& globalPos);
     void ApplyTheme();
@@ -97,12 +106,15 @@ private:
     AiFillCallback aiFill_;
     MoveCallback moved_;
     ResizeCallback resized_;
+    EditCallback edit_;
     bool aiConfigured_ = false;
     bool hasSavedPosition_ = false;
     QPoint savedPosition_;
 
     QWidget* header_ = nullptr;
     ClipboardPreviewWindow* preview_ = nullptr;
+    bool previewVisible_ = false;
+    size_t previewIndex_ = static_cast<size_t>(-1);
     QToolButton* closeButton_ = nullptr;
     QToolButton* clearSearchButton_ = nullptr;
     QLineEdit* searchEdit_ = nullptr;
@@ -111,6 +123,7 @@ private:
     QToolButton* clipboardViewButton_ = nullptr;
     QToolButton* favoritesViewButton_ = nullptr;
     QStackedWidget* pages_ = nullptr;
+    QStackedWidget* bodyStack_ = nullptr;
     QWidget* syncPage_ = nullptr;
     QToolButton* syncSettingsButton_ = nullptr;
     QWidget* body_ = nullptr;

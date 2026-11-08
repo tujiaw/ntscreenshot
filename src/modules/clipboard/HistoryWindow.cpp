@@ -16,6 +16,7 @@
 #include <QCursor>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QHBoxLayout>
 #include <QHash>
 #include <QHideEvent>
 #include <QImage>
@@ -472,6 +473,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     setObjectName(QStringLiteral("HistoryWindowRoot"));
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground, true);
+    setAttribute(Qt::WA_NoSystemBackground, true);
     setMinimumSize(scaled(kMinimumWidth), scaled(kMinimumHeight));
     resize(scaled(kPopupWidth), scaled(kPopupHeight));
 
@@ -539,7 +541,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     connect(viewGroup_, &QButtonGroup::idClicked, this, [this](int id) {
         pages_->setCurrentIndex(id == 2 ? 1 : 0);
         searchEdit_->setEnabled(id != 2);
-        if (id == 2) { if (preview_) preview_->hide(); syncPage_->setFocus(); return; }
+        if (id == 2) { HidePreview(); syncPage_->setFocus(); return; }
         searchEdit_->setPlaceholderText(id == 1
             ? QCoreApplication::translate("App", "搜索收藏")
             : QCoreApplication::translate("App", "搜索剪切板"));
@@ -569,7 +571,8 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     headerLayout->addWidget(closeButton_);
     root->addWidget(header_);
 
-    body_ = new QWidget(this);
+    bodyStack_ = new QStackedWidget(this);
+    body_ = new QWidget(bodyStack_);
     auto* bodyLayout = new QVBoxLayout(body_);
     bodyLayout->setContentsMargins(0, 0, 0, 0);
     bodyLayout->setSpacing(0);
@@ -603,9 +606,10 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
 
     bodyLayout->addWidget(list_, 1);
     bodyLayout->addWidget(emptyState_);
+    bodyStack_->addWidget(body_);
     pages_ = new QStackedWidget(this);
     pages_->setObjectName(QStringLiteral("clipPages"));
-    pages_->addWidget(body_);
+    pages_->addWidget(bodyStack_);
     syncPage_ = new QWidget(pages_);
     pages_->addWidget(syncPage_);
     root->addWidget(pages_, 1);
@@ -632,7 +636,7 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     connect(searchEdit_, &QLineEdit::textChanged, this, &HistoryWindow::onSearchChanged);
     connect(list_, &QListWidget::itemActivated, this, &HistoryWindow::onItemActivated);
     connect(list_, &QListWidget::currentRowChanged, this, [this]() {
-        if (preview_ && preview_->isVisible()) PreviewSelected();
+        if (previewVisible_) UpdatePreview();
     });
     connect(timeTimer_, &QTimer::timeout, this, &HistoryWindow::onRelativeTimeTick);
     connect(toastTimer_, &QTimer::timeout, toastLabel_, &QLabel::hide);
@@ -671,7 +675,8 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
                               AiFillCallback aiFill,
                               MoveCallback moved,
                               ResizeCallback resized,
-                              bool aiConfigured, DeleteCallback toggleFavorite) {
+                              bool aiConfigured, DeleteCallback toggleFavorite,
+                              EditCallback edit) {
     history_ = history;
     paste_ = std::move(paste);
     remove_ = std::move(remove);
@@ -680,6 +685,7 @@ void HistoryWindow::Configure(const ClipboardHistory* history,
     aiFill_ = std::move(aiFill);
     moved_ = std::move(moved);
     resized_ = std::move(resized);
+    edit_ = std::move(edit);
     aiConfigured_ = aiConfigured;
     static_cast<HistoryDelegate*>(delegate_)->setHistory(history_);
 }
@@ -702,6 +708,7 @@ void HistoryWindow::SetSavedSize(const QSize& size, bool available, qreal savedS
 }
 
 void HistoryWindow::ShowPopup(bool activate) {
+    if (previewVisible_) HidePreview();
     ApplyTheme();
     Refresh();
     QScreen* screen = hasSavedPosition_
@@ -836,9 +843,9 @@ void HistoryWindow::BuildList() {
         }
     }
     list_->setUpdatesEnabled(true);
-    if (preview_ && preview_->isVisible()) {
-        if (list_->currentItem()) PreviewSelected();
-        else preview_->hide();
+    if (previewVisible_) {
+        if (list_->currentItem()) UpdatePreview();
+        else HidePreview();
     }
 }
 
@@ -944,7 +951,7 @@ void HistoryWindow::ShowContextMenu(const QPoint& globalPos) {
         });
         if (found != items.end()) toggleFavorite_(static_cast<size_t>(std::distance(items.begin(), found)));
     } else if (previewAction && selected == previewAction) {
-        PreviewItem(contextItem);
+        ShowPreview();
     } else if (selected == copyAction) {
         CopySelected();
     } else if (deleteAction && selected == deleteAction) {
@@ -968,20 +975,133 @@ void HistoryWindow::ToggleFavoriteSelected() {
     }
 }
 
-void HistoryWindow::PreviewSelected() {
+void HistoryWindow::TogglePreview() {
+    if (previewVisible_) {
+        HidePreview();
+        return;
+    }
+    ShowPreview();
+}
+
+void HistoryWindow::ShowPreview() {
+    if (!list_->currentItem()) return;
+    UpdatePreview();
+    if (!preview_) return;
+    previewVisible_ = true;
+    // The preview is a page of the body stack, so it fills exactly the list
+    // area below the header. Toggling it never moves/resizes the window and
+    // never overlaps the header (which stays draggable).
+    bodyStack_->setCurrentWidget(preview_);
+    if (resizeGrip_) resizeGrip_->hide();
+    if (history_ && previewIndex_ < history_->Items().size()
+        && history_->Items()[previewIndex_].kind == ClipKind::Image) {
+        preview_->FocusImage();
+    } else {
+        preview_->setFocus();
+    }
+}
+
+void HistoryWindow::UpdatePreview() {
     const size_t index = HistoryIndexForRow(list_->currentRow());
     if (!history_ || index >= history_->Items().size()) return;
+    CommitPendingEdit();
+    previewIndex_ = index;
     PreviewItem(history_->Items()[index]);
 }
 
 void HistoryWindow::PreviewItem(const ClipItem& item) {
-    if (!preview_) {
-        preview_ = new ClipboardPreviewWindow(this);
-        connect(preview_, &ClipboardPreviewWindow::navigateRequested, this, [this](int delta) {
-            list_->setCurrentRow(qBound(0, list_->currentRow() + delta, list_->count() - 1));
-        });
-    }
+    EnsurePreview();
     preview_->ShowItem(item);
+}
+
+void HistoryWindow::EnsurePreview() {
+    if (preview_) return;
+    preview_ = new ClipboardPreviewWindow(bodyStack_);
+    bodyStack_->addWidget(preview_);
+    connect(preview_, &ClipboardPreviewWindow::navigateRequested, this, [this](int delta) {
+        if (list_->count() == 0) return;
+        list_->setCurrentRow(qBound(0, list_->currentRow() + delta, list_->count() - 1));
+    });
+    connect(preview_, &ClipboardPreviewWindow::dismissRequested, this, &HistoryWindow::HidePreview);
+    connect(preview_, &ClipboardPreviewWindow::editCommitted, this, [this](const QString& text) {
+        if (edit_ && history_ && previewIndex_ < history_->Items().size()) {
+            edit_(previewIndex_, text);
+        }
+    });
+    ApplyPreviewTheme();
+}
+
+void HistoryWindow::CommitPendingEdit() {
+    if (preview_) preview_->CommitEdit();
+}
+
+void HistoryWindow::RefreshItemText(size_t index) {
+    if (!history_ || !list_ || index >= history_->Items().size()) return;
+    // A filtered list must re-run its query; otherwise update the row in place
+    // so focus and selection are preserved.
+    if (!lastQuery_.isEmpty()) {
+        BuildList();
+        return;
+    }
+    auto* delegate = static_cast<HistoryDelegate*>(delegate_);
+    delegate->UpdateFavoriteMarkers();
+    const bool favorites = viewGroup_->checkedId() == 1;
+    const QString text = history_->Items()[index].text;
+    for (int row = 0; row < list_->count(); ++row) {
+        QListWidgetItem* item = list_->item(row);
+        if (item->data(Qt::UserRole).toInt() != static_cast<int>(index)) continue;
+        item->setText(text);
+        item->setData(kContentRole, text);
+        item->setData(kFavoriteRole, !favorites && delegate->FavoriteMarked(index));
+        item->setData(kAccountRole, favorites && delegate->AccountMarked(index));
+        break;
+    }
+    list_->doItemsLayout();
+    list_->viewport()->update();
+}
+
+void HistoryWindow::HidePreview() {
+    if (!preview_) return;
+    CommitPendingEdit();
+    QWidget* focused = QApplication::focusWidget();
+    const bool hadFocus = focused && preview_->isAncestorOf(focused);
+    previewVisible_ = false;
+    bodyStack_->setCurrentWidget(body_);
+    if (resizeGrip_) resizeGrip_->show();
+    if (hadFocus && list_) list_->setFocus();
+}
+
+void HistoryWindow::ApplyPreviewTheme() {
+    if (!preview_) return;
+    const ThemeTokens& tokens = ThemeManager::tokens();
+    QPalette previewPalette = preview_->palette();
+    previewPalette.setColor(QPalette::Window, Qt::transparent);
+    previewPalette.setColor(QPalette::Base, Qt::transparent);
+    previewPalette.setColor(QPalette::Text, tokens.textPrimary);
+    previewPalette.setColor(QPalette::WindowText, tokens.textPrimary);
+    previewPalette.setColor(QPalette::PlaceholderText, tokens.textSecondary);
+    preview_->setPalette(previewPalette);
+    // The popup paints the pane surface itself so the rounded window corners
+    // stay intact; the pane and its content must not paint an opaque square.
+    preview_->setStyleSheet(
+        QStringLiteral("QWidget#clipboardPreviewWindow { background: transparent; }"
+                       "QPlainTextEdit#clipboardPreviewText, QGraphicsView#clipboardPreviewImage {"
+                       " background: transparent; border: none; }"
+                       "QToolButton#clipPreviewBackButton, QToolButton#clipPreviewEditButton {"
+                       " color: %1; background: %2; border: 1px solid %3; border-radius: %4px;"
+                       " padding: %5px %6px; }"
+                       "QToolButton#clipPreviewBackButton:hover, QToolButton#clipPreviewEditButton:hover {"
+                       " background: %7; }"
+                       "QToolButton#clipPreviewBackButton:pressed, QToolButton#clipPreviewEditButton:pressed {"
+                       " background: %8; }")
+            .arg(CssColor(tokens.textPrimary))
+            .arg(CssColor(tokens.surfaceRaised))
+            .arg(CssColor(tokens.border))
+            .arg(scaled(4))
+            .arg(scaled(2)).arg(scaled(8))
+            .arg(CssColor(tokens.surfaceSubtle))
+            .arg(CssColor(tokens.accentSubtle)));
+    preview_->update();
 }
 
 void HistoryWindow::ApplyTheme() {
@@ -1051,6 +1171,7 @@ void HistoryWindow::ApplyTheme() {
                  CssColor(palette.color(QPalette::Highlight)))
             .arg(scaled(5)).arg(scaled(12)).arg(scaled(10)));
     resizeGrip_->setStyleSheet(QStringLiteral("background: transparent;"));
+    ApplyPreviewTheme();
     update();
     list_->viewport()->update();
 }
@@ -1107,7 +1228,8 @@ void HistoryWindow::paintEvent(QPaintEvent*) {
     painter.save();
     painter.setClipPath(path);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.fillRect(pages_->geometry(), WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
+    const QRect pagesRect(pages_->mapTo(this, QPoint(0, 0)), pages_->size());
+    painter.fillRect(pagesRect, WithAlpha(ThemeManager::tokens().surface, backgroundAlpha_));
     painter.restore();
     // Keep the outline visible in both themes, independently of background transparency.
     painter.setPen(QPen(ThemeManager::tokens().borderStrong, frameWidth));
@@ -1116,8 +1238,12 @@ void HistoryWindow::paintEvent(QPaintEvent*) {
 
 void HistoryWindow::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
-        if (preview_ && preview_->isVisible()) { preview_->hide(); return; }
+        if (previewVisible_) { HidePreview(); return; }
         onCloseClicked();
+        return;
+    }
+    if (event->key() == Qt::Key_Space && event->modifiers() == Qt::NoModifier && previewVisible_) {
+        HidePreview();
         return;
     }
     QWidget::keyPressEvent(event);
@@ -1135,7 +1261,8 @@ void HistoryWindow::showEvent(QShowEvent* event) {
 }
 
 void HistoryWindow::hideEvent(QHideEvent* event) {
-    if (preview_) preview_->hide();
+    if (previewVisible_) HidePreview();
+    else if (preview_) preview_->hide();
     timeTimer_->stop();
     toastTimer_->stop();
     toastLabel_->hide();
@@ -1164,7 +1291,7 @@ void HistoryWindow::resizeEvent(QResizeEvent* event) {
     if (searchEdit_) {
         searchEdit_->setFixedWidth(qMax(scaled(80), width() / 3));
     }
-    if (isVisible() && resizeSaveTimer_) {
+    if (isVisible() && resizeSaveTimer_ && !previewVisible_) {
         resizeSaveTimer_->start();
     }
 }
@@ -1172,7 +1299,7 @@ void HistoryWindow::resizeEvent(QResizeEvent* event) {
 bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
     if (obj == resizeGrip_ && event->type() == QEvent::MouseButtonRelease) {
         resizeSaveTimer_->stop();
-        if (resized_) {
+        if (resized_ && !previewVisible_) {
             resized_(size());
         }
     }
@@ -1206,7 +1333,7 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
     const bool fromSearch = obj == searchEdit_;
     const bool control = key->modifiers().testFlag(Qt::ControlModifier);
     if (key->key() == Qt::Key_Escape) {
-        if (preview_ && preview_->isVisible()) { preview_->hide(); return true; }
+        if (previewVisible_) { HidePreview(); return true; }
         if (fromSearch && !searchEdit_->text().isEmpty()) {
             searchEdit_->clear();
         } else {
@@ -1231,6 +1358,13 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
             list_->setFocus();
             return true;
         }
+        // The search field can end up focused after the list is hidden behind
+        // the preview; let Space/Escape keep toggling the preview.
+        if (previewVisible_ && key->modifiers() == Qt::NoModifier
+            && (key->key() == Qt::Key_Space || key->key() == Qt::Key_Escape)) {
+            HidePreview();
+            return true;
+        }
         return QWidget::eventFilter(obj, event);
     }
     if (control && key->key() == Qt::Key_C) {
@@ -1242,7 +1376,7 @@ bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
         return true;
     }
     if (key->modifiers() == Qt::NoModifier && key->key() == Qt::Key_Space) {
-        PreviewSelected();
+        TogglePreview();
         return true;
     }
     if (key->key() == Qt::Key_Delete) {
