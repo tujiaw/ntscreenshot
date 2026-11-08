@@ -305,6 +305,9 @@ void Settings::arrangeGeneralSettings()
     ui.horizontalLayout_8->removeWidget(ui.label_8);
     ui.horizontalLayout_8->setContentsMargins(0, 0, 0, 0);
     ui.horizontalLayout_8->setSpacing(Util::scaleSize(12));
+    for (auto* radio : {ui.rbRGB, ui.rbHexadecimal}) {
+        radio->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    }
     ui.label_8->setText(QCoreApplication::translate("App", "颜色格式"));
     qobject_cast<QLabel*>(theme[0])->setText(QCoreApplication::translate("App", "主题"));
     for (auto* label : {qobject_cast<QLabel*>(theme[0]), qobject_cast<QLabel*>(cursor[0]),
@@ -316,27 +319,27 @@ void Settings::arrangeGeneralSettings()
         label->setText(text + QCoreApplication::translate("App", "："));
     }
     ui.widget->setToolTip(QCoreApplication::translate("App", "颜色格式显示(C键复制颜色)："));
-    qobject_cast<QLabel*>(cursor[3])->setText(QCoreApplication::translate("App", "移到预览上查看"));
     cursor[3]->setStyleSheet(QStringLiteral("color: palette(mid);"));
-    borderColor[3]->hide();
-    crossColor[3]->hide();
-    borderStyle[3]->setStyleSheet(QStringLiteral("color: palette(mid);"));
 
     auto* grid = new QGridLayout();
     grid->setObjectName(QStringLiteral("generalSettingsGrid"));
     grid->setHorizontalSpacing(Util::scaleSize(12));
     grid->setVerticalSpacing(Util::scaleSize(6));
+    // Keep the form compact; spare width belongs after the action column.
     grid->setColumnStretch(3, 1);
-    const int controlWidth = Util::scaleSize(180);
+    const int controlWidth = Util::scaleSize(160);
     for (QWidget* control : {static_cast<QWidget*>(cbCursor_),
                             static_cast<QWidget*>(selectionBorderColorButton_),
                             static_cast<QWidget*>(selectionBorderStyleCombo_),
                             static_cast<QWidget*>(amplifierCrossColorButton_)}) {
-        control->setFixedWidth(controlWidth);
+        control->setMinimumWidth(controlWidth);
+        control->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     }
     auto addRow = [grid](int row, const QList<QWidget*>& widgets) {
-        for (int column = 0; column < widgets.size(); ++column) {
-            grid->addWidget(widgets[column], row, column, Qt::AlignLeft | Qt::AlignVCenter);
+        // Keep labels, controls and reset buttons in consistent columns.
+        for (int column = 0; column < 3; ++column) {
+            grid->addWidget(widgets[column], row, column,
+                            column == 2 ? Qt::AlignLeft : Qt::Alignment());
         }
     };
     auto* appearance = new QHBoxLayout();
@@ -352,46 +355,50 @@ void Settings::arrangeGeneralSettings()
     for (auto* combo : {cbTheme_, ui.cbLanguage}) {
         combo->setMinimumWidth(0);
         combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-        combo->setFixedWidth(qMax(Util::scaleSize(76), combo->sizeHint().width() + Util::scaleSize(8)));
+        combo->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     }
     grid->addLayout(appearance, 0, 0, 1, 4);
-    addRow(1, cursor);
+    grid->addWidget(cursor[0], 1, 0);
+    grid->addWidget(cursor[1], 1, 1);
+    auto* cursorHelp = new QHBoxLayout();
+    cursorHelp->setSpacing(Util::scaleSize(8));
+    cursorHelp->addWidget(cursor[2]);
+    cursorHelp->addWidget(cursor[3], 1);
+    grid->addLayout(cursorHelp, 1, 2, 1, 2);
     addRow(2, borderColor);
     addRow(3, borderStyle);
     addRow(4, crossColor);
-    grid->addWidget(ui.label_8, 5, 0, Qt::AlignLeft | Qt::AlignVCenter);
+    grid->addWidget(ui.label_8, 5, 0);
     grid->addWidget(ui.widget, 5, 1, 1, 3);
-    auto* hotkeys = new QGridLayout();
-    hotkeys->setHorizontalSpacing(Util::scaleSize(12));
-    hotkeys->setColumnStretch(1, 1);
-    hotkeys->setColumnStretch(4, 1);
-    int labelWidth = 0;
-    for (auto* label : {theme[0], cursor[0], borderColor[0], borderStyle[0], crossColor[0],
-                        static_cast<QWidget*>(ui.label_8)}) {
-        labelWidth = qMax(labelWidth, label->sizeHint().width());
+    for (auto* label : {qobject_cast<QLabel*>(cursor[0]), qobject_cast<QLabel*>(borderColor[0]),
+                        qobject_cast<QLabel*>(borderStyle[0]), qobject_cast<QLabel*>(crossColor[0]),
+                        ui.label_8, ui.label, ui.label_2}) {
+        label->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
     }
-    grid->setColumnMinimumWidth(0, labelWidth);
-    hotkeys->setColumnMinimumWidth(0, labelWidth);
     ui.kseScreenshot->setMinimumWidth(Util::scaleSize(100));
     ui.ksePin->setMinimumWidth(Util::scaleSize(100));
-    hotkeys->addWidget(ui.label, 0, 0);
-    hotkeys->addWidget(ui.kseScreenshot, 0, 1);
-    hotkeys->addWidget(ui.pbScreenshotStatus, 0, 2);
-    hotkeys->addWidget(ui.label_2, 0, 3);
-    hotkeys->addWidget(ui.ksePin, 0, 4);
-    hotkeys->addWidget(ui.pbPinStatus, 0, 5);
+    grid->addWidget(ui.label, 6, 0);
+    grid->addWidget(ui.kseScreenshot, 6, 1);
+    grid->addWidget(ui.pbScreenshotStatus, 6, 2, Qt::AlignLeft);
+    grid->addWidget(ui.label_2, 7, 0);
+    grid->addWidget(ui.ksePin, 7, 1);
+    grid->addWidget(ui.pbPinStatus, 7, 2, Qt::AlignLeft);
     ui.labelTips->hide();
     ui.kseScreenshot->setToolTip(ui.labelTips->toolTip());
     ui.ksePin->setToolTip(ui.labelTips->toolTip());
-    grid->addLayout(hotkeys, 6, 0, 1, 4);
+    ui.cbBackground->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    auto* backgroundOptions = new QHBoxLayout();
+    backgroundOptions->setSpacing(Util::scaleSize(12));
+    backgroundOptions->addWidget(ui.cbBackground);
+    backgroundOptions->addWidget(ui.hsBackgroundAlpha);
+    backgroundOptions->addStretch();
+    grid->addLayout(backgroundOptions, 8, 0, 1, 4);
     auto* pinOptions = new QHBoxLayout();
     pinOptions->setSpacing(Util::scaleSize(20));
-    pinOptions->addWidget(ui.cbBackground);
-    pinOptions->addWidget(ui.hsBackgroundAlpha);
     pinOptions->addWidget(ui.cbAutoPin);
     pinOptions->addWidget(ui.cbPinNoBorder);
     pinOptions->addStretch();
-    grid->addLayout(pinOptions, 7, 0, 1, 4);
+    grid->addLayout(pinOptions, 9, 0, 1, 4);
     ui.verticalLayout_2->addLayout(grid);
     ui.verticalLayout_2->addStretch();
 }
@@ -1010,7 +1017,7 @@ void Settings::initCursorSelector()
     cursorPreview_->setObjectName(QStringLiteral("screenshotCursorPreview"));
     cursorPreview_->setFixedSize(Util::scaleSize(64), Util::scaleSize(48));
     cursorPreview_->setAlignment(Qt::AlignCenter);
-    auto* hint = new QLabel(QCoreApplication::translate("App", "移到预览上查看，下次截图生效"), this);
+    auto* hint = new QLabel(QCoreApplication::translate("App", "移到预览上查看"), this);
     hint->setWordWrap(true);
     row->addWidget(label);
     row->addWidget(cbCursor_);
@@ -1049,7 +1056,6 @@ void Settings::initSelectionBorderColor()
     auto* reset = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
     reset->setObjectName(QStringLiteral("resetSelectionBorderColorButton"));
     row->addWidget(reset);
-    row->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
     row->addStretch();
     ui.verticalLayout_2->insertLayout(3, row);
     auto* styleRow = new QHBoxLayout();
@@ -1066,7 +1072,6 @@ void Settings::initSelectionBorderColor()
     styleRow->addWidget(selectionBorderStyleCombo_);
     auto* resetStyle = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
     styleRow->addWidget(resetStyle);
-    styleRow->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
     styleRow->addStretch();
     ui.verticalLayout_2->insertLayout(4, styleRow);
     connect(selectionBorderStyleCombo_, &QComboBox::currentIndexChanged, this, [this](int index) {
@@ -1118,7 +1123,6 @@ void Settings::initAmplifierCrossColor()
     auto* reset = new QPushButton(QCoreApplication::translate("App", "恢复默认"), this);
     reset->setObjectName(QStringLiteral("resetAmplifierCrossColorButton"));
     row->addWidget(reset);
-    row->addWidget(new QLabel(QCoreApplication::translate("App", "下次截图生效"), this));
     row->addStretch();
     ui.verticalLayout_2->insertLayout(5, row);
     connect(amplifierCrossColorButton_, &QPushButton::clicked, this, [this] {

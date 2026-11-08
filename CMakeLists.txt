@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(ntscreenshot VERSION 0.2.4 LANGUAGES CXX)
+project(ntscreenshot VERSION 0.2.5 LANGUAGES CXX)
 
 include(cmake/NtMsvcDependencies.cmake)
 
