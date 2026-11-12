@@ -18,6 +18,7 @@ class QTimer;
 class TextEdit;
 class QButtonGroup;
 class QHideEvent;
+class QHBoxLayout;
 class QMouseEvent;
 class QPainter;
 class QShowEvent;
@@ -174,7 +175,6 @@ signals:
     void sigSmartMask();
     void sigAutoCrop();
     void sigExtractColors();
-    void sigEnhance(int preset);
 
 public slots:
     void onReferRectChanged(const QRect &rect);
@@ -200,11 +200,15 @@ private:
     void uncheckOtherButtons(QAbstractButton *checkedButton);
     void setupButtonGroup();
     void setupPanels();
+    void setupMoreTools(bool hasParent);
     void setupButtonsAndLayout(bool hasParent);
-    void refreshPanelHeight();
+    void refreshPanelSize();
 
     QRect referRect_;
     QPushButton *pbFont_ = nullptr;
+    QPushButton *pbMore_ = nullptr;
+    QHBoxLayout *toolbarLayout_ = nullptr;
+    QWidget *moreTools_ = nullptr;
     DrawSettings *drawSettings_ = nullptr;
     QButtonGroup *shapeGroup_ = nullptr;
     QList<QPair<QPushButton*, DrawMode>> btns_;

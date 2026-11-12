@@ -64,6 +64,20 @@ public:
             painter->drawRoundedRect(QRectF(8, 7, 12, 14), 2, 2);
             QPainterPath path; path.moveTo(16, 3); path.lineTo(5, 3);
             path.quadTo(3, 3, 3, 5); path.lineTo(3, 16); painter->drawPath(path);
+        } else if (name_ == "scroll-capture") {
+            painter->drawRoundedRect(QRectF(5, 3, 14, 18), 2, 2);
+            line(12, 7, 12, 17);
+            line(9, 14, 12, 17); line(12, 17, 15, 14);
+        } else if (name_ == "gif-record") {
+            painter->drawRoundedRect(QRectF(3, 5, 18, 14), 2, 2);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(color);
+            painter->drawEllipse(QPointF(12, 12), 3, 3);
+        } else if (name_ == "qr") {
+            for (const QPointF& corner : {QPointF(4, 4), QPointF(14, 4), QPointF(4, 14)}) {
+                painter->drawRect(QRectF(corner, QSizeF(6, 6)));
+            }
+            line(15, 15, 15, 19); line(15, 19, 19, 19); line(19, 14, 19, 15);
         } else if (name_ == "ocr") {
             for (int x : {4, 20}) for (int y : {4, 20}) {
                 line(x, y, x + (x == 4 ? 4 : -4), y);

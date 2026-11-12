@@ -28,7 +28,7 @@
 #include "core/theme/AppTheme.h"
 #include "core/theme/ThemeManager.h"
 #include <algorithm>
-#include <QMenu>
+#include <QScreen>
 #include <QVBoxLayout>
 #include "core/theme/ThemeIcon.h"
 #include "core/theme/UiStyler.h"
@@ -46,7 +46,6 @@
 namespace {
 constexpr int ToolbarButtonSize = 32;
 constexpr int ToolbarIconSize = 18;
-constexpr int ToolbarHeight = 44;
 constexpr int CopyButtonMinWidth = 72;
 constexpr int CopyButtonContentPadding = 42;
 
@@ -102,6 +101,72 @@ protected:
     }
 };
 
+class MoreToolButton : public QPushButton
+{
+public:
+    using QPushButton::QPushButton;
+
+    int labelWidth() const
+    {
+        return QFontMetrics(labelFont()).horizontalAdvance(text());
+    }
+
+    int widthWithoutLabel() const
+    {
+        return labelInset() + horizontalPadding();
+    }
+
+    int heightForWidth(int width) const override
+    {
+        const QRect labelBounds(0, 0, qMax(1, width - widthWithoutLabel()), 0);
+        const int labelHeight = QFontMetrics(labelFont()).boundingRect(labelBounds, LabelAlignment, text()).height();
+        return qMax(Util::scaleSize(32), labelHeight + 2 * Util::scaleSize(3));
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        const auto& tokens = ThemeManager::tokens();
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        if (isEnabled() && (underMouse() || isDown() || hasFocus())) {
+            QColor fill = tokens.textPrimary;
+            fill.setAlphaF(isDown() ? 0.14 : 0.08);
+            painter.setBrush(fill);
+            painter.setPen(hasFocus() ? QPen(tokens.accent, 1) : QPen(Qt::NoPen));
+            const QRectF background = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+            const qreal radius = background.height() / 2;
+            painter.drawRoundedRect(background, radius, radius);
+        }
+
+        const QRect iconRect(QPoint(horizontalPadding(), (height() - iconSize().height()) / 2), iconSize());
+        icon().paint(&painter, iconRect, Qt::AlignCenter, isEnabled() ? QIcon::Normal : QIcon::Disabled);
+        const int verticalPadding = Util::scaleSize(3);
+        const QRect labelRect = rect().adjusted(labelInset(), verticalPadding,
+                                               -horizontalPadding(), -verticalPadding);
+        painter.setFont(labelFont());
+        painter.setPen(isEnabled() ? tokens.textSecondary : tokens.textDisabled);
+        painter.drawText(labelRect, LabelAlignment, text());
+    }
+
+private:
+    static constexpr int LabelAlignment = Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap;
+
+    static int horizontalPadding() { return Util::scaleSize(6); }
+
+    int labelInset() const
+    {
+        return horizontalPadding() + iconSize().width() + Util::scaleSize(4);
+    }
+
+    QFont labelFont() const
+    {
+        QFont label = font();
+        label.setPixelSize(Util::scaleSize(11));
+        return label;
+    }
+};
+
 int mosaicBlockWidth()
 {
     return Util::scaleSize(DrawSettings::fontSize() * 1.5);
@@ -146,7 +211,7 @@ DrawPanel::DrawPanel(SettingModel* settings, QWidget *parent, QWidget *drawWidge
     setupButtonGroup();
     setupPanels();
     setupButtonsAndLayout(parent != nullptr);
-    this->setFixedHeight(Util::scaleSize(ToolbarHeight) + 2);
+    adjustPos();
 }
 
 void DrawPanel::setupButtonGroup()
@@ -195,6 +260,47 @@ void DrawPanel::setupPanels()
     });
 }
 
+void DrawPanel::setupMoreTools(bool hasParent)
+{
+    moreTools_ = new QWidget(this);
+    moreTools_->setObjectName(QStringLiteral("DrawPanelMoreTools"));
+    moreTools_->hide();
+    auto* toolsLayout = new QHBoxLayout(moreTools_);
+    toolsLayout->setContentsMargins(Util::scaleSize(8), 0, Util::scaleSize(8), 0);
+    toolsLayout->setSpacing(Util::scaleSize(4));
+    auto addTool = [&](const QIcon& icon, const QString& label, void (DrawPanel::*action)()) {
+        auto* button = new MoreToolButton(icon, label, moreTools_);
+        button->setCursor(Qt::PointingHandCursor);
+        toolsLayout->addWidget(button, 1);
+        connect(button, &QPushButton::clicked, this, [this, action] {
+            pbMore_->setChecked(false);
+            (this->*action)();
+        });
+        return button;
+    };
+
+    if (hasParent) {
+        addTool(AnnotationIcon::icon("scroll-capture"), QCoreApplication::translate("App", "长截图"),
+                &DrawPanel::sigLongScreenshot);
+        addTool(AnnotationIcon::icon("gif-record"), QCoreApplication::translate("App", "录制 GIF"),
+                &DrawPanel::sigGifRecording);
+    }
+    auto* scanButton = addTool(AnnotationIcon::icon("qr"), QCoreApplication::translate("App", "扫码"),
+                               &DrawPanel::sigScanCode);
+    scanButton->setToolTip(QCoreApplication::translate("App", "识别二维码/条码"));
+    addTool(AnnotationIcon::icon("mosaic.png"), QCoreApplication::translate("App", "智能打码"),
+            &DrawPanel::sigSmartMask);
+    addTool(ThemeIcon::icon("browser-crop.png"), QCoreApplication::translate("App", "自动裁边"),
+            &DrawPanel::sigAutoCrop);
+    addTool(AnnotationIcon::icon("color.png"), QCoreApplication::translate("App", "提取主色"),
+            &DrawPanel::sigExtractColors);
+
+    connect(pbMore_, &QPushButton::toggled, this, [this](bool expanded) {
+        moreTools_->setVisible(expanded);
+        adjustPos();
+    });
+}
+
 void DrawPanel::setupButtonsAndLayout(bool hasParent)
 {
     // 使用通用DPI适配方法计算尺寸
@@ -238,31 +344,10 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     QPushButton* pbText = createShapeBtn("text.png", QCoreApplication::translate("App", "文本（Ctrl+Enter 完成，Esc 取消）"));
 
     QPushButton* pbMosaic = createShapeBtn("mosaic.png", QCoreApplication::translate("App", "马赛克"));
-    QPushButton* pbImageTools = new AnnotationButton(AnnotationIcon::icon("more"), QString(), this);
-    pbImageTools->setToolTip(QCoreApplication::translate("App", "更多图像工具"));
-    pbImageTools->setFixedSize(btnSize, btnSize);
-    pbImageTools->setIconSize(QSize(iconSize, iconSize));
-    UiStyler::setRole(pbImageTools, UiRole::IconButton);
-    QMenu* mosaicMenu = new QMenu(pbImageTools);
-    if (hasParent) {
-        mosaicMenu->addAction(QCoreApplication::translate("App", "长截图"), this, &DrawPanel::sigLongScreenshot);
-        mosaicMenu->addAction(QCoreApplication::translate("App", "录制 GIF"), this, &DrawPanel::sigGifRecording);
-        mosaicMenu->addSeparator();
-    }
-    mosaicMenu->addAction(QCoreApplication::translate("App", "识别二维码/条码"), this, &DrawPanel::sigScanCode);
-    QMenu* enhanceMenu = mosaicMenu->addMenu(QCoreApplication::translate("App", "图像增强"));
-    enhanceMenu->addAction(QCoreApplication::translate("App", "自动增强"), this, [this]() { emit sigEnhance(0); });
-    enhanceMenu->addAction(QCoreApplication::translate("App", "提亮"), this, [this]() { emit sigEnhance(1); });
-    enhanceMenu->addAction(QCoreApplication::translate("App", "对比度"), this, [this]() { emit sigEnhance(2); });
-    enhanceMenu->addAction(QCoreApplication::translate("App", "锐化"), this, [this]() { emit sigEnhance(3); });
-    enhanceMenu->addAction(QCoreApplication::translate("App", "降噪"), this, [this]() { emit sigEnhance(4); });
-    mosaicMenu->addAction(QCoreApplication::translate("App", "智能打码"), this, &DrawPanel::sigSmartMask);
-    mosaicMenu->addAction(QCoreApplication::translate("App", "自动裁边"), this, &DrawPanel::sigAutoCrop);
-    mosaicMenu->addAction(QCoreApplication::translate("App", "提取主色"), this, &DrawPanel::sigExtractColors);
-
-    connect(pbImageTools, &QPushButton::clicked, this, [pbImageTools, mosaicMenu]() {
-        mosaicMenu->exec(pbImageTools->mapToGlobal(QPoint(0, pbImageTools->height())));
-    });
+    pbMore_ = createActionBtn("more", QCoreApplication::translate("App", "更多图像工具"));
+    pbMore_->setObjectName(QStringLiteral("DrawPanelMoreButton"));
+    pbMore_->setCheckable(true);
+    setupMoreTools(hasParent);
 
     QPushButton* pbUndo = createActionBtn("undo.png", QCoreApplication::translate("App", "撤销"));
     QPushButton* pbSticker = createActionBtn("pin.png", QCoreApplication::translate("App", "贴图"));
@@ -301,7 +386,8 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     btns_.push_back(qMakePair(pbText, textMode));
     btns_.push_back(qMakePair(pbMosaic, mosaicMode));
 
-    QHBoxLayout *hLayout = new QHBoxLayout();
+    auto* hLayout = new QHBoxLayout();
+    toolbarLayout_ = hLayout;
     hLayout->setContentsMargins(Util::scaleSize(8), Util::scaleSize(6),
                                 Util::scaleSize(8), Util::scaleSize(6));
     hLayout->setSpacing(Util::scaleSize(2));
@@ -310,7 +396,7 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     for (int i = 0; i < btns_.size(); ++i) hLayout->addWidget(btns_.at(i).first);
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
-    hLayout->addWidget(pbImageTools);
+    hLayout->addWidget(pbMore_);
     hLayout->addWidget(pbOcr);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbSticker);
@@ -329,6 +415,7 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     settingsRow->addWidget(drawSettings_);
     settingsRow->addStretch();
     mLayout->addLayout(settingsRow);
+    mLayout->addWidget(moreTools_, 0, Qt::AlignLeft);
     auto* messageRow = new QHBoxLayout();
     messageRow->setContentsMargins(Util::scaleSize(16), 0, Util::scaleSize(16), 0);
     messageRow->addWidget(toolMessageLabel_);
@@ -374,29 +461,28 @@ void DrawPanel::applyCurrentStyle(DrawMode &mode) const
     mode.font().setPixelSize(DrawSettings::fontSize());
 }
 
-void DrawPanel::refreshPanelHeight()
+void DrawPanel::refreshPanelSize()
 {
-    const int toolbarHeight = Util::scaleSize(ToolbarHeight);
     // Keep the existing 2px visual gap inside the toolbar's mouse region.
     // Its window starts immediately outside the selection, never over its edge.
     constexpr int bridge = 2;
-    int height = toolbarHeight + bridge;
-    const bool hasDetails = (drawSettings_ && drawSettings_->isVisible())
-        || (toolMessageLabel_ && toolMessageLabel_->isVisible());
-    const int bottomPadding = hasDetails ? Util::scaleSize(12) : 0;
-    if (layout()) layout()->setContentsMargins(0, aboveSelection_ ? 0 : bridge,
-                                               0, bottomPadding + (aboveSelection_ ? bridge : 0));
-    height += bottomPadding;
-    if (drawSettings_ && drawSettings_->isVisible()) {
-        height += drawSettings_->height();
-    }
-    if (toolMessageLabel_ && toolMessageLabel_->isVisible()) {
+    const bool hasMessage = !toolMessageLabel_->isHidden();
+    const bool hasMoreTools = !moreTools_->isHidden();
+    const bool hasDetails = !drawSettings_->isHidden() || hasMoreTools || hasMessage;
+    const int bottomPadding = hasDetails
+        ? Util::scaleSize(hasMessage ? 16 : (!drawSettings_->isHidden() ? 12 : 7))
+        : 0;
+    layout()->setContentsMargins(0, aboveSelection_ ? 0 : bridge,
+                                 0, bottomPadding + (aboveSelection_ ? bridge : 0));
+    int panelWidth = toolbarLayout_->sizeHint().width();
+    if (hasMessage) {
         const int minMsgWidth = Util::scaleSize(280);
         const int maxMsgWidth = referRect_.isValid()
             ? qMax(minMsgWidth, qMin(referRect_.width(), Util::scaleSize(420)))
             : Util::scaleSize(360);
         const int horizontalPadding = Util::scaleSize(32);
-        const int msgWidth = qMax(minMsgWidth, qMax(width() - horizontalPadding, maxMsgWidth));
+        panelWidth = qMax(panelWidth, maxMsgWidth + horizontalPadding);
+        const int msgWidth = panelWidth - horizontalPadding;
         toolMessageLabel_->setFixedWidth(msgWidth);
         // Reserve scrollbar width while measuring so wrapping is stable when
         // the content crosses the height cap.
@@ -406,18 +492,41 @@ void DrawPanel::refreshPanelHeight()
             + 2 * toolMessageLabel_->frameWidth();
         const int messageHeight = qBound(Util::scaleSize(32), contentHeight, Util::scaleSize(160));
         toolMessageLabel_->setFixedHeight(messageHeight);
-        height += messageHeight + Util::scaleSize(4);
-        if (width() < msgWidth + horizontalPadding) {
-            setMinimumWidth(msgWidth + horizontalPadding);
+    }
+    if (hasMoreTools) {
+        auto* toolsLayout = moreTools_->layout();
+        const int count = toolsLayout->count();
+        const QMargins margins = toolsLayout->contentsMargins();
+        const int rowPadding = margins.left() + margins.right() + (count - 1) * toolsLayout->spacing();
+        QList<MoreToolButton*> buttons;
+        int preferredLabelWidth = 0;
+        int totalButtonPadding = 0;
+        for (int i = 0; i < count; ++i) {
+            auto* button = static_cast<MoreToolButton*>(toolsLayout->itemAt(i)->widget());
+            buttons.append(button);
+            preferredLabelWidth += button->labelWidth();
+            totalButtonPadding += button->widthWithoutLabel();
+        }
+        const int labelBudget = qMax(0, panelWidth - rowPadding - totalButtonPadding);
+        const qreal labelScale = qMin(1.0, qreal(labelBudget) / qMax(1, preferredLabelWidth));
+        int rowWidth = rowPadding;
+        int buttonHeight = 0;
+        for (auto* button : buttons) {
+            const int buttonWidth = button->widthWithoutLabel() + int(button->labelWidth() * labelScale);
+            button->setFixedWidth(buttonWidth);
+            rowWidth += buttonWidth;
+            buttonHeight = qMax(buttonHeight, button->heightForWidth(buttonWidth));
+        }
+        moreTools_->setFixedWidth(rowWidth);
+        for (auto* button : buttons) {
+            button->setFixedHeight(buttonHeight);
         }
     }
     // Refresh the size hint before Windows handles the native resize request;
     // otherwise its old minimum height can reject shrinking a floating panel.
-    if (layout()) {
-        layout()->invalidate();
-        layout()->activate();
-    }
-    setFixedHeight(height);
+    layout()->invalidate();
+    layout()->activate();
+    setFixedSize(panelWidth, layout()->sizeHint().height());
 }
 
 void DrawPanel::showToolMessage(const QString& message, bool isError)
@@ -440,7 +549,6 @@ void DrawPanel::showToolMessage(const QString& message, bool isError)
     toolMessageLabel_->setPlainText(message);
     toolMessageLabel_->setVisible(true);
     toolMessageLabel_->setToolTip(isError ? QString() : QCoreApplication::translate("App", "可选中提示文字进行复制"));
-    refreshPanelHeight();
     adjustPos();
 
     if (toolMessageTimer_) {
@@ -462,8 +570,6 @@ void DrawPanel::clearToolMessage()
     toolMessageLabel_->clear();
     toolMessageLabel_->setVisible(false);
     toolMessageLabel_->setToolTip(QString());
-    setMinimumWidth(0);
-    refreshPanelHeight();
     adjustPos();
 }
 
@@ -479,6 +585,9 @@ void DrawPanel::adjustPos()
         
         QList<QPushButton*> btns = this->findChildren<QPushButton*>();
         for (QPushButton* btn : btns) {
+            if (moreTools_->isAncestorOf(btn)) {
+                btn->setIconSize(QSize(iconSize, iconSize));
+            }
             if (btn->parent() == this) {
                 const int buttonWidth = btn->objectName() == QStringLiteral("DrawPanelCopyButton")
                     ? qMax(Util::scaleSize(CopyButtonMinWidth), btn->fontMetrics().horizontalAdvance(btn->text()) + Util::scaleSize(CopyButtonContentPadding))
@@ -496,30 +605,32 @@ void DrawPanel::adjustPos()
         if (drawSettings_) {
             drawSettings_->rescaleForDpi();
         }
-        refreshPanelHeight();
-    } else if (toolMessageLabel_ && toolMessageLabel_->isVisible()) {
-        refreshPanelHeight();
     }
-
-    int x = referRect_.x() + referRect_.width() - this->width();
-    int y = referRect_.y() + referRect_.height();
-    bool above = false;
-    const QRect screenRect = Util::desktopRect();
-    if (x + this->width() > screenRect.width()) {
-        x = screenRect.width() - this->width();
+    QRect bounds;
+    if (parentWidget()) {
+        bounds = parentWidget()->rect();
+    } else {
+        QScreen* targetScreen = QGuiApplication::screenAt(referRect_.center());
+        bounds = (targetScreen ? targetScreen : screen())->geometry();
     }
-    if (y + this->height() > screenRect.height()) {
-        y = referRect_.y() - this->height();
-        above = true;
+    refreshPanelSize();
+    if (!referRect_.isValid()) {
+        return;
     }
+    const int belowY = referRect_.bottom() + 1;
+    const int spaceBelow = bounds.bottom() + 1 - belowY;
+    const int spaceAbove = referRect_.top() - bounds.top();
+    const bool above = height() > spaceBelow && spaceAbove > spaceBelow;
     if (aboveSelection_ != above) {
         aboveSelection_ = above;
-        refreshPanelHeight();
+        refreshPanelSize();
         update();
     }
-    x = qMax(x, 2);
-    y = qMax(y, 2);
-    this->move(x, y);
+    const int x = qBound(bounds.left(), referRect_.right() + 1 - width(),
+                         qMax(bounds.left(), bounds.right() + 1 - width()));
+    const int y = qBound(bounds.top(), above ? referRect_.top() - height() : belowY,
+                         qMax(bounds.top(), bounds.bottom() + 1 - height()));
+    move(x, y);
 }
 
 Drawer* DrawPanel::drawer()
@@ -580,7 +691,6 @@ void DrawPanel::onColorBtnClicked()
 {
     drawSettings_->setVisible(!drawSettings_->isVisible());
     pbFont_->setChecked(drawSettings_->isVisible());
-    refreshPanelHeight();
     adjustPos();
 }
 
@@ -623,6 +733,7 @@ void DrawPanel::showEvent(QShowEvent *event)
 
 void DrawPanel::hideEvent(QHideEvent *event)
 {
+    pbMore_->setChecked(false);
     clearToolMessage();
     QWidget::hideEvent(event);
 }

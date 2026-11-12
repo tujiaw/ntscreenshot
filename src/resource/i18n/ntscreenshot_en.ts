@@ -954,6 +954,10 @@ Please choose another key combination.</translation>
       <translation>Scan QR/barcode</translation>
     </message>
     <message>
+      <source>扫码</source>
+      <translation>Scan code</translation>
+    </message>
+    <message>
       <location filename="../../modules/capture/annotation/DrawPanel.cpp" line="209" />
       <location filename="../../modules/capture/pin/PinWidget.cpp" line="61" />
       <source>图像增强</source>

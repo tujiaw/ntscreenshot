@@ -241,13 +241,63 @@ int runScreenshotSelectionTest(QApplication& app) {
         okay &= panel->geometry().bottom() == bottomAnchor.top() - 1;
         const QPoint upperBridge(panel->width() / 2, panel->height() - 1);
         okay &= screenshot->childAt(panel->mapTo(screenshot, upperBridge)) == panel;
-        screenshot->moveDrawPanel();
         qInfo() << "Continuous toolbar hover and accessible selection edge:" << okay;
+        auto* moreButton = panel->findChild<QPushButton*>(QStringLiteral("DrawPanelMoreButton"));
+        auto* moreTools = panel->findChild<QWidget*>(QStringLiteral("DrawPanelMoreTools"));
+        bool moreToolsOkay = moreButton && moreTools && moreTools->isHidden();
+        if (moreToolsOkay) {
+            const int collapsedHeight = panel->height();
+            const int collapsedWidth = panel->width();
+            const QRect nearBottom(200, screenshot->height() - collapsedHeight - 50, 600, 40);
+            panel->onReferRectChanged(nearBottom);
+            moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
+            moreButton->click();
+            QApplication::processEvents();
+            moreToolsOkay &= moreTools->isVisible() && panel->height() > collapsedHeight;
+            moreToolsOkay &= panel->width() == collapsedWidth;
+            moreToolsOkay &= panel->geometry().bottom() == nearBottom.top() - 1;
+            moreToolsOkay &= panel->rect().contains(moreTools->geometry());
+            moreToolsOkay &= moreTools->x() == 0;
+            const auto buttons = moreTools->findChildren<QPushButton*>();
+            moreToolsOkay &= buttons.size() == 6;
+            for (int i = 0; i < buttons.size(); ++i) {
+                auto* button = buttons.at(i);
+                moreToolsOkay &= !button->icon().isNull() && !button->text().isEmpty()
+                    && button->y() == buttons.first()->y()
+                    && button->width() > button->iconSize().width()
+                    && button->height() >= button->iconSize().height()
+                    && moreTools->rect().contains(button->geometry());
+                if (i > 0) {
+                    const int gap = button->x() - buttons.at(i - 1)->geometry().right() - 1;
+                    moreToolsOkay &= gap == Util::scaleSize(4);
+                }
+            }
+            if (!buttons.isEmpty()) {
+                const QString label = buttons.first()->text();
+                const int buttonHeight = buttons.first()->height();
+                buttons.first()->setText(QStringLiteral("A label that needs several lines ").repeated(4));
+                panel->adjustPos();
+                QApplication::processEvents();
+                moreToolsOkay &= panel->width() == collapsedWidth && buttons.first()->height() > buttonHeight;
+                moreToolsOkay &= panel->geometry().bottom() == nearBottom.top() - 1;
+                buttons.first()->setText(label);
+            }
+            moreButton->click();
+            QApplication::processEvents();
+            moreToolsOkay &= moreTools->isHidden() && panel->height() == collapsedHeight;
+            moreToolsOkay &= panel->width() == collapsedWidth;
+            moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
+        }
+        qInfo() << "More tools use the expanded toolbar height:" << moreToolsOkay;
+        okay &= moreToolsOkay;
+        screenshot->moveDrawPanel();
         // Expiring a result must restore the exact toolbar/settings height,
         // even after Qt processes the queued layout and native resize events.
         auto verifyResultExpiry = [&](DrawPanel* target) {
           const QPoint previousMousePosition = QCursor::pos();
-          QCursor::setPos(target->mapToGlobal(QPoint(0, -4)));
+          // A taller result can move the toolbar, so park the cursor away
+          // from both possible positions before testing hover and expiry.
+          QCursor::setPos(screenshot->mapToGlobal(QPoint(0, 0)));
           for (bool settingsOpen : {false, true}) {
             if (settingsOpen) target->onColorBtnClicked();
             QApplication::processEvents();
@@ -296,6 +346,36 @@ int runScreenshotSelectionTest(QApplication& app) {
             floating.show();
             QApplication::processEvents();
             verifyResultExpiry(&floating);
+            auto* toggle = floating.findChild<QPushButton*>(QStringLiteral("DrawPanelMoreButton"));
+            auto* tools = floating.findChild<QWidget*>(QStringLiteral("DrawPanelMoreTools"));
+            bool floatingToolsOkay = toggle && tools;
+            if (floatingToolsOkay) {
+                const int collapsedHeight = floating.height();
+                bool scanRequested = false;
+                QObject::connect(&floating, &DrawPanel::sigScanCode, &floating, [&] {
+                    scanRequested = true;
+                });
+                toggle->click();
+                const auto buttons = tools->findChildren<QPushButton*>();
+                floatingToolsOkay &= tools->isVisible() && buttons.size() == 4;
+                for (auto* button : buttons) {
+                    if (button->text() == QCoreApplication::translate("App", "扫码")) {
+                        const QPoint textPoint(button->width() - Util::scaleSize(8), button->height() / 2);
+                        const QPoint globalPoint = button->mapToGlobal(textPoint);
+                        QMouseEvent press(QEvent::MouseButtonPress, textPoint, globalPoint,
+                                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                        QApplication::sendEvent(button, &press);
+                        QMouseEvent release(QEvent::MouseButtonRelease, textPoint, globalPoint,
+                                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                        QApplication::sendEvent(button, &release);
+                        break;
+                    }
+                }
+                floatingToolsOkay &= scanRequested && tools->isHidden()
+                    && !toggle->isChecked() && floating.height() == collapsedHeight;
+            }
+            qInfo() << "Floating toolbar dispatches and collapses more tools:" << floatingToolsOkay;
+            okay &= floatingToolsOkay;
         }
         const QPoint toolbarBeforeResize = panel->pos();
         mouse(QEvent::MouseMove,{799,375},Qt::NoButton,Qt::NoButton);

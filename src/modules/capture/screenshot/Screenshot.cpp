@@ -29,7 +29,6 @@
 
 #include "core/imaging/detector/RectDetector.h"
 #include "core/imaging/CodeScanner.h"
-#include "core/imaging/ImageEnhance.h"
 #include "core/imaging/ImageUtil.h"
 #include "core/imaging/SmartMask.h"
 #include "core/foundation/Constants.h"
@@ -441,20 +440,6 @@ void ScreenshotWidget::initDrawPanel(void)
                 ? QCoreApplication::translate("App", "识别成功（%1 条，已复制）").arg(results.size())
                 : QCoreApplication::translate("App", "识别成功（已复制）");
             drawPanel_->showToolMessage(title + QLatin1Char('\n') + text, false);
-        });
-
-        connect(drawPanel_.get(), &DrawPanel::sigEnhance, this, [this, captureSelection](int preset) {
-            if (!drawPanel_) {
-                return;
-            }
-            QImage src = captureSelection().toImage();
-            QImage out = ImageEnhance::apply(src, static_cast<ImageEnhance::Preset>(preset));
-            if (out.isNull()) {
-                drawPanel_->showToolMessage(QCoreApplication::translate("App", "图像增强失败"), true);
-                return;
-            }
-            drawPanel_->drawer()->replaceWithBitmap(out, currentRect_);
-            drawPanel_->showToolMessage(QCoreApplication::translate("App", "已应用图像增强"), false);
         });
 
         connect(drawPanel_.get(), &DrawPanel::sigSmartMask, this, [this, captureSelection]() {

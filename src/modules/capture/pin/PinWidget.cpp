@@ -383,7 +383,6 @@ void PinWidget::connectDrawPanelTools()
     connect(drawPanel_.get(), &DrawPanel::sigSmartMask, this, &PinWidget::onSmartMask);
     connect(drawPanel_.get(), &DrawPanel::sigAutoCrop, this, &PinWidget::onAutoCrop);
     connect(drawPanel_.get(), &DrawPanel::sigExtractColors, this, &PinWidget::onExtractColors);
-    connect(drawPanel_.get(), &DrawPanel::sigEnhance, this, &PinWidget::onEnhance);
 }
 
 QImage PinWidget::currentImage()
