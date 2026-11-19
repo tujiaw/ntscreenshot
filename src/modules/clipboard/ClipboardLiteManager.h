@@ -154,6 +154,8 @@ private:
     QString accountClipboardText_;
     QString pendingAccountPassword_;
     HWND accountTargetWindow_ = nullptr;
+    bool accountTerminalMode_ = false;
+    int terminalPasswordDelayMs_ = 1500;
     QTimer* retryCaptureTimer_ = nullptr;
     QTimer* pollTimer_ = nullptr;
     QTimer* trackTimer_ = nullptr;

@@ -68,5 +68,43 @@ int main(int argc, char** argv) {
         fill.Cancel();
         CHECK(!fill.Busy() && restores == 2);
     }
+    for (int scenario = 0; scenario < 7; ++scenario) {
+        int enters = 0, tabs = 0, inspections = 0, pastes = 0, restores = 0;
+        bool active = true;
+        qint64 enterAt = -1, pasteAt = -1, submitAt = -1;
+        QElapsedTimer elapsed; elapsed.start();
+        FavoriteAccountFillController fill({
+            [&]() { return active; },
+            [&]() { ++inspections; return false; },
+            [&]() { ++tabs; return true; },
+            [&](const QString& password) {
+                ++pastes; pasteAt = elapsed.elapsed();
+                if (scenario == 5) active = false;
+                return password == QStringLiteral("ssh-password") && scenario != 4;
+            },
+            [&]() { ++restores; },
+            [&]() {
+                ++enters;
+                if (enters == 1) enterAt = elapsed.elapsed();
+                else submitAt = elapsed.elapsed();
+                return scenario != 2;
+            }
+        });
+        CHECK(fill.Reserve(FavoriteAccountFillController::Mode::SshTerminal, 250));
+        fill.UsernamePasted(QStringLiteral("ssh-password"));
+        // Lose focus or cancel after Enter but before the password is pasted.
+        if (scenario == 1) QTimer::singleShot(180, &fill, [&]() { active = false; });
+        if (scenario == 3) QTimer::singleShot(180, &fill, [&]() { fill.Cancel(); });
+        if (scenario == 6) QTimer::singleShot(400, &fill, [&]() { fill.Cancel(); });
+        while (fill.Busy() && elapsed.elapsed() < 2000)
+            app.processEvents(QEventLoop::AllEvents, 10);
+        CHECK(!fill.Busy() && restores == 1);
+        CHECK(enters == (scenario == 0 ? 2 : 1) && tabs == 0 && inspections == 0);
+        CHECK(enterAt >= 100);
+        if (scenario == 0 || scenario >= 4) CHECK(pastes == 1 && pasteAt - enterAt >= 250);
+        else CHECK(pastes == 0);
+        if (scenario == 0) CHECK(submitAt - pasteAt >= 100);
+        else CHECK(submitAt == -1);
+    }
     return 0;
 }

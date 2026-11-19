@@ -9,8 +9,10 @@ FavoriteAccountFillController::FavoriteAccountFillController(Actions actions, QO
     connect(&timer_, &QTimer::timeout, this, &FavoriteAccountFillController::Advance);
 }
 
-bool FavoriteAccountFillController::Reserve() {
+bool FavoriteAccountFillController::Reserve(Mode mode, int terminalDelayMs) {
     if (Busy()) return false;
+    mode_ = mode;
+    terminalDelayMs_ = qBound(100, terminalDelayMs, 10000);
     stage_ = Stage::Reserved;
     tabAttempts_ = 0;
     return true;
@@ -19,7 +21,7 @@ bool FavoriteAccountFillController::Reserve() {
 void FavoriteAccountFillController::UsernamePasted(QString password) {
     if (stage_ != Stage::Reserved) return;
     password_ = std::move(password);
-    stage_ = Stage::WaitBeforeTab;
+    stage_ = mode_ == Mode::SshTerminal ? Stage::WaitBeforeEnter : Stage::WaitBeforeTab;
     Wait(100);
 }
 
@@ -55,6 +57,24 @@ void FavoriteAccountFillController::Advance() {
         return;
     }
     if (!actions_.targetActive() || password_.isEmpty()) {
+        Finish();
+        return;
+    }
+    if (stage_ == Stage::WaitBeforeEnter) {
+        if (!actions_.enter || !actions_.enter()) { Finish(); return; }
+        stage_ = Stage::WaitPassword;
+        Wait(terminalDelayMs_);
+        return;
+    }
+    if (stage_ == Stage::WaitPassword) {
+        if (!actions_.pastePassword(password_)) { Finish(); return; }
+        // Let the terminal process the paste before submitting the password.
+        stage_ = Stage::SubmitPassword;
+        Wait(100);
+        return;
+    }
+    if (stage_ == Stage::SubmitPassword) {
+        if (actions_.enter) actions_.enter();
         Finish();
         return;
     }

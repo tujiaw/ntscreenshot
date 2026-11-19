@@ -38,6 +38,14 @@ QByteArray ImageToPng(const QImage& image) {
     return bytes;
 }
 
+bool IsSshTerminal(HWND window) {
+    wchar_t className[256] = {};
+    if (!window || !GetClassNameW(window, className, 256)) return false;
+    const QString name = QString::fromWCharArray(className);
+    return name.compare(QStringLiteral("PuTTY"), Qt::CaseInsensitive) == 0
+        || name.compare(QStringLiteral("KiTTY"), Qt::CaseInsensitive) == 0;
+}
+
 constexpr int kMaxHistoryValues[] = {20, 50, 100, 200};
 constexpr int kBackgroundTransparencyValues[] = {0, 20, 40, 80};
 
@@ -66,7 +74,14 @@ void ClipboardLiteManager::initialize()
         [this]() { return accountUia_.FocusedInputIsWritable(accountTargetWindow_, accountUsernameElement_.Get()); },
         []() { return WinClipboard::SendTab(); },
         [this](const QString& password) { return PasteFavoritePassword(password); },
-        [this]() { RestoreAccountClipboard(); }
+        [this]() { RestoreAccountClipboard(); },
+        []() {
+            INPUT keys[2] = {};
+            keys[0].type = keys[1].type = INPUT_KEYBOARD;
+            keys[0].ki.wVk = keys[1].ki.wVk = VK_RETURN;
+            keys[1].ki.dwFlags = KEYEVENTF_KEYUP;
+            return SendInput(2, keys, sizeof(INPUT)) == 2;
+        }
     });
 
     retryCaptureTimer_ = new QTimer(this);
@@ -305,7 +320,10 @@ void ClipboardLiteManager::BeginPaste(size_t index, bool keepPopupReady,
     if (fillFavoriteAccount && pendingClipboardItem_.favorite && pendingClipboardItem_.kind == ClipKind::Text) {
         const auto account = ParseFavoriteAccount(pendingClipboardItem_.text);
         if (!account.username.isEmpty() && !account.password.isEmpty()) {
-            if (!accountFill_->Reserve()) return;
+            accountTerminalMode_ = IsSshTerminal(targetWindow_);
+            const auto mode = accountTerminalMode_ ? FavoriteAccountFillController::Mode::SshTerminal
+                                                   : FavoriteAccountFillController::Mode::Form;
+            if (!accountFill_->Reserve(mode, terminalPasswordDelayMs_)) return;
             const QMimeData* original = QApplication::clipboard()->mimeData();
             accountClipboardBackup_ = std::make_unique<QMimeData>();
             if (original) {
@@ -407,6 +425,7 @@ void ClipboardLiteManager::RestoreAccountClipboard() {
     accountClipboardSequence_ = 0;
     accountClipboardText_.clear();
     accountTargetWindow_ = nullptr;
+    accountTerminalMode_ = false;
     pendingAccountPassword_.clear();
 }
 
@@ -538,6 +557,16 @@ void ClipboardLiteManager::PopulateClipboardMenu(QMenu* menu) {
         AppendPasteHotkeyItem(pasteMenu, option.commandId);
     }
 
+    auto* terminalMenu = menu->addMenu(QCoreApplication::translate("App", "SSH 登录等待时间"));
+    for (int delay : {500, 1000, 1500, 2000, 3000, 5000}) {
+        auto* action = terminalMenu->addAction(QCoreApplication::translate("App", "%1 秒").arg(delay / 1000.0));
+        MenuCheckMark::apply(action, terminalPasswordDelayMs_ == delay);
+        connect(action, &QAction::triggered, this, [this, delay]() {
+            terminalPasswordDelayMs_ = delay;
+            store_.SaveSettingInt("TerminalPasswordDelayMs", delay);
+        });
+    }
+
     QMenu* scaleMenu = menu->addMenu(QCoreApplication::translate("App", "图片粘贴尺寸"));
     for (const ImageScaleOption& option : ImageScaleOptions()) {
         AppendImageScaleItem(scaleMenu, option.commandId);
@@ -635,6 +664,7 @@ QString ClipboardLiteManager::ActiveImageScaleLabel() const {
 // ── Settings ──────────────────────────────────────────────────────
 
 void ClipboardLiteManager::LoadSettings() {
+    terminalPasswordDelayMs_ = qBound(500, store_.LoadSettingInt("TerminalPasswordDelayMs", 1500), 10000);
     captureEnabled_ = store_.LoadSettingInt("CaptureEnabled", 1) != 0;
     const int transparency = store_.LoadSettingInt("BackgroundTransparency", 0);
     for (int percent : kBackgroundTransparencyValues) {
@@ -944,7 +974,7 @@ void ClipboardLiteManager::ShowHistory(bool activate) {
 }
 
 void ClipboardLiteManager::EnsurePopup() {
-    auto paste = [this](size_t index) { BeginPaste(index, true, 0, 0, true); };
+    auto paste = [this](size_t index) { BeginPaste(index, true); };
     auto remove = [this](size_t index) {
         const bool favorite = index < history_.Items().size() && history_.Items()[index].favorite;
         if (history_.RemoveAt(index)) {
@@ -984,6 +1014,8 @@ void ClipboardLiteManager::EnsurePopup() {
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
     connect(popup_, &HistoryWindow::accountFieldRequested, this, &ClipboardLiteManager::PasteAccountField);
+    connect(popup_, &HistoryWindow::accountSequenceRequested, this,
+            [this](size_t index) { BeginPaste(index, true, 0, 0, true); });
     connect(popup_, &HistoryWindow::qrCodeRequested, this, &ClipboardLiteManager::GenerateQrCode);
     if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
     if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
@@ -1036,7 +1068,7 @@ void ClipboardLiteManager::onPasteTimer() {
             accountFill_->Cancel();
             return;
         }
-        if (accountUia_.Initialize()) accountUsernameElement_ = accountUia_.FocusedElement(accountTargetWindow_);
+        if (!accountTerminalMode_ && accountUia_.Initialize()) accountUsernameElement_ = accountUia_.FocusedElement(accountTargetWindow_);
         if (!AccountTargetActive()) {
             accountFill_->Cancel();
             return;

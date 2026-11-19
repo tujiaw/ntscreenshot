@@ -117,6 +117,42 @@ int runFavoriteAccountManagerRegression() {
     manager.targetWindow_ = nullptr;
     CHECK(consumed && manager.pendingClipboardSequence_ == 0);
     CHECK(preserved);
+    manager.EnsurePopup();
+    auto* managerViews = manager.popup_->findChild<QButtonGroup*>(QStringLiteral("clipViewGroup"));
+    managerViews->button(1)->click();
+    auto* managerList = manager.popup_->findChild<QListWidget*>(QStringLiteral("clipList"));
+    CHECK(managerList->count() == 1);
+    managerList->itemActivated(managerList->item(0));
+    CHECK(clipboard->text() == QStringLiteral("username: account-user password: account-password"));
+    CHECK(!manager.accountFill_->Busy() && manager.pendingAccountPassword_.isEmpty());
+    manager.pasteTimer_->stop();
+    manager.popup_->accountSequenceRequested(manager.popup_->HistoryIndexForRow(0));
+    CHECK(clipboard->text() == QStringLiteral("account-user"));
+    CHECK(manager.accountFill_->Busy() && manager.pendingAccountPassword_ == QStringLiteral("account-password"));
+    manager.pasteTimer_->stop();
+    manager.accountFill_->Cancel();
+    for (const wchar_t* terminalClass : {L"PuTTY", L"KiTTY"}) {
+        WNDCLASSW windowClass = {};
+        windowClass.lpfnWndProc = DefWindowProcW;
+        windowClass.hInstance = GetModuleHandleW(nullptr);
+        windowClass.lpszClassName = terminalClass;
+        const ATOM registered = RegisterClassW(&windowClass);
+        CHECK(registered != 0);
+        const HWND terminal = CreateWindowExW(0, terminalClass, L"SSH detection test", WS_POPUP,
+                                              0, 0, 10, 10, nullptr, nullptr, windowClass.hInstance, nullptr);
+        CHECK(terminal != nullptr);
+        manager.targetWindow_ = terminal;
+        manager.popup_->accountSequenceRequested(manager.popup_->HistoryIndexForRow(0));
+        const bool terminalMode = manager.accountTerminalMode_ && manager.accountFill_->Busy();
+        manager.pasteTimer_->stop();
+        manager.accountFill_->Cancel();
+        manager.targetWindow_ = nullptr;
+        DestroyWindow(terminal);
+        UnregisterClassW(terminalClass, windowClass.hInstance);
+        CHECK(terminalMode && !manager.accountTerminalMode_);
+    }
+    delete manager.popup_;
+    manager.popup_ = nullptr;
     clipboard->setMimeData(original.release());
     return 0;
 }
@@ -455,7 +491,7 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     list->doItemsLayout();
     const QRect accountRow = list->visualItemRect(list->item(0));
     for (int button = 0; button < 2; ++button) {
-        const QPoint point(accountRow.right() - (button == 0 ? 46 : 18), accountRow.bottom() - 16);
+        const QPoint point(accountRow.right() - (button == 0 ? 74 : 46), accountRow.bottom() - 16);
         QApplication::clipboard()->setText(QStringLiteral("unchanged"));
         QMouseEvent press(QEvent::MouseButtonPress, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
                           Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
@@ -467,7 +503,7 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
         CHECK(QApplication::clipboard()->text() == (button == 0 ? QStringLiteral("admin") : QStringLiteral("123")));
         CHECK(window.isVisible());
     }
-    const QPoint hoverPoint(accountRow.right() - 46, accountRow.bottom() - 16);
+    const QPoint hoverPoint(accountRow.right() - 74, accountRow.bottom() - 16);
     const QImage restingButtons = list->viewport()->grab().toImage();
     QMouseEvent hover(QEvent::MouseMove, QPointF(hoverPoint), QPointF(list->viewport()->mapToGlobal(hoverPoint)),
                       Qt::NoButton, Qt::NoButton, Qt::NoModifier);
@@ -481,7 +517,7 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     const auto fieldConnection = QObject::connect(&window, &HistoryWindow::accountFieldRequested,
         [&](const QString& text) { requestedField = text; });
     for (int button = 0; button < 2; ++button) {
-        const QPoint point(accountRow.right() - (button == 0 ? 46 : 18), accountRow.bottom() - 16);
+        const QPoint point(accountRow.right() - (button == 0 ? 74 : 46), accountRow.bottom() - 16);
         QMouseEvent press(QEvent::MouseButtonPress, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
                           Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
         QMouseEvent release(QEvent::MouseButtonRelease, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
@@ -491,6 +527,20 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
         CHECK(requestedField == (button == 0 ? QStringLiteral("admin") : QStringLiteral("123")));
     }
     QObject::disconnect(fieldConnection);
+    size_t sequenceIndex = static_cast<size_t>(-1);
+    const auto sequenceConnection = QObject::connect(&window, &HistoryWindow::accountSequenceRequested,
+        [&](size_t index) { sequenceIndex = index; });
+    const QPoint sequencePoint(accountRow.right() - 18, accountRow.bottom() - 16);
+    QMouseEvent sequencePress(QEvent::MouseButtonPress, QPointF(sequencePoint), QPointF(list->viewport()->mapToGlobal(sequencePoint)),
+                             Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QMouseEvent sequenceRelease(QEvent::MouseButtonRelease, QPointF(sequencePoint), QPointF(list->viewport()->mapToGlobal(sequencePoint)),
+                               Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    app.sendEvent(list->viewport(), &sequencePress);
+    CHECK(sequenceIndex == static_cast<size_t>(-1));
+    app.sendEvent(list->viewport(), &sequenceRelease);
+    CHECK(sequenceIndex == window.HistoryIndexForRow(0));
+    QObject::disconnect(sequenceConnection);
+
     CHECK(inspectMenu(true, "username")); CHECK(QApplication::clipboard()->text() == QStringLiteral("admin"));
     CHECK(inspectMenu(true, "password")); CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
     ClipboardUrlRecorder urls;

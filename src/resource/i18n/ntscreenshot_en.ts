@@ -36,6 +36,8 @@
     <message><source>系统十字</source><translation>System crosshair</translation></message>
     <message><source>移到预览上查看，下次截图生效</source><translation>Hover over the preview to try it. Applies to the next screenshot.</translation></message>
     <message><source>复制用户名</source><translation>Copy username</translation></message>
+    <message><source>SSH 登录等待时间</source><translation>SSH login delay</translation></message>
+    <message><source>%1 秒</source><translation>%1 seconds</translation></message>
     <message><source>复制密码</source><translation>Copy password</translation></message>
     <message><source>打开网址</source><translation>Open URL</translation></message>
     <message><source>无法打开网址</source><translation>Unable to open URL</translation></message>

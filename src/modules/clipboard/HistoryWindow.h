@@ -60,6 +60,7 @@ public:
 
 signals:
     void accountFieldRequested(const QString& text);
+    void accountSequenceRequested(size_t index);
     void qrCodeRequested(const QString& text);
 
 protected:

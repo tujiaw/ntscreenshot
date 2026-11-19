@@ -9,22 +9,24 @@
 // Separates the delayed fill sequence from clipboard and Windows UI access.
 class FavoriteAccountFillController : public QObject {
 public:
+    enum class Mode { Form, SshTerminal };
     struct Actions {
         std::function<bool()> targetActive;
         std::function<bool()> canEnterPassword;
         std::function<bool()> tab;
         std::function<bool(const QString&)> pastePassword;
         std::function<void()> restoreClipboard;
+        std::function<bool()> enter;
     };
 
     explicit FavoriteAccountFillController(Actions actions, QObject* parent = nullptr);
-    bool Reserve();
+    bool Reserve(Mode mode = Mode::Form, int terminalDelayMs = 1500);
     bool Busy() const { return stage_ != Stage::Idle; }
     void UsernamePasted(QString password);
     void Cancel();
 
 private:
-    enum class Stage { Idle, Reserved, WaitBeforeTab, CheckInput, Restore };
+    enum class Stage { Idle, Reserved, WaitBeforeTab, CheckInput, WaitBeforeEnter, WaitPassword, SubmitPassword, Restore };
     void Advance();
     void Finish();
     void Wait(int milliseconds);
@@ -36,4 +38,6 @@ private:
     Stage stage_ = Stage::Idle;
     QString password_;
     int tabAttempts_ = 0;
+    Mode mode_ = Mode::Form;
+    int terminalDelayMs_ = 1500;
 };
