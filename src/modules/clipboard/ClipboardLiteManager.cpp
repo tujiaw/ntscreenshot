@@ -300,6 +300,7 @@ void ClipboardLiteManager::BeginPaste(size_t index, bool keepPopupReady,
     pendingPasteReady_ = false;
     pendingAccountPassword_.clear();
     accountTargetWindow_ = nullptr;
+    pendingFieldPaste_ = false;
     pendingClipboardItem_ = items[index];
     if (fillFavoriteAccount && pendingClipboardItem_.favorite && pendingClipboardItem_.kind == ClipKind::Text) {
         const auto account = ParseFavoriteAccount(pendingClipboardItem_.text);
@@ -336,6 +337,33 @@ void ClipboardLiteManager::BeginPaste(size_t index, bool keepPopupReady,
     pendingPasteReleaseModifiers_ = releaseModifiers;
     pendingPasteTriggerKey_ = triggerKey;
     pasteTimer_->start(triggerKey != 0 ? 15 : (keepPopupReady ? 180 : 400));
+}
+
+void ClipboardLiteManager::PasteAccountField(const QString& text) {
+    if (accountFill_->Busy()) accountFill_->Cancel();
+    pasteTimer_->stop();
+    pendingPasteReady_ = pendingFieldPaste_ = false;
+    fieldClipboardSequence_ = 0;
+    pendingAccountPassword_.clear();
+    pendingClipboardItem_ = ClipItem{};
+    pendingClipboardItem_.text = text;
+    suppressNextCapture_ = true;
+    pendingClipboardSequence_ = 0;
+    if (!SetClipboardItem(pendingClipboardItem_)) {
+        suppressNextCapture_ = false;
+        return;
+    }
+    pendingClipboardSequence_ = WinClipboard::ClipboardSequence();
+    fieldClipboardSequence_ = pendingClipboardSequence_;
+    if (!targetWindow_ || !::IsWindow(targetWindow_) ||
+        WinClipboard::IsOwnWindow(targetWindow_, reinterpret_cast<HWND>(winId()),
+            popup_ ? reinterpret_cast<HWND>(popup_->winId()) : nullptr)) {
+        return;
+    }
+    pendingPasteReady_ = pendingFieldPaste_ = true;
+    pendingKeepPopupVisible_ = true;
+    pendingPasteReleaseModifiers_ = pendingPasteTriggerKey_ = 0;
+    pasteTimer_->start(180);
 }
 
 bool ClipboardLiteManager::AccountTargetActive() const {
@@ -955,6 +983,7 @@ void ClipboardLiteManager::EnsurePopup() {
     }
     const QPoint scalePoint = hasPopupPosition_ ? popupPosition_ : QCursor::pos();
     popup_ = new HistoryWindow(Util::getScreenScaleFactor(scalePoint));
+    connect(popup_, &HistoryWindow::accountFieldRequested, this, &ClipboardLiteManager::PasteAccountField);
     connect(popup_, &HistoryWindow::qrCodeRequested, this, &ClipboardLiteManager::GenerateQrCode);
     if (favoriteSync_) popup_->SetSyncPage(new FavoriteSyncPage(favoriteSync_, popup_));
     if (favoriteSync_) popup_->SetSyncStatus(favoriteSync_->Status());
@@ -993,6 +1022,15 @@ void ClipboardLiteManager::onPasteTimer() {
         return;
     }
     RestoreTargetFocus();
+    if (std::exchange(pendingFieldPaste_, false)) {
+        // Never send input to a different window if focus restoration failed.
+        if (!targetWindow_ || !::IsWindow(targetWindow_) || ::GetForegroundWindow() != targetWindow_ ||
+            WinClipboard::ClipboardSequence() != fieldClipboardSequence_) {
+            return;
+        }
+        WinClipboard::SendPasteForHotkey(0);
+        return;
+    }
     if (accountFill_->Busy()) {
         if (!AccountTargetActive()) {
             accountFill_->Cancel();

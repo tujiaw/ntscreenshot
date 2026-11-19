@@ -19,10 +19,13 @@
 #include <QHBoxLayout>
 #include <QHash>
 #include <QHideEvent>
+#include <QHelpEvent>
+#include <QToolTip>
 #include <QImage>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QMenu>
+#include <QMetaMethod>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -50,7 +53,7 @@ constexpr int kContentRole = Qt::UserRole + 2;
 constexpr int kViewRole = Qt::UserRole + 3;
 constexpr int kAccountRole = Qt::UserRole + 4;
 
-void DrawAccountKey(QPainter& painter, const QRectF& rect, const QColor& color)
+void DrawAccountLock(QPainter& painter, const QRectF& rect, const QColor& color)
 {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
@@ -58,10 +61,14 @@ void DrawAccountKey(QPainter& painter, const QRectF& rect, const QColor& color)
     painter.scale(rect.width() / 16.0, rect.height() / 16.0);
     painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(QPointF(5, 5), 3.2, 3.2);
-    painter.drawLine(QPointF(7.3, 7.3), QPointF(13.8, 13.8));
-    painter.drawLine(QPointF(10, 10), QPointF(12, 8));
-    painter.drawLine(QPointF(12, 12), QPointF(14, 10));
+    QPainterPath shackle;
+    shackle.moveTo(4, 7);
+    shackle.lineTo(4, 4);
+    shackle.cubicTo(4, -1, 12, -1, 12, 4);
+    shackle.lineTo(12, 7);
+    painter.drawPath(shackle);
+    painter.drawRoundedRect(QRectF(2, 7, 12, 9), 2, 2);
+    painter.drawLine(QPointF(8, 10.5), QPointF(8, 12.5));
     painter.restore();
 }
 
@@ -217,6 +224,27 @@ public:
         return index < accountMarkers_.size() && accountMarkers_[index];
     }
 
+    int feedbackRow = -1;
+    int feedbackButton = -1;
+    int feedbackVersion = 0;
+    int hoveredRow = -1;
+    int hoveredButton = -1;
+    int pressedRow = -1;
+    int pressedButton = -1;
+
+    QRect CopyButtonRect(const QRect& row, bool password) const {
+        const int size = s(24);
+        return QRect(row.right() - s(6) - (password ? size : 2 * size + s(4)) + 1,
+                     row.bottom() - s(4) - size + 1, size, size);
+    }
+
+    int CopyButtonAt(const QModelIndex& index, const QRect& row, const QPoint& point) const {
+        if (!index.data(kAccountRole).toBool()) return -1;
+        for (int button = 0; button < 2; ++button)
+            if (CopyButtonRect(row, button == 1).contains(point)) return button;
+        return -1;
+    }
+
     void setBackgroundAlpha(int alpha) { backgroundAlpha_ = alpha; }
 
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
@@ -238,7 +266,8 @@ public:
                 lineCount = LayoutPreview(layout, ContentWidth(width, option.font, index.row(), marked, account)).lines;
             }
         }
-        const QSize result(width, lineCount * QFontMetrics(option.font).height() + s(10));
+        const QSize result(width, qMax(lineCount * QFontMetrics(option.font).height() + s(10),
+            account ? QFontMetrics(option.font).height() + s(38) : 0));
         sizeCache_.insert(historyIndex, {width, index.row(), option.font, marked, account, result});
         return result;
     }
@@ -297,9 +326,6 @@ public:
             DrawStar(*painter, QRectF(markerRight - s(12), markerTop, s(12), s(12)), tokens.accent, true);
             markerRight -= s(18);
         }
-        if (accountMarker) {
-            DrawAccountKey(*painter, QRectF(markerRight - s(12), markerTop, s(12), s(12)), tokens.accent);
-        }
 
         const int contentOffset = ContentOffset(option.font, index.row());
         const QRect contentRect(rowRect.left() + contentOffset, rowRect.top() + s(5),
@@ -309,6 +335,36 @@ public:
             DrawImage(painter, contentRect, item, historyIndex);
         } else {
             DrawText(painter, contentRect, item.text, option.font, primary);
+        }
+
+        if (accountMarker) {
+            for (int button = 0; button < 2; ++button) {
+                const QRect rect = CopyButtonRect(rowRect, button == 1);
+                const bool hovered = hoveredRow == index.row() && hoveredButton == button;
+                const bool pressed = pressedRow == index.row() && pressedButton == button;
+                const QColor iconColor = pressed ? tokens.accentPressed : hovered ? tokens.accent : secondary;
+                painter->setPen(Qt::NoPen);
+                if (hovered || pressed) {
+                    painter->setBrush(WithAlpha(tokens.accent, pressed ? 45 : 24));
+                    painter->drawRoundedRect(rect.adjusted(1, 1, -1, -1), s(5), s(5));
+                }
+                const QRectF icon = QRectF(rect).adjusted(s(5), s(5), -s(5), -s(5));
+                if (feedbackRow == index.row() && feedbackButton == button) {
+                    painter->setPen(QPen(tokens.success, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                    painter->drawLine(QPointF(icon.left() + s(1), icon.center().y()), QPointF(icon.left() + s(5), icon.bottom() - s(2)));
+                    painter->drawLine(QPointF(icon.left() + s(5), icon.bottom() - s(2)), QPointF(icon.right(), icon.top() + s(2)));
+                } else if (button == 1) {
+                    DrawAccountLock(*painter, icon, iconColor);
+                } else {
+                    painter->setPen(QPen(iconColor, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                    painter->setBrush(Qt::NoBrush);
+                    painter->drawEllipse(QPointF(icon.center().x(), icon.top() + s(3)), s(3), s(3));
+                    QPainterPath shoulders;
+                    shoulders.moveTo(icon.left() + s(1), icon.bottom());
+                    shoulders.cubicTo(icon.left() + s(1), icon.top() + s(7), icon.right() - s(1), icon.top() + s(7), icon.right() - s(1), icon.bottom());
+                    painter->drawPath(shoulders);
+                }
+            }
         }
 
         if (!selected) {
@@ -336,7 +392,7 @@ private:
 
     int ContentWidth(int rowWidth, const QFont& font, int historyIndex,
                      bool favoriteMarker = false, bool accountMarker = false) const {
-        const int markerWidth = (int(favoriteMarker) + int(accountMarker)) * 18;
+        const int markerWidth = qMax((int(favoriteMarker) + int(accountMarker)) * 18, accountMarker ? 24 : 0);
         return qMax(1, rowWidth - ContentOffset(font, historyIndex) - s(kTimeWidth + 8 + markerWidth));
     }
 
@@ -657,6 +713,8 @@ HistoryWindow::HistoryWindow(qreal scaleFactor, QWidget* parent)
     header_->installEventFilter(this);
     resizeGrip_->installEventFilter(this);
     list_->installEventFilter(this);
+    list_->viewport()->installEventFilter(this);
+    list_->viewport()->setMouseTracking(true);
     searchEdit_->installEventFilter(this);
     QFont popupFont = font();
     Util::scaleFont(popupFont, scaleFactor_);
@@ -1297,6 +1355,72 @@ void HistoryWindow::resizeEvent(QResizeEvent* event) {
 }
 
 bool HistoryWindow::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == list_->viewport()) {
+        auto* delegate = static_cast<HistoryDelegate*>(delegate_);
+        if (event->type() == QEvent::MouseMove || event->type() == QEvent::Leave) {
+            const QPoint point = event->type() == QEvent::MouseMove
+                ? static_cast<QMouseEvent*>(event)->position().toPoint() : QPoint(-1, -1);
+            const auto index = list_->indexAt(point);
+            const int button = delegate->CopyButtonAt(index, list_->visualRect(index), point);
+            delegate->hoveredRow = button >= 0 ? index.row() : -1;
+            delegate->hoveredButton = button;
+            list_->viewport()->setCursor(button >= 0 ? Qt::PointingHandCursor : Qt::ArrowCursor);
+            list_->viewport()->update();
+        }
+        if (event->type() == QEvent::ToolTip) {
+            const auto* help = static_cast<QHelpEvent*>(event);
+            const auto index = list_->indexAt(help->pos());
+            const int button = static_cast<HistoryDelegate*>(delegate_)->CopyButtonAt(index, list_->visualRect(index), help->pos());
+            if (button >= 0) {
+                QToolTip::showText(help->globalPos(), QCoreApplication::translate("App", button == 0 ? "复制用户名" : "复制密码"), list_);
+                return true;
+            }
+        }
+        if (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonDblClick
+            || event->type() == QEvent::MouseButtonRelease) {
+            const auto* mouse = static_cast<QMouseEvent*>(event);
+            if (mouse->button() == Qt::LeftButton) {
+                const auto index = list_->indexAt(mouse->position().toPoint());
+                const int button = static_cast<HistoryDelegate*>(delegate_)->CopyButtonAt(index, list_->visualRect(index), mouse->position().toPoint());
+                if (event->type() != QEvent::MouseButtonRelease) {
+                    copyButtonRow_ = button >= 0 ? index.row() : -1;
+                    copyButton_ = button;
+                    delegate->pressedRow = copyButtonRow_;
+                    delegate->pressedButton = button;
+                    list_->viewport()->update();
+                    if (button >= 0) return true;
+                } else {
+                    const bool pressed = copyButton_ >= 0;
+                    const bool copy = pressed && button == copyButton_ && index.row() == copyButtonRow_;
+                    copyButton_ = copyButtonRow_ = -1;
+                    delegate->pressedRow = delegate->pressedButton = -1;
+                    list_->viewport()->update();
+                    if (copy && history_) {
+                        const size_t item = HistoryIndexForRow(index.row());
+                        if (item < history_->Items().size()) {
+                            const auto fields = ParseFavoriteAccount(history_->Items()[item].text);
+                            const QString text = button == 0 ? fields.username : fields.password;
+                            delegate->feedbackRow = index.row();
+                            delegate->feedbackButton = button;
+                            const int version = ++delegate->feedbackVersion;
+                            QTimer::singleShot(900, list_, [this, delegate, version]() {
+                                if (delegate->feedbackVersion != version) return;
+                                delegate->feedbackRow = delegate->feedbackButton = -1;
+                                list_->viewport()->update();
+                            });
+                            if (isSignalConnected(QMetaMethod::fromSignal(&HistoryWindow::accountFieldRequested))) {
+                                emit accountFieldRequested(text);
+                            } else {
+                                QApplication::clipboard()->setText(text);
+                            }
+                        }
+                    }
+                    if (pressed || button >= 0) return true;
+                }
+            }
+        }
+    }
+
     if (obj == resizeGrip_ && event->type() == QEvent::MouseButtonRelease) {
         resizeSaveTimer_->stop();
         if (resized_ && !previewVisible_) {

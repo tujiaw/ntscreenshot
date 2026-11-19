@@ -59,6 +59,7 @@ public:
     void ShowSyncPage();
 
 signals:
+    void accountFieldRequested(const QString& text);
     void qrCodeRequested(const QString& text);
 
 protected:
@@ -139,6 +140,8 @@ private:
     QTimer* toastTimer_ = nullptr;
     QTimer* resizeSaveTimer_ = nullptr;
 
+    int copyButtonRow_ = -1;
+    int copyButton_ = -1;
     bool dragging_ = false;
     QPoint dragStartPos_;
     QString lastQuery_;

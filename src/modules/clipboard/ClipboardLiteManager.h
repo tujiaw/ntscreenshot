@@ -75,6 +75,7 @@ private:
     // Paste
     void BeginPaste(size_t index, bool keepPopupReady, UINT releaseModifiers = 0, UINT triggerKey = 0,
                     bool fillFavoriteAccount = false);
+    void PasteAccountField(const QString& text);
     bool PasteFavoritePassword(const QString& password);
     void RestoreAccountClipboard();
     bool AccountTargetActive() const;
@@ -164,6 +165,8 @@ private:
     int retryCaptureCount_ = 0;
     bool suppressNextCapture_ = false;
     bool pendingPasteReady_ = false;
+    bool pendingFieldPaste_ = false;
+    DWORD fieldClipboardSequence_ = 0;
     bool pendingKeepPopupVisible_ = false;
     UINT pendingPasteReleaseModifiers_ = 0;
     UINT pendingPasteTriggerKey_ = 0;

@@ -92,6 +92,31 @@ int runFavoriteAccountManagerRegression() {
     CHECK(clipboard->text() == QStringLiteral("account-user")); // No active destination, no password write.
     manager.accountFill_->Cancel();
     CHECK(clipboard->image() == image);
+    manager.targetWindow_ = nullptr;
+    manager.PasteAccountField(QStringLiteral("field-only"));
+    CHECK(clipboard->text() == QStringLiteral("field-only"));
+    CHECK(!manager.pendingPasteReady_ && !manager.pendingFieldPaste_);
+    CHECK(!manager.accountFill_->Busy());
+    manager.targetWindow_ = reinterpret_cast<HWND>(quintptr(1));
+    manager.PasteAccountField(QStringLiteral("invalid-target"));
+    CHECK(clipboard->text() == QStringLiteral("invalid-target"));
+    CHECK(!manager.pendingPasteReady_ && !manager.pendingFieldPaste_);
+    // WM_CLIPBOARDUPDATE consumes the capture-suppression sequence before the paste timer fires.
+    HWND fieldTarget = ::CreateWindowExW(0, L"STATIC", L"Field paste regression", WS_POPUP,
+                                        0, 0, 10, 10, nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+    CHECK(fieldTarget != nullptr);
+    manager.targetWindow_ = fieldTarget;
+    manager.PasteAccountField(QStringLiteral("field-after-notification"));
+    CHECK(manager.pendingPasteReady_ && manager.pendingFieldPaste_);
+    const DWORD fieldSequence = WinClipboard::ClipboardSequence();
+    ClipItem ownField; ownField.text = QStringLiteral("field-after-notification");
+    const bool consumed = manager.ConsumeOwnClipboardChange(ownField);
+    const bool preserved = manager.fieldClipboardSequence_ == fieldSequence && fieldSequence != 0;
+    manager.pasteTimer_->stop();
+    ::DestroyWindow(fieldTarget);
+    manager.targetWindow_ = nullptr;
+    CHECK(consumed && manager.pendingClipboardSequence_ == 0);
+    CHECK(preserved);
     clipboard->setMimeData(original.release());
     return 0;
 }
@@ -426,6 +451,46 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     views->button(1)->click();
     CHECK(list->item(0)->data(Qt::UserRole + 4).toBool());
     CHECK(list->item(0)->toolTip().isEmpty());
+    app.processEvents();
+    list->doItemsLayout();
+    const QRect accountRow = list->visualItemRect(list->item(0));
+    for (int button = 0; button < 2; ++button) {
+        const QPoint point(accountRow.right() - (button == 0 ? 46 : 18), accountRow.bottom() - 16);
+        QApplication::clipboard()->setText(QStringLiteral("unchanged"));
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        app.sendEvent(list->viewport(), &press);
+        CHECK(QApplication::clipboard()->text() == QStringLiteral("unchanged"));
+        app.sendEvent(list->viewport(), &release);
+        CHECK(QApplication::clipboard()->text() == (button == 0 ? QStringLiteral("admin") : QStringLiteral("123")));
+        CHECK(window.isVisible());
+    }
+    const QPoint hoverPoint(accountRow.right() - 46, accountRow.bottom() - 16);
+    const QImage restingButtons = list->viewport()->grab().toImage();
+    QMouseEvent hover(QEvent::MouseMove, QPointF(hoverPoint), QPointF(list->viewport()->mapToGlobal(hoverPoint)),
+                      Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    app.sendEvent(list->viewport(), &hover);
+    CHECK(list->viewport()->cursor().shape() == Qt::PointingHandCursor);
+    CHECK(restingButtons != list->viewport()->grab().toImage());
+    QEvent leave(QEvent::Leave);
+    app.sendEvent(list->viewport(), &leave);
+    CHECK(list->viewport()->cursor().shape() == Qt::ArrowCursor);
+    QString requestedField;
+    const auto fieldConnection = QObject::connect(&window, &HistoryWindow::accountFieldRequested,
+        [&](const QString& text) { requestedField = text; });
+    for (int button = 0; button < 2; ++button) {
+        const QPoint point(accountRow.right() - (button == 0 ? 46 : 18), accountRow.bottom() - 16);
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(point), QPointF(list->viewport()->mapToGlobal(point)),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        app.sendEvent(list->viewport(), &press);
+        app.sendEvent(list->viewport(), &release);
+        CHECK(requestedField == (button == 0 ? QStringLiteral("admin") : QStringLiteral("123")));
+    }
+    QObject::disconnect(fieldConnection);
     CHECK(inspectMenu(true, "username")); CHECK(QApplication::clipboard()->text() == QStringLiteral("admin"));
     CHECK(inspectMenu(true, "password")); CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
     ClipboardUrlRecorder urls;
@@ -435,6 +500,7 @@ int runFavoriteAccountRegression(QApplication& app, const QString& previewDir) {
     CHECK(openMenuValid);
     CHECK(urls.openedUrl == QUrl(QStringLiteral("https://example.com/login?next=%2Fhome&a=1")));
     CHECK(QApplication::clipboard()->text() == QStringLiteral("123"));
+    window.ShowHint(QString(), 1);
     if (!previewDir.isEmpty()) {
         ClipItem account; account.favorite = true;
         account.text = QStringLiteral("演示账号\n用户名：admin@example.com\n密码：demo-password");
