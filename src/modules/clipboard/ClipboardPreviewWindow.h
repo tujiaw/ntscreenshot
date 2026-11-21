@@ -22,6 +22,7 @@ public:
     bool CommitEdit();
     // Focuses the image view so arrow keys navigate between items.
     void FocusImage();
+    void UpdateIcons(int size);
 signals:
     void navigateRequested(int delta);
     void dismissRequested();

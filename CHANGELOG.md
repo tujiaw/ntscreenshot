@@ -4,6 +4,13 @@ All notable changes will be documented in this file. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-21
+
+### Changed
+
+- Replaced clipboard preview back and edit actions with compact, borderless icon buttons, including a save checkmark while editing.
+- Added a theme-aware divider between the preview toolbar and its content.
+
 ## [0.2.5] - 2026-11-05
 
 ### Added

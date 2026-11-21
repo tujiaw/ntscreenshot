@@ -1156,25 +1156,26 @@ void HistoryWindow::ApplyPreviewTheme() {
     previewPalette.setColor(QPalette::WindowText, tokens.textPrimary);
     previewPalette.setColor(QPalette::PlaceholderText, tokens.textSecondary);
     preview_->setPalette(previewPalette);
+    preview_->UpdateIcons(scaled(16));
     // The popup paints the pane surface itself so the rounded window corners
     // stay intact; the pane and its content must not paint an opaque square.
     preview_->setStyleSheet(
         QStringLiteral("QWidget#clipboardPreviewWindow { background: transparent; }"
                        "QPlainTextEdit#clipboardPreviewText, QGraphicsView#clipboardPreviewImage {"
                        " background: transparent; border: none; }"
+                       "QFrame#clipPreviewSeparator { background: %3; border: none; }"
                        "QToolButton#clipPreviewBackButton, QToolButton#clipPreviewEditButton {"
-                       " color: %1; background: %2; border: 1px solid %3; border-radius: %4px;"
-                       " padding: %5px %6px; }"
+                       " color: %1; background: transparent; border: none; border-radius: %4px;"
+                       " min-height: %5px; max-height: %5px; min-width: %6px; max-width: %6px; padding: 0px; }"
                        "QToolButton#clipPreviewBackButton:hover, QToolButton#clipPreviewEditButton:hover {"
-                       " background: %7; }"
+                       " background: %2; }"
                        "QToolButton#clipPreviewBackButton:pressed, QToolButton#clipPreviewEditButton:pressed {"
-                       " background: %8; }")
+                       " background: %7; }")
             .arg(CssColor(tokens.textPrimary))
-            .arg(CssColor(tokens.surfaceRaised))
+            .arg(CssColor(tokens.surfaceSubtle))
             .arg(CssColor(tokens.border))
             .arg(scaled(4))
-            .arg(scaled(2)).arg(scaled(8))
-            .arg(CssColor(tokens.surfaceSubtle))
+            .arg(scaled(24)).arg(scaled(28))
             .arg(CssColor(tokens.accentSubtle)));
     preview_->update();
 }

@@ -1,6 +1,8 @@
 #include "ClipboardPreviewWindow.h"
 
 #include <QCoreApplication>
+#include <QApplication>
+#include <QFrame>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -8,6 +10,8 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPlainTextEdit>
+#include <QPainter>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QStackedWidget>
 #include <QToolButton>
@@ -16,6 +20,33 @@
 #include <cmath>
 
 namespace {
+QIcon PreviewActionIcon(int action, int size, const QColor& color) {
+    const qreal dpr = qApp->devicePixelRatio();
+    QPixmap pixmap(qRound(size * dpr), qRound(size * dpr));
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(size / 16.0, size / 16.0);
+    painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    QPainterPath path;
+    if (action == 0) {
+        path.moveTo(7, 3); path.lineTo(2, 8); path.lineTo(7, 13);
+        path.moveTo(2, 8); path.lineTo(14, 8);
+    } else if (action == 1) {
+        path.moveTo(3, 10); path.lineTo(10.5, 2.5);
+        path.quadTo(11.5, 1.5, 12.5, 2.5);
+        path.lineTo(13.5, 3.5); path.quadTo(14.5, 4.5, 13.5, 5.5);
+        path.lineTo(6, 13); path.lineTo(2, 14); path.closeSubpath();
+        path.moveTo(9, 4); path.lineTo(12, 7);
+    } else {
+        path.moveTo(3, 8); path.lineTo(6.5, 11.5); path.lineTo(13, 4.5);
+    }
+    painter.drawPath(path);
+    painter.end();
+    return QIcon(pixmap);
+}
+
 class PreviewImageView final : public QGraphicsView {
 public:
     explicit PreviewImageView(QWidget* parent) : QGraphicsView(parent) {
@@ -73,7 +104,8 @@ ClipboardPreviewWindow::ClipboardPreviewWindow(QWidget* parent)
     backButton_->setAccessibleName(QCoreApplication::translate("App", "返回"));
     backButton_->setCursor(Qt::PointingHandCursor);
     backButton_->setAutoRaise(true);
-    backButton_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    backButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    backButton_->setToolTip(backButton_->text());
     connect(backButton_, &QToolButton::clicked, this, &ClipboardPreviewWindow::onBackClicked);
     editButton_ = new QToolButton(toolbar);
     editButton_->setObjectName(QStringLiteral("clipPreviewEditButton"));
@@ -81,12 +113,18 @@ ClipboardPreviewWindow::ClipboardPreviewWindow(QWidget* parent)
     editButton_->setAccessibleName(QCoreApplication::translate("App", "编辑"));
     editButton_->setCursor(Qt::PointingHandCursor);
     editButton_->setAutoRaise(true);
-    editButton_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    editButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    editButton_->setToolTip(editButton_->text());
     connect(editButton_, &QToolButton::clicked, this, &ClipboardPreviewWindow::onEditClicked);
     toolbarLayout->addWidget(backButton_);
     toolbarLayout->addStretch(1);
     toolbarLayout->addWidget(editButton_);
     root->addWidget(toolbar);
+
+    auto* separator = new QFrame(this);
+    separator->setObjectName(QStringLiteral("clipPreviewSeparator"));
+    separator->setFixedHeight(1);
+    root->addWidget(separator);
 
     pages_ = new QStackedWidget(this);
     root->addWidget(pages_, 1);
@@ -113,6 +151,15 @@ ClipboardPreviewWindow::ClipboardPreviewWindow(QWidget* parent)
     image_->installEventFilter(this);
     image_->viewport()->installEventFilter(this);
     error_->installEventFilter(this);
+    UpdateIcons(16);
+}
+
+void ClipboardPreviewWindow::UpdateIcons(int size) {
+    const QColor color = palette().color(QPalette::WindowText);
+    backButton_->setIconSize(QSize(size, size));
+    editButton_->setIconSize(QSize(size, size));
+    backButton_->setIcon(PreviewActionIcon(0, size, color));
+    editButton_->setIcon(PreviewActionIcon(editing_ ? 2 : 1, size, color));
 }
 
 void ClipboardPreviewWindow::ShowItem(const ClipItem& item) {
@@ -168,6 +215,8 @@ void ClipboardPreviewWindow::SetEditing(bool editing) {
                                   : QCoreApplication::translate("App", "编辑");
     editButton_->setText(label);
     editButton_->setAccessibleName(label);
+    editButton_->setToolTip(label);
+    UpdateIcons(editButton_->iconSize().width());
     if (editing) {
         text_->setFocus();
     }
