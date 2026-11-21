@@ -162,6 +162,7 @@ ImageBrowserWindow::ImageBrowserWindow(SettingModel* settings, ImageLoader* load
         regionOperation_ = {};
         regionFromPanel_ = false;
         canvas_->setCropping(cropAction_->isChecked());
+        if (canvas_->cropping()) canvas_->setCropAspectRatio(editorPanel_->cropAspectRatio());
         if (canvas_->cropping()) showStatus(tr("拖动选择区域，按 Enter 应用，Esc 取消。"));
         updateActions();
     }); });
@@ -499,6 +500,14 @@ ImageBrowserWindow::~ImageBrowserWindow() {
 
 void ImageBrowserWindow::createEditorPanel() {
     editorPanel_ = new ImageEditorPanel(this);
+    connect(editorPanel_, &ImageEditorPanel::assetLoadRequested, this, [this](const QString& path, quint64 revision) {
+        loader_->run(editorPanel_, [path] { return ImageDocument::read(path); },
+            [panel = editorPanel_, revision](const ImageResult& result) { panel->completeAssetLoad(revision, result); });
+    });
+    connect(editorPanel_, &ImageEditorPanel::cropAspectRatioChanged, this, [this](double ratio) {
+        if (canvas_->cropping() && regionOperation_.kind == EditOperation::Crop)
+            canvas_->setCropAspectRatio(ratio);
+    });
     connect(editorPanel_, &ImageEditorPanel::closeRequested, this, [this] {
         editorPanel_->hide(); editorAction_->setChecked(false);
         positionEditorPanel();
@@ -514,9 +523,29 @@ void ImageBrowserWindow::createEditorPanel() {
     colorTimer_.setInterval(100);
     connect(&colorTimer_, &QTimer::timeout, this, &ImageBrowserWindow::renderColor);
     connect(editorPanel_, &ImageEditorPanel::colorChanged, this, &ImageBrowserWindow::queueColor);
+    connect(editorPanel_, &ImageEditorPanel::colorSessionFinished, this, [this](bool apply) {
+        dispatchAction([this, apply] {
+            if (!colorSession_) return;
+            if (!apply) {
+                document_ = colorBase_;
+                displayedSize_ = document_.current.size();
+                canvas_->setImage(document_.current);
+            }
+            colorSession_ = false; colorBase_ = {};
+            editorPanel_->resetColorParameters();
+            showStatus({}); updateActions();
+        });
+    });
     connect(editorPanel_, &ImageEditorPanel::drawingStyleChanged, this, [this] {
+        if (editorPanel_->isVisible() && editorPanel_->perspectiveActive() && !busy_ && !canvas_->cropping())
+            canvas_->setPerspective(editorPanel_->currentOperation().corners);
         canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
             !busy_ && editorPanel_->isVisible() && editorPanel_->drawingActive());
+    });
+    connect(canvas_, &ImageCanvas::perspectiveChanged, editorPanel_, &ImageEditorPanel::setPerspectiveCorners);
+    connect(canvas_, &ImageCanvas::perspectiveAccepted, this, [this] {
+        if (editorPanel_->isVisible() && editorPanel_->perspectiveActive() && !busy_)
+            edit(editorPanel_->currentOperation());
     });
     connect(canvas_, &ImageCanvas::annotationAccepted, this, [this](const EditOperation& operation) {
         if (editorPanel_->isVisible() && editorPanel_->drawingActive() && editorPanel_->validateOperation(operation)) edit(operation);
@@ -551,6 +580,7 @@ void ImageBrowserWindow::selectEditRegion(const EditOperation& operation) {
     regionOperation_ = operation;
     regionFromPanel_ = true;
     canvas_->setCropping(true);
+    if (operation.kind == EditOperation::Crop) canvas_->setCropAspectRatio(editorPanel_->cropAspectRatio());
     showStatus(tr("拖动选择区域，按 Enter 应用，Esc 取消。"));
     updateActions();
 }
@@ -906,7 +936,7 @@ void ImageBrowserWindow::selectRow(int row) {
     list_->scrollTo(model_->index(actualRow));
     loadImage(path);
 }
-void ImageBrowserWindow::loadImage(const QString& path) {
+void ImageBrowserWindow::loadImage(const QString& path, int animationState, int animationFrame) {
     deferredActions_.clear();
     colorSession_ = false; colorBase_ = {}; editorPanel_->resetColorParameters();
     stopMovie();
@@ -930,7 +960,7 @@ void ImageBrowserWindow::loadImage(const QString& path) {
     const auto generation = loadGeneration_;
     loader_->run(this, [path, generation, version] {
         return generation->load() == version ? ImageDocument::read(path) : ImageResult{};
-    }, [this, path, version](const ImageResult& result) {
+    }, [this, path, version, animationState, animationFrame](const ImageResult& result) {
         if (version != imageVersion_) return;
         loading_ = false;
         document_.load(path, result);
@@ -955,8 +985,13 @@ void ImageBrowserWindow::loadImage(const QString& path) {
                 showStatus(tr("无法播放动图，当前显示静态帧。"));
                 stopMovie(); updateActions();
             });
-            if (isVisible()) movie_->start();
-            else resumeMovie_ = true;
+            if (isVisible() || animationState == QMovie::Paused || animationState == QMovie::NotRunning) {
+                movie_->start();
+                // start/jump may synchronously emit error and release movie_.
+                if (movie_ && animationFrame > 0) movie_->jumpToFrame(animationFrame);
+                if (movie_ && animationState == QMovie::Paused) movie_->setPaused(true);
+                else if (movie_ && animationState == QMovie::NotRunning) movie_->stop();
+            } else resumeMovie_ = true;
         } else if ((QFileInfo(path).suffix().compare("gif", Qt::CaseInsensitive) == 0 ||
                     QFileInfo(path).suffix().compare("webp", Qt::CaseInsensitive) == 0) && !result.animationSupported) {
             showStatus(tr("当前图片插件不支持动图播放。"));
@@ -1097,7 +1132,10 @@ void ImageBrowserWindow::updateEditorState() {
     const bool processing = rendering_ || colorPending_ || colorRendering_;
     const bool editable = !document_.current.isNull() && !loading_ && !document_.limited && !movie_ && (!busy_ || processing);
     editorPanel_->setDocumentContext(document_.path, document_.current.size(), editable, processing);
+    editorPanel_->setColorSessionActive(colorSession_);
     editorPanel_->setSelectionState(regionFromPanel_ && canvas_->cropping(), canvas_->cropRect());
+    canvas_->setPerspective(editorPanel_->isVisible() && editorPanel_->perspectiveActive() && editable && !busy_ && !canvas_->cropping()
+        ? editorPanel_->currentOperation().corners : QPolygonF{});
     canvas_->setAnnotation(editorPanel_->drawingActive() ? editorPanel_->currentOperation() : EditOperation{},
         !busy_ && editorPanel_->isVisible() && editorPanel_->drawingActive());
 }
@@ -1184,9 +1222,10 @@ bool ImageBrowserWindow::save(bool overwrite, bool refreshListing, const QByteAr
         updateActions();
         return false;
     }
-    if (format == "pdf") {
-        // PDF is an export: retain the source image, selection and undo history.
-        showStatus(tr("PDF 已保存"), 3000);
+    if (!requestedFormat.isEmpty()) {
+        // Conversion exports a copy; it must never replace the editing document.
+        // Keep the source path, selection, dirty state and undo/redo history.
+        showStatus(format == "pdf" ? tr("PDF 已保存") : tr("图片已保存"), 3000);
         updateActions();
         return true;
     }
@@ -1247,10 +1286,12 @@ void ImageBrowserWindow::deleteImage() {
         else if (row > 0) next = model_->pathAt(row - 1);
     }
     const bool hadMovie = movie_ != nullptr;
+    const int playbackState = movie_ ? int(movie_->state()) : -1;
+    const int frame = movie_ ? movie_->currentFrameNumber() : 0;
     stopMovie(true);
     QString error;
     if (!QFile::moveToTrash(path, &error)) {
-        if (hadMovie) loadImage(path);
+        if (hadMovie) loadImage(path, playbackState, frame);
         QMessageBox::warning(this, tr("删除图片"), tr("无法删除「%1」。\n%2").arg(
             name, error.isEmpty() ? tr("文件可能正被占用。") : error));
         return;

@@ -16,6 +16,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QColorSpace>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QContextMenuEvent>
@@ -54,6 +55,7 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QTranslator>
+#include <QTransform>
 #include <QWheelEvent>
 #include <functional>
 #ifdef Q_OS_WIN
@@ -393,6 +395,32 @@ int runImageBrowserTest(QApplication& app) {
     const QString jpeg = directory.filePath("white.jpg");
     check(ImageDocument::save(jpeg, transparent, "jpeg").success, "JPEG save");
     check(qRed(ImageDocument::read(jpeg).image.pixel(10, 10)) > 250, "JPEG white alpha background");
+    QImage profiled = transparent;
+    profiled.fill(QColor(140, 80, 30, 128));
+    profiled.setColorSpace(QColorSpace(QColorSpace::AdobeRgb));
+    const QString profiledJpeg = directory.filePath("nested/profiled.jpg");
+    check(ImageDocument::save(profiledJpeg, profiled, "jpeg").success &&
+          QImage(profiledJpeg).colorSpace() == profiled.colorSpace(),
+          "JPEG alpha flattening retains source ICC profile");
+    const QString orientationBase = directory.filePath("nested/orientation-base.jpg");
+    check(source.save(orientationBase, "JPEG"), "write EXIF orientation base");
+    const QImage orientationPixels(orientationBase);
+    QFile orientationInput(orientationBase);
+    check(orientationInput.open(QIODevice::ReadOnly), "read EXIF fixture base");
+    QByteArray orientationData = orientationInput.readAll();
+    orientationInput.close();
+    // JPEG APP1, little-endian TIFF, Orientation (0x0112) = 6 (90 degrees clockwise).
+    orientationData.insert(2, QByteArray::fromHex("ffe1002245786966000049492a0008000000010012010300010000000600000000000000"));
+    const QString orientedPath = directory.filePath("nested/oriented.jpg");
+    QFile orientedFile(orientedPath);
+    check(orientedFile.open(QIODevice::WriteOnly) && orientedFile.write(orientationData) == orientationData.size(), "write EXIF fixture");
+    orientedFile.close();
+    const auto oriented = ImageDocument::read(orientedPath);
+    check(oriented.error.isEmpty() && oriented.image == orientationPixels.transformed(QTransform().rotate(90)),
+          "EXIF orientation is applied exactly once to image pixels");
+    const QString orientedExport = directory.filePath("nested/oriented-export.png");
+    check(ImageDocument::save(orientedExport, oriented.image, "png").success && QImage(orientedExport) == oriented.image,
+          "oriented image export round trip does not rotate twice");
     const QString bitmap = directory.filePath("nested/converted.bmp");
     check(ImageDocument::save(bitmap, transparent, "bmp").success, "BMP format conversion");
     check(ImageDocument::read(bitmap).image.pixelColor(10, 10) == QColor(Qt::white), "BMP white alpha background");
@@ -567,6 +595,35 @@ int runImageBrowserTest(QApplication& app) {
         delete closingModel;
     }
 
+    {
+        ImageEditorPanel materials;
+        materials.setDocumentContext(path, source.size(), true);
+        materials.findChild<QToolButton*>("browserEditorTool5")->click();
+        int requests = 0; quint64 requestedRevision = 0;
+        QObject::connect(&materials, &ImageEditorPanel::assetLoadRequested, &materials,
+            [&](const QString&, quint64 revision) { ++requests; requestedRevision = revision; });
+        auto* input = materials.findChild<QLineEdit*>("editorAssetPath");
+        input->setText("first-material.png");
+        check(waitUntil([&] { return requests == 1; }), "material input debounce starts one worker request");
+        const quint64 oldRevision = requestedRevision;
+        input->setText("second-material.png");
+        QElapsedTimer debounce; debounce.start();
+        check(waitUntil([&] { return debounce.elapsed() >= 200; }) && requests == 1,
+              "changing material never queues a second simultaneous decode");
+        ImageResult decoded; decoded.image = source;
+        materials.completeAssetLoad(oldRevision, decoded);
+        check(materials.currentOperation().asset.isNull(), "stale material completion cannot publish old pixels");
+        check(waitUntil([&] { return requests == 2; }), "latest material starts after stale worker finishes");
+        decoded.image = source.mirrored();
+        materials.completeAssetLoad(requestedRevision, decoded);
+        check(materials.currentOperation().asset == decoded.image, "latest material revision publishes cached pixels");
+        input->setText("oversized-material.png");
+        check(waitUntil([&] { return requests == 3; }), "oversized material request starts");
+        decoded.limited = true;
+        materials.completeAssetLoad(requestedRevision, decoded);
+        check(materials.currentOperation().asset.isNull() && !materials.findChild<QPushButton*>("editorSubmit")->isEnabled(),
+              "limited material preview cannot enter editing history");
+    }
     // Coordinate mapping after zoom and pan, including crop movement and handles.
     ImageCanvas canvas;
     {
@@ -638,6 +695,10 @@ int runImageBrowserTest(QApplication& app) {
     mouse(&canvas, QEvent::MouseMove, canvas.viewportPoint(QPointF(100, 80)));
     mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(100, 80)));
     check(canvas.cropRect() == QRect(20, 30, 80, 50), "resize crop handle");
+    mouse(&canvas, QEvent::MouseButtonPress, canvas.viewportPoint(QPointF(100, 55)));
+    mouse(&canvas, QEvent::MouseMove, canvas.viewportPoint(QPointF(120, 55)));
+    mouse(&canvas, QEvent::MouseButtonRelease, canvas.viewportPoint(QPointF(120, 55)));
+    check(canvas.cropRect() == QRect(20, 30, 100, 50), "crop edge handle resizes one dimension");
     canvas.setCropping(false);
     EditOperation stroke; stroke.kind = EditOperation::Annotate; stroke.variant = 2; stroke.strength = 4;
     int drawn = 0; EditOperation committed;
@@ -720,6 +781,73 @@ int runImageBrowserTest(QApplication& app) {
         editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool%1").arg(tool))->click();
         check(!QApplication::activeModalWidget() && !QApplication::activePopupWidget() && editorPanel->isVisible(), "tool details stay inline without popup");
         check(editorPanel->findChild<QStackedWidget*>()->currentIndex() == tool, "lower details match selected tool");
+    }
+    editorPanel->findChild<QToolButton*>("browserEditorTool5")->click();
+    auto* assetInput = editorPanel->findChild<QLineEdit*>("editorAssetPath");
+    assetInput->setText(path);
+    check(qobject_cast<ImageEditorPanel*>(editorPanel)->currentOperation().asset.isNull(),
+          "material path input never decodes synchronously");
+    check(waitUntil([&] { return qobject_cast<ImageEditorPanel*>(editorPanel)->currentOperation().asset == source; }),
+          "material import asynchronously supplies full resolution pixels");
+    editorPanel->findChild<QPushButton*>("editorSubmit")->click();
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(20, 20)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(100, 70)));
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(100, 70)));
+    editorPanel->findChild<QPushButton*>("editorApplySelection")->click();
+    check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "loaded material applies through edit history");
+    trigger(window, QStringLiteral("复制图片"));
+    EditOperation placedMaterial; placedMaterial.kind = EditOperation::Sticker;
+    placedMaterial.asset = source; placedMaterial.rect = QRect(20, 20, 80, 50);
+    check(QApplication::clipboard()->image() == ImageDocument::render(source, {placedMaterial}, 1).image,
+          "cached full resolution material produces correct placed pixels");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return !window->windowTitle().contains('*'); }), "material placement can be undone");
+    editorPanel->findChild<QPushButton*>("editorSubmit")->click();
+    assetInput->setText(directory.filePath("missing-material.png"));
+    check(!browserCanvas->cropping(), "changing material cancels its uncommitted placement region");
+    check(qobject_cast<ImageEditorPanel*>(editorPanel)->currentOperation().asset.isNull(),
+          "changing material path invalidates previous decoded pixels immediately");
+    check(!editorPanel->findChild<QPushButton*>("editorSubmit")->isEnabled(), "invalid material cannot start selection");
+    assetInput->clear();
+    editorPanel->findChild<QToolButton*>("browserEditorTool2")->click();
+    const QPointF perspectiveStart = browserCanvas->viewportPoint(QPointF(0, 0));
+    const QPointF perspectiveEnd = browserCanvas->viewportPoint(QPointF(20, 15));
+    mouse(browserCanvas, QEvent::MouseButtonPress, perspectiveStart);
+    mouse(browserCanvas, QEvent::MouseMove, perspectiveEnd);
+    mouse(browserCanvas, QEvent::MouseButtonRelease, perspectiveEnd);
+    check(editorPanel->findChild<QSpinBox*>("editorCorner0")->value() == 20 &&
+          editorPanel->findChild<QSpinBox*>("editorCorner1")->value() == 15,
+          "perspective corners drag directly on canvas in image coordinates");
+    check(!window->windowTitle().contains('*'), "perspective handle preview does not commit pixels");
+    editorPanel->findChild<QSpinBox*>("editorCorner0")->setValue(30);
+    mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(30, 15)));
+    mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(40, 25)));
+    mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(40, 25)));
+    check(editorPanel->findChild<QSpinBox*>("editorCorner0")->value() == 40,
+          "numeric perspective edits synchronize canvas handles");
+    trigger(window, QStringLiteral("裁剪"));
+    editorPanel->findChild<QSpinBox*>("editorCorner1")->setValue(30);
+    const QPointF cropStart = browserCanvas->viewportPoint(QPointF(40, 25));
+    const QPointF cropEnd = browserCanvas->viewportPoint(QPointF(120, 90));
+    mouse(browserCanvas, QEvent::MouseButtonPress, cropStart);
+    mouse(browserCanvas, QEvent::MouseMove, cropEnd);
+    mouse(browserCanvas, QEvent::MouseButtonRelease, cropEnd);
+    check(browserCanvas->cropRect() == QRect(40, 25, 80, 65) &&
+          editorPanel->findChild<QSpinBox*>("editorCorner0")->value() == 40,
+          "standalone crop takes precedence over perspective handles");
+    trigger(window, QStringLiteral("裁剪"));
+    {
+        const auto expected = ImageDocument::render(source,
+            {qobject_cast<ImageEditorPanel*>(editorPanel)->currentOperation()}, 1);
+        QKeyEvent applyPerspective(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+        QApplication::sendEvent(browserCanvas, &applyPerspective);
+        check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }),
+              "Enter commits perspective handles through document history");
+        trigger(window, QStringLiteral("复制图片"));
+        check(expected.error.isEmpty() && QApplication::clipboard()->image() == expected.image,
+              "perspective commit matches displayed corner coordinates");
+        trigger(window, QStringLiteral("撤销"));
+        check(waitUntil([&] { return !window->windowTitle().contains('*'); }), "undo perspective restores clean source");
     }
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool4"))->click();
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
@@ -812,6 +940,32 @@ int runImageBrowserTest(QApplication& app) {
     check(waitUntil([&] { return action(window, QStringLiteral("复制图片"))->isEnabled(); }), "reset parameters updates image automatically");
     trigger(window, QStringLiteral("复制图片"));
     check(QApplication::clipboard()->image() == source && !window->windowTitle().contains('*'), "reset live color returns to unadjusted session image");
+    auto* applyColor = editorPanel->findChild<QPushButton*>("editorColorApply");
+    auto* cancelColor = editorPanel->findChild<QPushButton*>("editorColorCancel");
+    check(applyColor && cancelColor, "live color exposes explicit apply and cancel controls");
+    if (applyColor && cancelColor) {
+        const bool baselineRedo = action(window, QStringLiteral("重做"))->isEnabled();
+        editorPanel->findChild<QSpinBox*>("editorBrightness")->setValue(25);
+        cancelColor->click();
+        check(waitUntil([&] { return !window->windowTitle().contains('*'); }), "cancel queued color preview restores clean baseline");
+        trigger(window, QStringLiteral("复制图片"));
+        check(QApplication::clipboard()->image() == source &&
+              action(window, QStringLiteral("重做"))->isEnabled() == baselineRedo,
+              "cancel color restores pixels and preexisting redo branch");
+        editorPanel->findChild<QSpinBox*>("editorBrightness")->setValue(15);
+        check(waitUntil([&] { return action(window, QStringLiteral("撤销"))->isEnabled(); }), "preview before explicit color apply");
+        applyColor->click();
+        trigger(window, QStringLiteral("复制图片"));
+        const QImage appliedColor = QApplication::clipboard()->image();
+        editorPanel->findChild<QSpinBox*>("editorContrast")->setValue(20);
+        cancelColor->click();
+        check(waitUntil([&] { return action(window, QStringLiteral("复制图片"))->isEnabled(); }), "cancel second color session completes");
+        trigger(window, QStringLiteral("复制图片"));
+        check(QApplication::clipboard()->image() == appliedColor && window->windowTitle().contains('*'),
+              "cancel later color session preserves previously applied edits");
+        trigger(window, QStringLiteral("撤销"));
+        check(waitUntil([&] { return !window->windowTitle().contains('*'); }), "applied color remains one undo step");
+    }
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool1"))->click();
     check(browserCanvas->annotating() && !browserCanvas->cropping() && !editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "selecting annotation immediately arms direct drawing");
     browserCanvas->setZoom(1.5);
@@ -832,6 +986,26 @@ int runImageBrowserTest(QApplication& app) {
     editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->click();
     check(browserCanvas->cropping() && editorPanel->isVisible(), "crop keeps details visible while selecting");
     check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorApplySelection"))->isEnabled(), "empty selection cannot be applied");
+    check(!editorPanel->findChild<QPushButton*>(QStringLiteral("editorSubmit"))->isVisible(), "selection mode shows only apply and cancel actions");
+    auto* cropRatio = editorPanel->findChild<QComboBox*>("editorCropRatio");
+    check(cropRatio != nullptr, "crop inspector provides aspect presets");
+    if (cropRatio) {
+        cropRatio->setCurrentIndex(cropRatio->findData(1.0));
+        mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(20, 20)));
+        mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(120, 60)));
+        mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(120, 60)));
+        check(browserCanvas->cropRect() == QRect(20, 20, 100, 100), "square preset constrains crop in image coordinates");
+        mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(120, 120)));
+        mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(500, 500)));
+        mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(500, 500)));
+        check(browserCanvas->cropRect() == QRect(20, 20, 160, 160), "ratio corner resize clamps without distortion at image boundary");
+        mouse(browserCanvas, QEvent::MouseButtonPress, browserCanvas->viewportPoint(QPointF(180, 100)));
+        mouse(browserCanvas, QEvent::MouseMove, browserCanvas->viewportPoint(QPointF(500, 100)));
+        mouse(browserCanvas, QEvent::MouseButtonRelease, browserCanvas->viewportPoint(QPointF(500, 100)));
+        check(browserCanvas->cropRect() == QRect(20, 20, 160, 160), "ratio edge resize respects orthogonal image boundary");
+        cropRatio->setCurrentIndex(cropRatio->findData(16.0/9));
+        check(browserCanvas->cropRect() == QRect(20, 55, 160, 90), "changing crop ratio fits inside selection with stable center");
+    }
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool6"))->click();
     check(!browserCanvas->cropping() && !window->windowTitle().contains('*'), "switching tools cancels uncommitted selection");
     editorPanel->findChild<QToolButton*>(QStringLiteral("browserEditorTool3"))->click();
@@ -990,6 +1164,79 @@ int runImageBrowserTest(QApplication& app) {
     pdfSteps.start(); trigger(window, QStringLiteral("格式转换")); pdfSteps.stop();
     check(contents(uiPdf).startsWith("%PDF-") && window->windowTitle() == titleBeforePdf &&
         action(window, QStringLiteral("撤销"))->isEnabled(), "PDF conversion exports edited image without losing source or undo history");
+    const QString uiPngExport = directory.filePath("ui-edited-export.png");
+    const auto selectionBeforeExport = list->currentIndex().data(Qt::ToolTipRole).toString();
+    trigger(window, QStringLiteral("复制图片"));
+    const QImage pixelsBeforeExport = QApplication::clipboard()->image();
+    QTimer pngSteps;
+    pngSteps.setInterval(10);
+    QObject::connect(&pngSteps, &QTimer::timeout, &app, [&] {
+        auto* modal = QApplication::activeModalWidget();
+        if (auto* fileDialog = qobject_cast<QFileDialog*>(modal)) {
+            fileDialog->selectFile(uiPngExport);
+            QMetaObject::invokeMethod(fileDialog, "accept", Qt::QueuedConnection);
+        } else if (auto* dialog = qobject_cast<ImageConversionDialog*>(modal)) {
+            auto* formats = dialog->findChild<QComboBox*>("conversionFormat");
+            formats->setCurrentIndex(formats->findData(QByteArray("png"))); dialog->accept();
+        }
+    });
+    pngSteps.start(); trigger(window, QStringLiteral("格式转换")); pngSteps.stop();
+    QElapsedTimer exportWatcherTimer; exportWatcherTimer.start();
+    check(waitUntil([&] { return exportWatcherTimer.elapsed() >= 500 && list->isEnabled(); }),
+          "same-directory export watcher refresh settles");
+    check(QImage(uiPngExport) == pixelsBeforeExport && window->windowTitle() == titleBeforePdf &&
+          list->currentIndex().data(Qt::ToolTipRole).toString() == selectionBeforeExport &&
+          action(window, QStringLiteral("撤销"))->isEnabled(), "PNG export retains dirty source, selection and undo history");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == pixelsBeforeExport, "export preserves current edit pixels");
+    QTimer cancelExport;
+    cancelExport.setInterval(10);
+    QObject::connect(&cancelExport, &QTimer::timeout, &app, [] {
+        if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) dialog->reject();
+    });
+    cancelExport.start(); trigger(window, QStringLiteral("格式转换")); cancelExport.stop();
+    check(window->windowTitle() == titleBeforePdf && action(window, QStringLiteral("撤销"))->isEnabled(),
+          "cancel conversion retains dirty document and history");
+    trigger(window, QStringLiteral("撤销"));
+    check(waitUntil([&] { return !window->windowTitle().contains('*'); }) &&
+          action(window, QStringLiteral("重做"))->isEnabled(), "undo remains functional after export");
+    trigger(window, QStringLiteral("重做"));
+    check(waitUntil([&] { return window->windowTitle().contains('*'); }), "redo remains functional after export");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == pixelsBeforeExport, "redo after export restores exact edit pixels");
+    // Simulate a removable/export destination disappearing after the file picker
+    // accepts it, before the writer opens it. No permission or platform assumptions.
+    const QString missingExportDirectory = directory.filePath("nested/export-destination");
+    check(QDir().mkpath(missingExportDirectory), "create disappearing export destination");
+    bool exportFailureShown = false;
+    bool exportPathChosen = false;
+    QTimer failedExport;
+    failedExport.setInterval(10);
+    QObject::connect(&failedExport, &QTimer::timeout, &app, [&] {
+        auto* modal = QApplication::activeModalWidget();
+        if (auto* picker = qobject_cast<QFileDialog*>(modal)) {
+            if (exportPathChosen) return;
+            exportPathChosen = true;
+            QObject::connect(picker, &QDialog::accepted, picker, [&] {
+                check(QDir().rmdir(missingExportDirectory), "remove destination before export opens it");
+            });
+            picker->selectFile(QDir(missingExportDirectory).filePath("failed.png"));
+            QMetaObject::invokeMethod(picker, "accept", Qt::QueuedConnection);
+        } else if (auto* warning = qobject_cast<QMessageBox*>(modal)) {
+            exportFailureShown = true;
+            warning->accept();
+        } else if (auto* dialog = qobject_cast<ImageConversionDialog*>(modal)) {
+            auto* formats = dialog->findChild<QComboBox*>("conversionFormat");
+            formats->setCurrentIndex(formats->findData(QByteArray("png"))); dialog->accept();
+        }
+    });
+    failedExport.start(); trigger(window, QStringLiteral("格式转换")); failedExport.stop();
+    check(exportFailureShown && window->windowTitle() == titleBeforePdf &&
+          action(window, QStringLiteral("撤销"))->isEnabled(), "failed export reports error and retains dirty document/history");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == pixelsBeforeExport &&
+          list->currentIndex().data(Qt::ToolTipRole).toString() == selectionBeforeExport,
+          "failed export preserves pixels and selection");
     if (!conversionQa.isEmpty()) QFile::copy(uiPdf, QDir(conversionQa).filePath("ui-edited.pdf"));
     QTimer::singleShot(0, [] {
         if (auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget())) dialog->reject();
@@ -1008,6 +1255,23 @@ int runImageBrowserTest(QApplication& app) {
     check(ImageDocument::read(uiSave).image.size() == QSize(180, 320), "UI saves full edit resolution");
     check(waitUntil([&] { return list->currentIndex().data(Qt::ToolTipRole).toString() == uiSave; }), "saved file selected after refresh");
     check(waitUntil([&] { return action(window, QStringLiteral("格式转换"))->isEnabled(); }), "saved image reload complete");
+    const QString uiLossySave = directory.filePath("nested/ui-lossy.jpg");
+    QTimer jpegSaveSteps; jpegSaveSteps.setInterval(10);
+    QObject::connect(&jpegSaveSteps, &QTimer::timeout, &app, [&] {
+        if (auto* picker = qobject_cast<QFileDialog*>(QApplication::activeModalWidget())) {
+            picker->selectFile(uiLossySave); QMetaObject::invokeMethod(picker, "accept", Qt::QueuedConnection);
+        } else if (auto* warning = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+            if (warning->button(QMessageBox::Yes)) warning->button(QMessageBox::Yes)->click();
+        }
+    });
+    jpegSaveSteps.start(); trigger(window, QStringLiteral("另存为")); jpegSaveSteps.stop();
+    check(waitUntil([&] { return window->windowTitle().startsWith("ui-lossy.jpg") &&
+        action(window, QStringLiteral("复制图片"))->isEnabled(); }), "JPEG Save As reload completes");
+    trigger(window, QStringLiteral("复制图片"));
+    check(QApplication::clipboard()->image() == QImage(uiLossySave), "saved JPEG baseline displays actual decoded file pixels");
+    drop(window, {QUrl::fromLocalFile(uiSave)});
+    check(waitUntil([&] { return window->windowTitle().startsWith("ui-saved.png") &&
+        action(window, QStringLiteral("复制图片"))->isEnabled(); }), "return to source after lossy save audit");
     const QString uiConverted = directory.filePath("nested/ui-converted.bmp");
     QTimer conversionSteps;
     conversionSteps.setInterval(10);
@@ -1030,7 +1294,7 @@ int runImageBrowserTest(QApplication& app) {
     conversionSteps.stop();
     check(waitUntil([&] { return action(window, QStringLiteral("格式转换"))->isEnabled(); }), "converted file loaded");
     check(QFileInfo::exists(uiConverted) && ImageDocument::read(uiConverted).image.size() == QSize(180, 320), "converter saves full resolution output");
-    check(window->windowTitle().startsWith("ui-converted.bmp") && !window->windowTitle().contains('*'), "conversion establishes new baseline");
+    check(window->windowTitle().startsWith("ui-saved.png") && !window->windowTitle().contains('*'), "BMP export retains source baseline");
     const QString uiIcon = directory.filePath("nested/ui-icon.ico");
     QTimer icoSteps; icoSteps.setInterval(10);
     QObject::connect(&icoSteps, &QTimer::timeout, &app, [&] {
@@ -1047,7 +1311,7 @@ int runImageBrowserTest(QApplication& app) {
     });
     icoSteps.start(); trigger(window, QStringLiteral("格式转换")); icoSteps.stop();
     check(waitUntil([&] { return action(window, QStringLiteral("格式转换"))->isEnabled(); }), "ICO conversion reload completes");
-    check(QImage(uiIcon).size() == QSize(32, 32) && window->windowTitle().startsWith("ui-icon.ico"), "ICO UI writes and reloads selected icon size");
+    check(QImage(uiIcon).size() == QSize(32, 32) && window->windowTitle().startsWith("ui-saved.png"), "ICO export writes selected size and retains source");
     drop(window, {QUrl::fromLocalFile(uiSave)});
     check(waitUntil([&] { return action(window, QStringLiteral("向左旋转"))->isEnabled(); }), "return to source directory after conversion");
     trigger(window, QStringLiteral("向左旋转"));
@@ -1084,8 +1348,9 @@ int runImageBrowserTest(QApplication& app) {
         check(source.save(neighbor), "GIF deletion neighbor fixture");
         QPointer<ImageBrowserWindow> deletionWindow = new ImageBrowserWindow(&settings, &loader);
         deletionWindow->show();
-        for (bool paused : {false, true}) {
-            const QString target = QDir(deletionDirectory.path()).filePath(paused ? "paused.gif" : "playing.gif");
+        for (const auto state : {QMovie::Running, QMovie::Paused, QMovie::NotRunning}) {
+            const bool paused = state == QMovie::Paused;
+            const QString target = QDir(deletionDirectory.path()).filePath(paused ? "paused.gif" : state == QMovie::NotRunning ? "stopped.gif" : "playing.gif");
             check(QFile::copy(gif, target), "GIF deletion fixture");
             drop(deletionWindow, {QUrl::fromLocalFile(target)});
             check(waitUntil([&] {
@@ -1095,12 +1360,40 @@ int runImageBrowserTest(QApplication& app) {
             }), "GIF ready for deletion");
             QPointer<QMovie> movie = deletionWindow->findChildren<QMovie*>().last();
             if (paused) trigger(deletionWindow, QStringLiteral("播放／暂停"));
-            const QMovie::MovieState state = paused ? QMovie::Paused : QMovie::Running;
+            if (state == QMovie::NotRunning) { movie->jumpToFrame(1); movie->stop(); }
             check(movie && movie->state() == state, "GIF playback state before deletion");
             cancelPrompt();
             trigger(deletionWindow, QStringLiteral("删除图片"));
             check(QFileInfo::exists(target) && movie && movie->state() == state,
                   "cancel GIF deletion preserves file and playback state");
+#ifdef Q_OS_WIN
+            if (paused) check(movie->jumpToFrame(1), "pause on noninitial frame before failed deletion");
+            HANDLE materialLock = CreateFileW(reinterpret_cast<LPCWSTR>(target.utf16()), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            check(materialLock != INVALID_HANDLE_VALUE, "lock GIF against deletion");
+            if (materialLock != INVALID_HANDLE_VALUE) {
+                bool warningShown = false;
+                QTimer failureConfirmation; failureConfirmation.setInterval(10);
+                QObject::connect(&failureConfirmation, &QTimer::timeout, &app, [&] {
+                    if (auto* dialog = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+                        if (auto* yes = dialog->button(QMessageBox::Yes)) yes->click();
+                        else { warningShown = true; dialog->accept(); }
+                    }
+                });
+                failureConfirmation.start(); trigger(deletionWindow, QStringLiteral("删除图片")); failureConfirmation.stop();
+                CloseHandle(materialLock);
+                check(warningShown && QFileInfo::exists(target), "failed recycle-bin deletion retains original file");
+                check(waitUntil([&] { return action(deletionWindow, QStringLiteral("播放／暂停"))->isEnabled(); }),
+                      "failed deletion restores animation controls");
+                movie = deletionWindow->findChildren<QMovie*>().last();
+                check(movie && movie->state() == state && (state == QMovie::Running || movie->currentFrameNumber() == 1),
+                      "failed deletion restores animation playback state and paused frame");
+                if (state == QMovie::NotRunning) {
+                    trigger(deletionWindow, QStringLiteral("播放／暂停"));
+                    check(movie && movie->state() == QMovie::Running, "completed animation can be replayed after deletion failure");
+                }
+            }
+#endif
             QTimer confirmation;
             confirmation.setInterval(10);
             QObject::connect(&confirmation, &QTimer::timeout, &app, [&] {
@@ -1177,6 +1470,14 @@ int runImageBrowserTest(QApplication& app) {
                     QCoreApplication::processEvents();
                     auto* editor = qa->findChild<QWidget*>(QStringLiteral("browserEditorPanel"));
                     check(editor && qa->rect().contains(editor->geometry()), "editor panel fits at DPI");
+                    const int inspectorHeight = editor->height();
+                    auto* navigationButton = editor->findChild<QToolButton*>("browserEditorTool0");
+                    check(navigationButton->height() <= qRound(36 * scale), "tool navigation preserves parameter viewport");
+                    editor->findChild<QToolButton*>("browserEditorTool7")->click();
+                    QCoreApplication::processEvents();
+                    check(editor->height() == inspectorHeight, "tool switching keeps inspector geometry stable");
+                    editor->findChild<QToolButton*>("browserEditorTool0")->click();
+                    QCoreApplication::processEvents();
                     qa->grab().save(QDir(screenshots).filePath(QStringLiteral("editor-%1-%2-%3.png")
                         .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale * 100))));
                     if ((size.width() == 1100 && scale == 1) || (size.width() == 560 && scale == 2)) {
@@ -1185,6 +1486,16 @@ int runImageBrowserTest(QApplication& app) {
                             QCoreApplication::processEvents();
                             qa->grab().save(QDir(screenshots).filePath(QStringLiteral("inline-%1-%2-%3-tool%4.png")
                                 .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale*100)).arg(tool)));
+                            if (tool == 0) {
+                                editor->findChild<QPushButton*>("editorSubmit")->click();
+                                auto* imageCanvas = qa->findChild<ImageCanvas*>();
+                                mouse(imageCanvas, QEvent::MouseButtonPress, imageCanvas->viewportPoint(QPointF(200, 150)));
+                                mouse(imageCanvas, QEvent::MouseMove, imageCanvas->viewportPoint(QPointF(1400, 750)));
+                                mouse(imageCanvas, QEvent::MouseButtonRelease, imageCanvas->viewportPoint(QPointF(1400, 750)));
+                                qa->grab().save(QDir(screenshots).filePath(QStringLiteral("crop-%1-%2-%3.png")
+                                    .arg(theme == AppTheme::Dark ? "dark" : "light").arg(size.width()).arg(qRound(scale*100))));
+                                editor->findChild<QPushButton*>("editorCancelSelection")->click();
+                            }
                         }
                         editor->findChild<QToolButton*>(QStringLiteral("browserEditorTool0"))->click();
                         if (size.width() == 560) {
@@ -1202,6 +1513,39 @@ int runImageBrowserTest(QApplication& app) {
         qa->close(); waitUntil([&] { return qa.isNull(); });
     }
     if (qEnvironmentVariableIsSet("NTSCREENSHOT_IMAGE_BROWSER_BENCHMARK")) {
+        {
+            QImage chainSource(1920, 1080, QImage::Format_RGB32);
+            chainSource.fill(QColor(100, 150, 200));
+            QVector<EditOperation> chain;
+            EditOperation blur; blur.kind = EditOperation::Filter; blur.variant = 3; blur.strength = 12;
+            for (int i = 0; i < 24; ++i) chain.append(blur);
+            QElapsedTimer chainTimer; chainTimer.start();
+            const auto chainResult = ImageDocument::render(chainSource, chain, 23);
+            qInfo() << "23-step 1080p blur undo replay ms:" << chainTimer.elapsed();
+            check(chainResult.error.isEmpty() && chainResult.image.size() == chainSource.size(), "long edit chain renders full resolution");
+        }
+        for (const QSize size : {QSize(4096, 3072), QSize(128, 30000)}) {
+            const QString materialPath = directory.filePath(QStringLiteral("nested/benchmark-%1x%2.png").arg(size.width()).arg(size.height()));
+            QImage material(size, QImage::Format_RGB32); material.fill(QColor(50, 120, 180));
+            check(material.save(materialPath), "write large material benchmark fixture"); material = {};
+            QElapsedTimer importTimer; importTimer.start();
+            const auto decoded = ImageDocument::read(materialPath);
+            const auto repeated = ImageDocument::read(materialPath);
+            const qint64 legacyMs = importTimer.elapsed();
+            check(decoded.image.size() == size && repeated.image == decoded.image, "large material retains full resolution");
+            ImageEditorPanel cached;
+            cached.setDocumentContext(path, source.size(), true);
+            cached.findChild<QToolButton*>("browserEditorTool5")->click();
+            cached.findChild<QLineEdit*>("editorAssetPath")->setText(materialPath);
+            cached.completeAssetLoad(1, decoded);
+            importTimer.restart();
+            const auto firstUse = cached.currentOperation();
+            const auto secondUse = cached.currentOperation();
+            const qint64 cachedNs = importTimer.nsecsElapsed();
+            check(firstUse.asset == decoded.image && secondUse.asset == decoded.image, "cached parameter reads reuse full material pixels");
+            qInfo() << "Material" << size << "legacy two synchronous decodes ms:" << legacyMs
+                    << "two cached parameter reads ns:" << cachedNs;
+        }
         directory.mkdir("many");
         const QString many = directory.filePath("many");
         for (int i = 0; i < 10000; ++i) QFile::copy(path, QDir(many).filePath(QStringLiteral("%1.png").arg(i, 5, 10, QChar('0'))));
@@ -1250,6 +1594,8 @@ int runImageBrowserTest(QApplication& app) {
     check(english.load(QStringLiteral(":/i18n/ntscreenshot_en.qm")), "load English translations");
     app.installTranslator(&english);
     check(QCoreApplication::translate("ImageBrowser::ImageBrowserWindow", "图片浏览") == "Image browser", "browser English translation");
+    check(QCoreApplication::translate("ImageBrowser::ImageEditorPanel", "样式") == "Style", "editor style English translation");
+    check(QCoreApplication::translate("ImageBrowser::ImageBrowserWindow", "删除图片") == "Delete image", "delete flow English translation");
     app.removeTranslator(&english);
     qInfo() << "Image browser test failures:" << failures;
     return failures ? 1 : 0;

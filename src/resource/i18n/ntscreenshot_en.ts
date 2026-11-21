@@ -2216,7 +2216,15 @@ Copied to clipboard</translation>
     <message><source>正在设置桌面背景…</source><translation>Setting desktop background...</translation></message>
     <message><source>已设为锁屏背景</source><translation>Lock screen background set</translation></message>
     <message><source>已设为桌面背景</source><translation>Desktop background set</translation></message>
-  </context>
+      <message><source>删除图片</source><translation>Delete image</translation></message>
+    <message><source>删除「%1」？</source><translation>Delete “%1”?</translation></message>
+    <message><source>删除「%1」？未保存的编辑会一并丢弃。</source><translation>Delete “%1”? Unsaved edits will also be discarded.</translation></message>
+    <message><source>无法删除「%1」。
+%2</source><translation>Could not delete “%1”.
+%2</translation></message>
+    <message><source>文件可能正被占用。</source><translation>The file may be in use.</translation></message>
+    <message><source>已删除「%1」</source><translation>Deleted “%1”</translation></message>
+</context>
   <context>
     <name>ImageBrowser::ImageDirectoryModel</name>
     <message><source>目录不存在或无法读取。</source><translation>Directory does not exist or cannot be read.</translation></message>
@@ -2250,6 +2258,15 @@ Copied to clipboard</translation>
     <message><source>素材</source><translation>Sticker</translation></message>
     <message><source>滤镜</source><translation>Filters</translation></message>
     <message><source>调色</source><translation>Color</translation></message>
+    <message><source>自由</source><translation>Free</translation></message>
+    <message><source>原图比例</source><translation>Original ratio</translation></message>
+    <message><source>取消本次调色</source><translation>Cancel adjustment</translation></message>
+    <message><source>应用调色</source><translation>Apply adjustment</translation></message>
+    <message><source>正在加载素材…</source><translation>Loading material…</translation></message>
+    <message><source>素材超过编辑尺寸上限，请选择较小的图片。</source><translation>The material exceeds the editing size limit. Choose a smaller image.</translation></message>
+    <message><source>素材 %1 × %2</source><translation>Material %1 × %2</translation></message>
+    <message><source>裁剪比例</source><translation>Crop ratio</translation></message>
+    <message><source>调整图片尺寸</source><translation>Resize image</translation></message>
     <message><source>拖动选区裁剪，或直接旋转、翻转和调整尺寸。</source><translation>Select an area to crop, or rotate, flip and resize directly.</translation></message>
     <message><source>向左旋转</source><translation>Rotate left</translation></message>
     <message><source>向右旋转</source><translation>Rotate right</translation></message>
@@ -2269,7 +2286,7 @@ Copied to clipboard</translation>
     <message><source>输入标注文字</source><translation>Enter annotation text</translation></message>
     <message><source>线宽（像素）</source><translation>Line width (pixels)</translation></message>
     <message><source>字号（像素）</source><translation>Font size (pixels)</translation></message>
-    <message><source>按左上、右上、右下、左下顺序输入原图坐标。</source><translation>Enter original-image coordinates in top-left, top-right, bottom-right, bottom-left order.</translation></message>
+    <message><source>拖动图片上的四个角调整矫正范围，按 Enter 或点击应用；也可输入坐标精确调整。</source><translation>Drag the four corners on the image, then press Enter or click Apply. Enter coordinates for precise adjustments.</translation></message>
     <message><source>左上</source><translation>Top left</translation></message>
     <message><source>右上</source><translation>Top right</translation></message>
     <message><source>右下</source><translation>Bottom right</translation></message>
@@ -2291,7 +2308,7 @@ Copied to clipboard</translation>
     <message><source>黑白</source><translation>Grayscale</translation></message>
     <message><source>复古</source><translation>Sepia</translation></message>
     <message><source>反色</source><translation>Invert</translation></message>
-    <message><source>参数改变后自动生效，可使用撤销恢复。</source><translation>Changes apply automatically. Use Undo to restore the image.</translation></message>
+    <message><source>调色即时显示，可应用或取消本次调整。切换工具保留当前效果。</source><translation>Adjustments appear immediately. Apply or cancel this adjustment. Switching tools retains the visible result.</translation></message>
     <message><source>亮度</source><translation>Brightness</translation></message>
     <message><source>对比度</source><translation>Contrast</translation></message>
     <message><source>饱和度</source><translation>Saturation</translation></message>
@@ -2345,6 +2362,8 @@ Copied to clipboard</translation>
     <message><source>拉伸明暗范围，改善偏灰图像。</source><translation>Stretch the tonal range to improve low-contrast images.</translation></message>
     <message><source>框选完整主体，选区外保留背景，再应用选区去除背景。适合主体与背景较清晰的图片；复杂发丝和透明物体可能需要重新选区。</source><translation>Select the entire subject, leaving background outside the rectangle, then apply. Best for distinct subjects and backgrounds. Complex hair and transparent objects may need another selection.</translation></message>
     <message><source>保留原图尺寸和透明度，建议另存为 PNG。增加细化次数会延长处理时间。</source><translation>Preserve dimensions and alpha. Save as PNG. More iterations take longer.</translation></message>
+    <message><source>样式</source><translation>Style</translation></message>
+    <message><source>正在处理图片，请稍候…</source><translation>Processing image, please wait…</translation></message>
 </context>
   <context>
     <name>SystemBackground</name>

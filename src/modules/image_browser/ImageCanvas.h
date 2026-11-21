@@ -17,6 +17,8 @@ public:
     void setLeftInset(int inset);
     double zoom() const { return scale_; }
     void setCropping(bool enabled);
+    void setCropAspectRatio(double ratio);
+    void setPerspective(const QPolygonF& corners);
     void setAnnotation(const EditOperation& operation, bool enabled);
     bool cancelDrawing();
     bool annotating() const { return annotating_; }
@@ -26,6 +28,8 @@ public:
     QPointF viewportPoint(QPointF imagePoint) const;
 
 signals:
+    void perspectiveChanged(const QPolygonF& corners);
+    void perspectiveAccepted();
     void annotationAccepted(const ImageBrowser::EditOperation& operation);
     void zoomChanged();
     void cropAccepted(const QRect& rect);
@@ -45,6 +49,7 @@ protected:
     void leaveEvent(QEvent*) override;
 
 private:
+    int cropHandleAt(QPointF point) const;
     void zoomAt(double scale, QPointF anchor);
     void previewMosaic(const QPolygonF& points);
     void updateDrawingCursor();
@@ -69,7 +74,10 @@ private:
     QPointF initialOffset_;
     QRectF crop_;
     QRectF initialCrop_;
+    double cropAspectRatio_ = 0;
     int handle_ = 0;
+    QPolygonF perspective_;
+    int perspectiveHandle_ = -1;
     int leftInset_ = 0;
 };
 } // namespace ImageBrowser

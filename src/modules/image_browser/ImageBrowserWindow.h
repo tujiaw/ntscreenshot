@@ -46,7 +46,7 @@ private:
     void refresh(const QString& selectPath = QString());
     void listingReady(const QString& error);
     void selectRow(int row);
-    void loadImage(const QString& path);
+    void loadImage(const QString& path, int animationState = -1, int animationFrame = 0);
     void updateActions();
     void updateEditorState();
     void refreshVisualStyle();

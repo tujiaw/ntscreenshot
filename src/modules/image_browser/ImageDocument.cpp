@@ -301,6 +301,7 @@ SaveResult ImageDocument::save(const QString& path, const QImage& image, const Q
             const QImage transparent = output;
             output = QImage(transparent.size(), QImage::Format_RGB32);
             if (output.isNull()) throw std::bad_alloc();
+            output.setColorSpace(transparent.colorSpace());
             output.fill(Qt::white);
             QPainter painter(&output);
             painter.drawImage(0, 0, transparent);

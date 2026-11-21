@@ -14,6 +14,7 @@ class QScrollArea;
 class QSpinBox;
 class QStackedWidget;
 class QToolButton;
+class QTimer;
 
 namespace ImageBrowser {
 
@@ -29,14 +30,22 @@ public:
     // 后台图像处理期间在面板内提示并锁住按钮，否则用户会以为点击没有生效。
     void setBusy(bool busy);
     EditOperation currentOperation() const;
+    bool perspectiveActive() const { return currentTool_ == 2; }
+    double cropAspectRatio() const;
+    void setPerspectiveCorners(const QPolygonF& corners);
     bool drawingActive() const { return (currentTool_ == 1 || currentTool_ == 3) && editable_; }
     bool validateOperation(const EditOperation& operation);
     void resetColorParameters();
+    void setColorSessionActive(bool active);
+    void completeAssetLoad(quint64 revision, const ImageResult& result);
 
 signals:
+    void cropAspectRatioChanged(double ratio);
+    void assetLoadRequested(const QString& path, quint64 revision);
     void closeRequested();
     void toolChanged();
     void drawingStyleChanged();
+    void colorSessionFinished(bool apply);
     void colorChanged(const ImageBrowser::EditOperation& operation);
     void editRequested(const ImageBrowser::EditOperation& operation, bool selectRegion);
     void applySelectionRequested();
@@ -52,15 +61,26 @@ private:
     void syncButtons();
     void showMessage(const QString& text);
 
+    QImage asset_;
+    QLabel* assetStatus_;
+    QTimer* assetTimer_;
+    quint64 assetRevision_ = 0;
+    bool assetLoading_ = false;
+    bool assetInFlight_ = false;
     QButtonGroup* tools_;
     QWidget* toolGrid_;
     QStackedWidget* pages_;
     QScrollArea* scroll_;
     QLabel* message_;
     QPushButton* submit_;
+    QWidget* colorActions_;
+    QPushButton* colorApply_;
+    QPushButton* colorCancel_;
+    bool colorSessionActive_ = false;
     QPushButton* applySelection_;
     QPushButton* cancelSelection_;
     QButtonGroup* annotationShape_;
+    QComboBox* cropRatio_;
     QComboBox* filter_;
     QComboBox* watermarkMode_;
     QButtonGroup* mosaicStyle_;

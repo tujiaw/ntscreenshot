@@ -22,6 +22,7 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QToolButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace ImageBrowser {
@@ -145,10 +146,11 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         button->setObjectName(QStringLiteral("browserEditorTool%1").arg(i));
         button->setProperty("editorTool", i);
         button->setText(names[i]); button->setToolTip(names[i]);
-        button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        button->setProperty("editorToolLabel", names[i]);
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
         button->setCheckable(true); button->setCursor(Qt::PointingHandCursor);
         tools_->addButton(button, i);
-        grid->addWidget(button, i / 4, i % 4);
+        grid->addWidget(button, i / 3, i % 3);
     }
     layout->addWidget(toolGrid_);
     auto* divider = new QFrame(this); divider->setFrameShape(QFrame::HLine);
@@ -162,6 +164,12 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     scroll_->setWidget(pages_); layout->addWidget(scroll_, 1);
 
     auto* crop = createPage(names[0], tr("拖动选区裁剪，或直接旋转、翻转和调整尺寸。"));
+    cropRatio_ = new QComboBox(crop); cropRatio_->setObjectName("editorCropRatio");
+    cropRatio_->addItem(tr("自由"), 0.0); cropRatio_->addItem(tr("原图比例"), -1.0);
+    for (const auto& preset : {QSize(1, 1), QSize(4, 3), QSize(3, 2), QSize(16, 9), QSize(9, 16)})
+        cropRatio_->addItem(QStringLiteral("%1:%2").arg(preset.width()).arg(preset.height()), double(preset.width())/preset.height());
+    qobject_cast<QFormLayout*>(crop->layout())->addRow(tr("裁剪比例"), cropRatio_);
+    connect(cropRatio_, &QComboBox::currentIndexChanged, this, [this] { emit cropAspectRatioChanged(cropAspectRatio()); });
     auto* transforms = new QWidget(crop); auto* transformGrid = new QGridLayout(transforms);
     transformGrid->setContentsMargins(0, 0, 0, 0);
     const QStringList transformNames = {tr("向左旋转"), tr("向右旋转"), tr("水平翻转"), tr("垂直翻转")};
@@ -175,6 +183,9 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         });
     }
     qobject_cast<QFormLayout*>(crop->layout())->addRow(transforms);
+    auto* resizeHeading = new QLabel(tr("调整图片尺寸"), crop);
+    auto resizeFont = resizeHeading->font(); resizeFont.setBold(true); resizeHeading->setFont(resizeFont);
+    qobject_cast<QFormLayout*>(crop->layout())->addRow(resizeHeading);
     resizeWidth_ = addSpin(crop, tr("宽度（像素）"), "editorResizeWidth", 1, int(MaxEditablePixels), 1);
     resizeHeight_ = addSpin(crop, tr("高度（像素）"), "editorResizeHeight", 1, int(MaxEditablePixels), 1);
     aspectLock_ = new QCheckBox(tr("锁定宽高比"), crop); aspectLock_->setChecked(true);
@@ -239,7 +250,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     };
     connect(annotationShape_, &QButtonGroup::idClicked, this, updateAnnotation); updateAnnotation();
 
-    auto* perspective = createPage(names[2], tr("按左上、右上、右下、左下顺序输入原图坐标。"));
+    auto* perspective = createPage(names[2], tr("拖动图片上的四个角调整矫正范围，按 Enter 或点击应用；也可输入坐标精确调整。"));
     const QStringList cornerNames = {tr("左上"), tr("右上"), tr("右下"), tr("左下")};
     for (int i = 0; i < 4; ++i) {
         auto* row = new QWidget(perspective); auto* fields = new QHBoxLayout(row);
@@ -249,6 +260,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
             auto* coordinate = new EditorValueSpinBox(row); coordinate->setRange(0, 0);
             coordinate->setObjectName(QStringLiteral("editorCorner%1").arg(i*2+axis));
             fields->addWidget(coordinate, 1); corners_ << coordinate;
+            connect(coordinate, &QSpinBox::valueChanged, this, &ImageEditorPanel::drawingStyleChanged);
         }
         qobject_cast<QFormLayout*>(perspective->layout())->addRow(cornerNames[i], row);
     }
@@ -298,6 +310,21 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
             tr("图片 (*.png *.jpg *.jpeg *.bmp *.webp)"));
         if (!path.isEmpty()) assetPath_->setText(path);
     });
+    assetStatus_ = new QLabel(sticker); assetStatus_->setObjectName("editorAssetStatus");
+    assetStatus_->setWordWrap(true); assetStatus_->setTextFormat(Qt::PlainText);
+    qobject_cast<QFormLayout*>(sticker->layout())->addRow(assetStatus_);
+    assetTimer_ = new QTimer(this); assetTimer_->setSingleShot(true); assetTimer_->setInterval(150);
+    connect(assetPath_, &QLineEdit::textChanged, this, [this](const QString& path) {
+        ++assetRevision_; asset_ = {}; assetLoading_ = !path.trimmed().isEmpty();
+        if (selecting_ && currentTool_ == 5) emit cancelSelectionRequested();
+        assetStatus_->setText(assetLoading_ ? tr("正在加载素材…") : QString());
+        assetTimer_->start(); syncButtons();
+    });
+    connect(assetTimer_, &QTimer::timeout, this, [this] {
+        if (!assetLoading_ || assetInFlight_) return;
+        assetInFlight_ = true;
+        emit assetLoadRequested(assetPath_->text(), assetRevision_);
+    });
     auto* filters = createPage(names[6], tr("选择滤镜，点击应用后生效。"));
     filter_ = new QComboBox(filters); filter_->setObjectName("editorFilter");
     filter_->addItems({tr("黑白"), tr("复古"), tr("反色"), tr("高斯模糊"), tr("中值降噪"), tr("锐化"),
@@ -320,7 +347,7 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
         filterHint->setText(hints[mode]); pages_->updateGeometry();
     };
     connect(filter_, &QComboBox::currentIndexChanged, this, updateFilter); updateFilter();
-    auto* color = createPage(names[7], tr("参数改变后自动生效，可使用撤销恢复。"));
+    auto* color = createPage(names[7], tr("调色即时显示，可应用或取消本次调整。切换工具保留当前效果。"));
     auto colorControl = [this, color](const QString& label, const QString& name, const QString& gradient, bool alpha = false) {
         auto* row = new QWidget(color); auto* layout = new QVBoxLayout(row); layout->setContentsMargins(0, 0, 0, 0); layout->setSpacing(2);
         auto* header = new QHBoxLayout;
@@ -357,6 +384,14 @@ ImageEditorPanel::ImageEditorPanel(QWidget* parent) : QFrame(parent) {
     message_ = new QLabel(this); message_->setObjectName("editorMessage"); message_->setWordWrap(true);
     message_->setTextFormat(Qt::PlainText); layout->addWidget(message_);
     submit_ = new QPushButton(this); submit_->setObjectName("editorSubmit"); layout->addWidget(submit_);
+    colorActions_ = new QWidget(this);
+    auto* colorActionsLayout = new QHBoxLayout(colorActions_); colorActionsLayout->setContentsMargins(0, 0, 0, 0);
+    colorCancel_ = new QPushButton(tr("取消本次调色"), colorActions_); colorCancel_->setObjectName("editorColorCancel");
+    colorApply_ = new QPushButton(tr("应用调色"), colorActions_); colorApply_->setObjectName("editorColorApply");
+    colorActionsLayout->addWidget(colorCancel_); colorActionsLayout->addWidget(colorApply_);
+    layout->addWidget(colorActions_);
+    connect(colorCancel_, &QPushButton::clicked, this, [this] { emit colorSessionFinished(false); });
+    connect(colorApply_, &QPushButton::clicked, this, [this] { emit colorSessionFinished(true); });
     auto* selectionRow = new QHBoxLayout;
     applySelection_ = new QPushButton(tr("应用选区"), this); applySelection_->setObjectName("editorApplySelection");
     cancelSelection_ = new QPushButton(tr("取消选区"), this); cancelSelection_->setObjectName("editorCancelSelection");
@@ -429,6 +464,18 @@ QLineEdit* ImageEditorPanel::addColor(QWidget* page, const QString& name) {
     layout->addLayout(swatches); qobject_cast<QFormLayout*>(page->layout())->addRow(tr("颜色"), container); return field;
 }
 
+double ImageEditorPanel::cropAspectRatio() const {
+    const double ratio = cropRatio_->currentData().toDouble();
+    return ratio < 0 ? (imageSize_.height() > 0 ? double(imageSize_.width())/imageSize_.height() : 0) : ratio;
+}
+void ImageEditorPanel::setPerspectiveCorners(const QPolygonF& corners) {
+    if (corners.size() != 4) return;
+    for (int i = 0; i < 4; ++i) {
+        const QSignalBlocker x(corners_[i*2]), y(corners_[i*2+1]);
+        corners_[i*2]->setValue(qRound(corners[i].x()));
+        corners_[i*2+1]->setValue(qRound(corners[i].y()));
+    }
+}
 void ImageEditorPanel::selectTool(int tool) {
     const bool changed = currentTool_ != tool;
     currentTool_ = tool; pages_->setCurrentIndex(tool); pages_->updateGeometry();
@@ -458,7 +505,7 @@ EditOperation ImageEditorPanel::currentOperation() const {
         operation.text = watermarkText_->text(); operation.color = QColor(watermarkColor_->text());
         operation.strength = watermarkFont_->value(); operation.variant = watermarkMode_->currentIndex();
         operation.opacity = watermarkOpacity_->value(); operation.margin = watermarkMargin_->value(); break;
-    case 5: operation.asset = ImageDocument::read(assetPath_->text()).image; break;
+    case 5: operation.asset = asset_; break;
     case 6: operation.variant = filter_->currentIndex(); operation.strength = filterStrength_->value(); break;
     case 7: operation.brightness = brightness_->value(); operation.contrast = contrast_->value(); operation.saturation = saturation_->value();
         operation.temperature = temperature_->value(); operation.tint = tint_->value(); operation.opacity = opacity_->value(); break;
@@ -516,12 +563,36 @@ void ImageEditorPanel::setSelectionState(bool selecting, const QRect& rect) {
 void ImageEditorPanel::syncButtons() {
     const bool region = currentTool_ == 0 || currentTool_ == 3 || (currentTool_ == 4 && watermarkMode_->currentIndex() == 0) || currentTool_ == 5 || currentTool_ == 8;
     submit_->setText(region ? (selecting_ ? tr("重新选择区域") : tr("选择区域")) : tr("应用"));
-    submit_->setVisible(currentTool_ != 1 && currentTool_ != 3 && currentTool_ != 7);
-    submit_->setEnabled(editable_ && !busy_ && !processing_);
+    submit_->setVisible(!selecting_ && currentTool_ != 1 && currentTool_ != 3 && currentTool_ != 7);
+    const bool assetReady = currentTool_ != 5 || (!assetLoading_ && !asset_.isNull());
+    submit_->setEnabled(editable_ && !busy_ && !processing_ && assetReady);
+    colorActions_->setVisible(currentTool_ == 7);
+    // These requests serialize behind pending previews in the window dispatcher.
+    colorApply_->setEnabled(editable_ && colorSessionActive_);
+    colorCancel_->setEnabled(editable_ && colorSessionActive_);
     applySelection_->setVisible(selecting_); cancelSelection_->setVisible(selecting_);
-    applySelection_->setEnabled(editable_ && validSelection_ && !busy_ && !processing_); cancelSelection_->setEnabled(editable_ && !busy_ && !processing_);
+    applySelection_->setEnabled(editable_ && validSelection_ && !busy_ && !processing_ && assetReady); cancelSelection_->setEnabled(editable_ && !busy_ && !processing_);
 }
 
+void ImageEditorPanel::completeAssetLoad(quint64 revision, const ImageResult& result) {
+    assetInFlight_ = false;
+    if (revision != assetRevision_) {
+        if (assetLoading_) assetTimer_->start();
+        return;
+    }
+    assetLoading_ = false;
+    if (result.limited) assetStatus_->setText(tr("素材超过编辑尺寸上限，请选择较小的图片。"));
+    else if (result.image.isNull()) assetStatus_->setText(result.error);
+    else {
+        asset_ = result.image;
+        assetStatus_->setText(tr("素材 %1 × %2").arg(asset_.width()).arg(asset_.height()));
+    }
+    syncButtons();
+}
+void ImageEditorPanel::setColorSessionActive(bool active) {
+    if (colorSessionActive_ == active) return;
+    colorSessionActive_ = active; syncButtons();
+}
 void ImageEditorPanel::resetColorParameters() {
     const QSignalBlocker blocker(this);
     for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_}) field->setValue(0);
@@ -550,18 +621,21 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
         "#browserEditorPanel QToolButton:hover, #browserEditorPanel QToolButton:checked { background: %5; }"
         "#browserEditorPanel QToolButton[mosaicStyle=\"true\"] { border: 2px solid %2; padding: 4px; }"
         "#browserEditorPanel QToolButton[mosaicStyle=\"true\"]:checked, #browserEditorPanel QToolButton[mosaicStyle=\"true\"]:focus { border-color: %6; background: %5; }"
-        "#browserEditorPanel QPushButton#editorSubmit { background: %6; color: white; border-radius: 6px; padding: %7px; }")
+        "#browserEditorPanel QPushButton#editorSubmit, #browserEditorPanel QPushButton#editorApplySelection, #browserEditorPanel QPushButton#editorColorApply { background: %6; color: white; border-radius: 6px; padding: %7px; }"
+        "#browserEditorPanel QPushButton#editorColorApply:disabled { background: %3; color: %4; }")
         .arg(theme.surface.name(), theme.border.name(), theme.surfaceRaised.name(), theme.textPrimary.name(),
              theme.accentSubtle.name(), theme.accent.name()).arg(qRound(6*scale)));
     auto* outer = qobject_cast<QVBoxLayout*>(layout());
     outer->setContentsMargins(qRound(10*scale), qRound(8*scale), qRound(10*scale), qRound(8*scale));
     outer->setSpacing(qRound(6*scale));
-    const bool compact = availableHeight < qRound(660*scale);
     findChild<QToolButton*>(QStringLiteral("editorClose"))->setFixedSize(qRound(24*scale), qRound(24*scale));
     for (auto* abstract : tools_->buttons()) {
         auto* button = qobject_cast<QToolButton*>(abstract);
-        button->setFixedSize(qRound(72*scale), qRound((compact ? 52 : 64)*scale));
-        button->setIconSize(QSize(qRound((compact ? 22 : 25)*scale), qRound((compact ? 22 : 25)*scale)));
+        button->setFixedSize(qRound(104*scale), qRound(34*scale));
+        button->setIconSize(QSize(qRound(18*scale), qRound(18*scale)));
+        const QString label = button->property("editorToolLabel").toString();
+        button->setAccessibleName(label);
+        button->setText(button->fontMetrics().elidedText(label, Qt::ElideRight, qRound(70*scale)));
         button->setIcon(editorToolIcon(tools_->id(button), theme.textPrimary));
     }
     for (auto* swatch : findChildren<QToolButton*>())
@@ -582,6 +656,8 @@ void ImageEditorPanel::setMetrics(double scale, int availableHeight) {
     for (auto* field : {brightness_, contrast_, saturation_, temperature_, tint_, opacity_})
         if (auto* slider = field->parentWidget()->findChild<QSlider*>()) slider->setFixedHeight(qRound(16*scale));
     setFixedWidth(qRound(344*scale));
-    setFixedHeight(qMin(qRound((currentTool_ == 7 || currentTool_ == 8 || currentTool_ == 6 ? 740 : 620)*scale), availableHeight));
+    // Reserve the same workspace for every tool so parameters and action buttons
+    // do not jump as the user switches between editing tasks.
+    setFixedHeight(availableHeight);
 }
 } // namespace ImageBrowser
