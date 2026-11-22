@@ -2,6 +2,7 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>椭圆（按住 Shift 绘制正圆）</source><translation>Ellipse (hold Shift to draw a circle)</translation></message>
     <message><source>荧光笔</source><translation>Highlighter</translation></message>
     <message><source>形状</source><translation>Shapes</translation></message>
     <message><source>图章</source><translation>Stamps</translation></message>

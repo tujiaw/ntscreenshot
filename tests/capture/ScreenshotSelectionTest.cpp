@@ -249,6 +249,50 @@ int runStampAnnotationTest(QApplication& app) {
         check(output().pixelColor(160, 300).alpha() == 96, "a click places a highlighter dot");
         panel.drawer()->undo();
     }
+    DrawMode ellipse(DrawMode::Ellipse);
+    ellipse.pen().setWidth(2);
+    panel.drawer()->setMode(ellipse);
+    auto ellipseEvent = [&](QEvent::Type type, QPoint pos, Qt::KeyboardModifiers modifiers) {
+        QMouseEvent event(type, QPointF(pos), QPointF(canvas.mapToGlobal(pos)),
+                          type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                          type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton, modifiers);
+        app.sendEvent(&canvas, &event);
+    };
+    auto inkBounds = [&](const QImage& image) {
+        QRect bounds;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+                if (image.pixelColor(x, y).alpha()) bounds |= QRect(x, y, 1, 1);
+        return bounds;
+    };
+    const QPoint origin(450, 250);
+    for (QPoint delta : {QPoint(70, 30), QPoint(-70, 30), QPoint(70, -30), QPoint(-70, -30),
+                         QPoint(0, 70), QPoint(70, 0)}) {
+        ellipseEvent(QEvent::MouseButtonPress, origin, Qt::ShiftModifier);
+        ellipseEvent(QEvent::MouseMove, origin + delta, Qt::ShiftModifier);
+        const QImage preview = output();
+        const QRect bounds = inkBounds(preview);
+        check(bounds.width() > 60 && bounds.width() == bounds.height(), "Shift constrains ellipse to circle in every direction");
+        ellipseEvent(QEvent::MouseButtonRelease, origin + delta, Qt::ShiftModifier);
+        check(output() == preview, "committed circle matches live preview");
+        panel.drawer()->undo();
+        check(output() == empty, "circle can be undone");
+    }
+    ellipseEvent(QEvent::MouseButtonPress, origin, Qt::NoModifier);
+    ellipseEvent(QEvent::MouseMove, origin + QPoint(70, 30), Qt::NoModifier);
+    const QImage freeEllipse = output();
+    const QRect freeBounds = inkBounds(freeEllipse);
+    check(freeBounds.width() > freeBounds.height(), "ellipse remains unconstrained without Shift");
+    QKeyEvent shiftDown(QEvent::KeyPress, Qt::Key_Shift, Qt::ShiftModifier);
+    app.sendEvent(&canvas, &shiftDown);
+    const QRect circleBounds = inkBounds(output());
+    check(circleBounds.width() == circleBounds.height(), "pressing Shift updates circle without moving mouse");
+    QKeyEvent shiftUp(QEvent::KeyRelease, Qt::Key_Shift, Qt::NoModifier);
+    app.sendEvent(&canvas, &shiftUp);
+    check(output() == freeEllipse, "releasing Shift restores ellipse without moving mouse");
+    ellipseEvent(QEvent::MouseButtonRelease, origin + QPoint(70, 30), Qt::NoModifier);
+    check(output() == freeEllipse, "unconstrained ellipse stays unchanged after release");
+    panel.drawer()->undo();
     stamp->click(); panel.hide(); app.processEvents();
     check(!picker->isVisible(), "hiding toolbar closes floating picker");
     return okay ? 0 : 1;

@@ -51,6 +51,7 @@ public:
     QBrush& brush() { return brush_; }
     QFont& font() { return font_; }
     void setPos(const QPoint &start, const QPoint &end);
+    void setConstrainAspect(bool enabled) { constrainAspect_ = enabled; }
     void addPos(const QPoint &pos);
     // 马赛克纹理基于当前选区生成，并通过 brushOrigin 对齐到选区坐标
     void initMosaicBrush(const QImage &baseImage, const QPoint &brushOrigin = QPoint());
@@ -94,6 +95,7 @@ private:
     QRect bitmapRect_;
     ::Stamp::Kind stampKind_ = ::Stamp::Number;
     QColor stampColor_ = QColor("#DC3545");
+    bool constrainAspect_ = false;
 };
 
 //////////////////////////////////////////////////////////////////////////

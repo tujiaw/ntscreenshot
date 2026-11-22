@@ -19,6 +19,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QApplication>
 #include <QPaintEvent>
 #include <QTimer>
@@ -465,6 +466,7 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     pbShapes_->setObjectName(QStringLiteral("DrawPanelShapesButton"));
     pbShapes_->setCheckable(true);
     setupShapePopup({pbPolyLine, pbLine, pbArrow, pbRectangle, pbEllipse, pbHighlighter});
+    pbEllipse->setToolTip(QCoreApplication::translate("App", "椭圆（按住 Shift 绘制正圆）"));
 
     auto* hLayout = new QHBoxLayout();
     toolbarLayout_ = hLayout;
@@ -1167,6 +1169,7 @@ void DrawMode::updateCursor()
 
 void DrawMode::clear()
 {
+    constrainAspect_ = false;
     start_ = QPoint(0, 0);
     end_ = QPoint(0, 0);
     points_.clear();
@@ -1301,7 +1304,13 @@ void DrawMode::drawEllipse(const QPoint &startPoint, const QPoint &endPoint, QPa
 {
     // 绘制椭圆
     painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(QRect(startPoint, endPoint));
+    QPoint end = endPoint;
+    if (constrainAspect_) {
+        const QPoint delta = endPoint - startPoint;
+        const int size = qMax(qAbs(delta.x()), qAbs(delta.y()));
+        end = startPoint + QPoint(delta.x() < 0 ? -size : size, delta.y() < 0 ? -size : size);
+    }
+    painter.drawEllipse(QRectF(QPointF(startPoint), QPointF(end)).normalized());
 }
 
 void DrawMode::drawText(const QPoint& startPoint, const QString& text, QPainter& painter)
@@ -1549,6 +1558,15 @@ bool Drawer::eventFilter(QObject* watched, QEvent* event)
     }
 
     switch (event->type()) {
+    case QEvent::KeyPress:
+    case QEvent::KeyRelease:
+        if (isPressed_ && isDraw() && drawMode_.shape() == DrawMode::Ellipse
+            && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Shift) {
+            drawMode_.setConstrainAspect(event->type() == QEvent::KeyPress);
+            parent_->update();
+            return true;
+        }
+        return false;
     case QEvent::MouseButtonPress:
         return onMousePressEvent(static_cast<QMouseEvent*>(event));
     case QEvent::MouseButtonRelease:
@@ -1571,6 +1589,7 @@ bool Drawer::onMousePressEvent(QMouseEvent *e)
     }
     if (e->button() == Qt::LeftButton) {
         isPressed_ = true;
+        drawMode_.setConstrainAspect(e->modifiers().testFlag(Qt::ShiftModifier));
         drawStartPos_ = e->pos();
         drawEndPos_ = e->pos();
         // Reset background image for new stroke (e.g. Mosaic)
@@ -1618,6 +1637,7 @@ bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
 
         // 当前绘制结束，存档、清理
         if (isPressed_) {
+            drawMode_.setConstrainAspect(e->modifiers().testFlag(Qt::ShiftModifier));
             drawMode_.setPos(drawStartPos_, e->pos());
             if (drawMode_.isPathShape()) {
                 drawMode_.addPos(e->pos());
@@ -1644,6 +1664,7 @@ bool Drawer::onMouseMoveEvent(QMouseEvent *e)
     if (isPressed_ && isDraw()) {
         // 进入绘制模式
         drawEndPos_ = e->pos();
+        drawMode_.setConstrainAspect(e->modifiers().testFlag(Qt::ShiftModifier));
 
         if (drawMode_.isPathShape()) {
             // 注意：马赛克纹理笔刷已经在 onMousePressEvent 中初始化完毕，
