@@ -46,8 +46,6 @@ inline QPixmap brush(int diameter, const QColor& color, qreal scale)
     painter.setPen(Qt::NoPen);
     const QPointF center(halfCanvas + 0.5, halfCanvas + 0.5);
     painter.setBrush(Qt::white);
-    painter.drawEllipse(center, radius + 2 * scale, radius + 2 * scale);
-    painter.setBrush(QColor("#202124"));
     painter.drawEllipse(center, radius + scale, radius + scale);
     painter.setBrush(color);
     painter.drawEllipse(center, radius, radius);

@@ -22,6 +22,7 @@
 #include <QMimeData>
 #include <QEventLoop>
 #include <QPushButton>
+#include <QScreen>
 #include <QTextEdit>
 #include <QScrollBar>
 #include <QEnterEvent>
@@ -114,10 +115,150 @@ static int runScreenshotAutoSaveTest(QApplication& app) {
     return okay ? 0 : 2;
 }
 
+int runStampAnnotationTest(QApplication& app) {
+    QWidget canvas;
+    canvas.resize(1000, 700);
+    DrawPanel panel(nullptr, &canvas, &canvas);
+    const QRect bounds(20, 20, 950, 500);
+    panel.onReferRectChanged(bounds);
+    panel.drawer()->setEnable(true);
+    canvas.show(); panel.show(); app.processEvents();
+    auto* stamp = panel.findChild<QPushButton*>(QStringLiteral("DrawPanelStampButton"));
+    auto* picker = panel.findChild<QWidget*>(QStringLiteral("DrawPanelStampPicker"));
+    bool okay = true;
+    auto check = [&](bool condition, const char* message) {
+        if (!condition) qWarning() << "Stamp test failed:" << message;
+        okay &= condition;
+    };
+    check(stamp && picker && picker->isWindow(), "picker is a separate floating window");
+    if (!stamp || !picker) return 1;
+    const QSize toolbarSize = panel.size();
+    stamp->click(); app.processEvents();
+    check(picker->isVisible() && panel.size() == toolbarSize, "opening picker does not expand toolbar");
+    auto choose = [&](int index) {
+        auto* button = picker->findChild<QPushButton*>(QStringLiteral("stampChoice%1").arg(index));
+        check(button != nullptr, "stamp choice exists");
+        if (button) button->click();
+    };
+    choose(0);
+    check(!picker->isVisible(), "choosing a stamp closes picker");
+    auto* more = panel.findChild<QPushButton*>(QStringLiteral("DrawPanelMoreButton"));
+    auto* morePopup = panel.findChild<QWidget*>(QStringLiteral("DrawPanelMoreTools"));
+    check(more && morePopup && morePopup->isWindow(), "more tools use a floating window");
+    if (more && morePopup) {
+        stamp->click(); more->click(); app.processEvents();
+        check(morePopup->isVisible() && !picker->isVisible() && panel.size() == toolbarSize,
+              "more tools replace stamp picker without resizing toolbar");
+        stamp->click(); app.processEvents();
+        check(picker->isVisible() && !morePopup->isVisible() && !more->isChecked(),
+              "stamp picker replaces more tools");
+        choose(0);
+    }
+    auto* shapes = panel.findChild<QPushButton*>(QStringLiteral("DrawPanelShapesButton"));
+    auto* shapePopup = panel.findChild<QWidget*>(QStringLiteral("DrawPanelShapePopup"));
+    check(shapes && shapePopup && shapePopup->isWindow(), "shapes share one toolbar button and floating picker");
+    if (shapes && shapePopup) {
+        shapes->click(); app.processEvents();
+        check(shapePopup->isVisible() && !picker->isVisible() && !morePopup->isVisible()
+                  && panel.size() == toolbarSize, "shape picker replaces other popups without resizing toolbar");
+        const auto buttons = shapePopup->findChildren<QPushButton*>();
+        const QList<DrawMode::Shape> modes = {DrawMode::PolyLine, DrawMode::Line, DrawMode::Arrow,
+                                             DrawMode::Rectangle, DrawMode::Ellipse, DrawMode::Highlighter};
+        check(buttons.size() == modes.size(), "shape picker contains all six tools");
+        const auto genericShapeIcon = shapes->icon().cacheKey();
+        for (int i = 0; i < qMin(buttons.size(), modes.size()); ++i) {
+            if (!shapePopup->isVisible()) shapes->click();
+            buttons.at(i)->click();
+            check(panel.drawer()->mode().shape() == modes.at(i) && shapes->isChecked()
+                      && shapes->icon().cacheKey() == genericShapeIcon
+                      && !shapePopup->isVisible(), "choosing a shape activates it and preserves generic toolbar icon");
+        }
+        panel.cancelChecked();
+        check(!shapes->isChecked() && panel.drawer()->mode().isNone(), "cancel clears shape selection");
+        choose(0);
+    }
+    auto click = [&](QPoint pos, Qt::MouseButton button = Qt::LeftButton) {
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(pos), QPointF(canvas.mapToGlobal(pos)),
+                          button, button, Qt::NoModifier);
+        app.sendEvent(&canvas, &press);
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(pos), QPointF(canvas.mapToGlobal(pos)),
+                            button, Qt::NoButton, Qt::NoModifier);
+        app.sendEvent(&canvas, &release);
+    };
+    auto output = [&] {
+        QPixmap pixmap(canvas.size()); pixmap.fill(Qt::transparent);
+        panel.drawer()->drawPixmap(pixmap);
+        return pixmap.toImage();
+    };
+    QImage empty = output(); empty.fill(Qt::transparent);
+    check(output() == empty, "no unplaced stamp is exported");
+    click(QPoint(160, 140)); click(QPoint(260, 140));
+    check(panel.drawer()->nextStampNumber() == 3, "number stamps increment from one");
+    const int size = Util::scaleSize(32);
+    const QImage expected = Stamp::image(Stamp::Number, QColor("#DC3545"), 2, size);
+    check(output().copy(QRect(QPoint(260 - size / 2, 140 - size / 2), QSize(size, size)))
+              .convertToFormat(expected.format()) == expected, "second exported stamp contains number two");
+    panel.drawer()->undo();
+    check(panel.drawer()->nextStampNumber() == 2 && output().pixelColor(260, 140).alpha() == 0,
+          "undo removes stamp and restores sequence");
+    choose(1); click(QPoint(260, 140));
+    check(panel.drawer()->nextStampNumber() == 3, "switching colors preserves sequence");
+    for (int i = 4; i < 8; ++i) {
+        choose(i); click(QPoint(360 + (i - 4) * 100, 140));
+    }
+    check(panel.drawer()->nextStampNumber() == 3, "symbols do not consume numbers");
+    choose(0);
+    const QImage beforeInvalidClicks = output();
+    click(QPoint(5, 5)); click(QPoint(160, 240), Qt::RightButton);
+    check(panel.drawer()->nextStampNumber() == 3 && output() == beforeInvalidClicks,
+          "outside and right clicks do not place stamps or consume numbers");
+    panel.drawer()->clearHistory();
+    check(panel.drawer()->nextStampNumber() == 1, "new canvas starts numbering at one");
+    auto* highlighter = panel.findChild<QPushButton*>(QStringLiteral("DrawPanelHighlighterButton"));
+    check(highlighter != nullptr, "highlighter is available in shape picker");
+    if (highlighter) {
+        highlighter->click();
+        DrawMode mode = panel.getMode();
+        check(mode.shape() == DrawMode::Highlighter && mode.isPathShape()
+                  && mode.pen().width() > DrawSettings::penWidth()
+                  && mode.pen().color() == DrawSettings::currentColor(),
+              "highlighter uses a wide stroke and the selected color");
+        mode.pen().setColor(Qt::yellow); mode.pen().setWidth(20);
+        panel.drawer()->setMode(mode);
+        auto strokeEvent = [&](QEvent::Type type, QPoint pos, Qt::MouseButton button, Qt::MouseButtons held) {
+            QMouseEvent event(type, QPointF(pos), QPointF(canvas.mapToGlobal(pos)), button, held, Qt::NoModifier);
+            app.sendEvent(&canvas, &event);
+        };
+        strokeEvent(QEvent::MouseButtonPress, {100, 300}, Qt::LeftButton, Qt::LeftButton);
+        for (QPoint pos : {QPoint(250, 300), QPoint(150, 300), QPoint(200, 300)})
+            strokeEvent(QEvent::MouseMove, pos, Qt::NoButton, Qt::LeftButton);
+        strokeEvent(QEvent::MouseButtonRelease, {300, 300}, Qt::LeftButton, Qt::NoButton);
+        const QImage highlighted = output();
+        check(highlighted.pixelColor(160, 300).alpha() == 96
+                  && highlighted.pixelColor(280, 300).alpha() == 96,
+              "retracing within one highlighter stroke keeps uniform transparency");
+        QPixmap textBackground(canvas.size()); textBackground.fill(Qt::white);
+        { QPainter painter(&textBackground); painter.fillRect(QRect(190, 294, 10, 12), Qt::black); }
+        panel.drawer()->drawPixmap(textBackground);
+        check(textBackground.toImage().pixelColor(195, 300) == QColor(Qt::black)
+                  && textBackground.toImage().pixelColor(160, 300).blue() < 255,
+              "highlighter tints the background while preserving dark text");
+        panel.drawer()->undo();
+        check(output() == empty, "undo removes the entire highlighter stroke");
+        click(QPoint(160, 300));
+        check(output().pixelColor(160, 300).alpha() == 96, "a click places a highlighter dot");
+        panel.drawer()->undo();
+    }
+    stamp->click(); panel.hide(); app.processEvents();
+    check(!picker->isVisible(), "hiding toolbar closes floating picker");
+    return okay ? 0 : 1;
+}
+
 int runScreenshotSelectionTest(QApplication& app) {
     if (qEnvironmentVariableIsSet("NTSCREENSHOT_AUTO_SAVE_TEST"))
         return runScreenshotAutoSaveTest(app);
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));
+    if (runStampAnnotationTest(app) != 0) return 1;
     app.setQuitOnLastWindowClosed(false);
     QSettings clean(Util::getConfigPath(), QSettings::IniFormat);
     clean.setValue(QStringLiteral("AUTO_PIN"), false);
@@ -253,33 +394,35 @@ int runScreenshotSelectionTest(QApplication& app) {
             moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
             moreButton->click();
             QApplication::processEvents();
-            moreToolsOkay &= moreTools->isVisible() && panel->height() > collapsedHeight;
+            moreToolsOkay &= moreTools->isVisible() && moreTools->isWindow() && panel->height() == collapsedHeight;
             moreToolsOkay &= panel->width() == collapsedWidth;
-            moreToolsOkay &= panel->geometry().bottom() == nearBottom.top() - 1;
-            moreToolsOkay &= panel->rect().contains(moreTools->geometry());
-            moreToolsOkay &= moreTools->x() == 0;
+            moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
+            moreToolsOkay &= screenshot->screen()->availableGeometry().contains(moreTools->geometry());
             const auto buttons = moreTools->findChildren<QPushButton*>();
             moreToolsOkay &= buttons.size() == 6;
             for (int i = 0; i < buttons.size(); ++i) {
                 auto* button = buttons.at(i);
                 moreToolsOkay &= !button->icon().isNull() && !button->text().isEmpty()
-                    && button->y() == buttons.first()->y()
+                    && button->y() == buttons.at((i / 2) * 2)->y()
                     && button->width() > button->iconSize().width()
                     && button->height() >= button->iconSize().height()
                     && moreTools->rect().contains(button->geometry());
-                if (i > 0) {
+                if (i % 2 == 1) {
                     const int gap = button->x() - buttons.at(i - 1)->geometry().right() - 1;
                     moreToolsOkay &= gap == Util::scaleSize(4);
+                } else if (i >= 2) {
+                    moreToolsOkay &= button->x() == buttons.first()->x()
+                        && button->y() > buttons.at(i - 2)->geometry().bottom();
                 }
             }
             if (!buttons.isEmpty()) {
                 const QString label = buttons.first()->text();
                 const int buttonHeight = buttons.first()->height();
                 buttons.first()->setText(QStringLiteral("A label that needs several lines ").repeated(4));
-                panel->adjustPos();
+                moreButton->click(); moreButton->click();
                 QApplication::processEvents();
                 moreToolsOkay &= panel->width() == collapsedWidth && buttons.first()->height() > buttonHeight;
-                moreToolsOkay &= panel->geometry().bottom() == nearBottom.top() - 1;
+                moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
                 buttons.first()->setText(label);
             }
             moreButton->click();
@@ -288,7 +431,7 @@ int runScreenshotSelectionTest(QApplication& app) {
             moreToolsOkay &= panel->width() == collapsedWidth;
             moreToolsOkay &= panel->y() == nearBottom.bottom() + 1;
         }
-        qInfo() << "More tools use the expanded toolbar height:" << moreToolsOkay;
+        qInfo() << "More tools float without resizing or moving toolbar:" << moreToolsOkay;
         okay &= moreToolsOkay;
         screenshot->moveDrawPanel();
         // Expiring a result must restore the exact toolbar/settings height,

@@ -2,6 +2,16 @@
 <TS version="2.1" language="en_US">
   <context>
     <name>App</name>
+    <message><source>荧光笔</source><translation>Highlighter</translation></message>
+    <message><source>形状</source><translation>Shapes</translation></message>
+    <message><source>图章</source><translation>Stamps</translation></message>
+    <message><source>数字</source><translation>Numbers</translation></message>
+    <message><source>数字图章</source><translation>Number stamp</translation></message>
+    <message><source>表情符号</source><translation>Symbols</translation></message>
+    <message><source>旗帜</source><translation>Flag</translation></message>
+    <message><source>爱心</source><translation>Heart</translation></message>
+    <message><source>图钉</source><translation>Pushpin</translation></message>
+    <message><source>圆头图钉</source><translation>Round pin</translation></message>
     <message><source>生成二维码</source><translation>Generate QR Code</translation></message>
     <message><source>没有可生成二维码的文字</source><translation>No text is available to generate a QR code</translation></message>
     <message><source>文字过长，请缩短后再生成二维码</source><translation>Text is too long. Shorten it before generating a QR code.</translation></message>

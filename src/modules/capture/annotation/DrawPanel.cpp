@@ -4,6 +4,7 @@
 
 #include <QPen>
 #include <QPainter>
+#include <QPainterPathStroker>
 #include <QPoint>
 #include <QPolygon>
 #include <QStaticText>
@@ -15,6 +16,7 @@
 #include <QButtonGroup>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QApplication>
@@ -48,6 +50,38 @@ constexpr int ToolbarButtonSize = 32;
 constexpr int ToolbarIconSize = 18;
 constexpr int CopyButtonMinWidth = 72;
 constexpr int CopyButtonContentPadding = 42;
+constexpr int PopupPadding = 8;
+constexpr int PopupGap = 4;
+constexpr int PopupOptionHeight = 30;
+
+class ToolPopup : public QFrame {
+public:
+    using QFrame::QFrame;
+protected:
+    void paintEvent(QPaintEvent*) override {
+        const auto& tokens = ThemeManager::tokens();
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(tokens.border, 1));
+        painter.setBrush(tokens.surfaceRaised);
+        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
+                                Util::scaleSize(10), Util::scaleSize(10));
+    }
+};
+
+void showToolPopup(QWidget* popup, QWidget* button)
+{
+    popup->adjustSize();
+    const QPoint anchor = button->mapToGlobal(QPoint(0, 0));
+    QScreen* target = QGuiApplication::screenAt(anchor);
+    const QRect bounds = (target ? target : button->screen())->availableGeometry();
+    int y = anchor.y() - popup->height() - Util::scaleSize(6);
+    if (y < bounds.top()) y = anchor.y() + button->height() + Util::scaleSize(6);
+    popup->move(qBound(bounds.left(), anchor.x(), qMax(bounds.left(), bounds.right() + 1 - popup->width())),
+                qBound(bounds.top(), y, qMax(bounds.top(), bounds.bottom() + 1 - popup->height())));
+    popup->show();
+    popup->raise();
+}
 
 class AnnotationButton : public QPushButton
 {
@@ -76,7 +110,10 @@ protected:
         const QRectF surface = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
         painter.setPen(hasFocus() ? QPen(tokens.accent, 1) : QPen(Qt::NoPen));
         painter.setBrush(background);
-        if (!primary) {
+        if (property("popupOption").toBool()) {
+            const qreal radius = Util::scaleSize(6);
+            painter.drawRoundedRect(surface, radius, radius);
+        } else if (!primary) {
             const qreal diameter = qMin(surface.width(), surface.height());
             painter.drawEllipse(QRectF(surface.center().x() - diameter / 2,
                                        surface.center().y() - diameter / 2, diameter, diameter));
@@ -120,7 +157,7 @@ public:
     {
         const QRect labelBounds(0, 0, qMax(1, width - widthWithoutLabel()), 0);
         const int labelHeight = QFontMetrics(labelFont()).boundingRect(labelBounds, LabelAlignment, text()).height();
-        return qMax(Util::scaleSize(32), labelHeight + 2 * Util::scaleSize(3));
+        return qMax(Util::scaleSize(PopupOptionHeight), labelHeight + 2 * Util::scaleSize(3));
     }
 
 protected:
@@ -211,6 +248,7 @@ DrawPanel::DrawPanel(SettingModel* settings, QWidget *parent, QWidget *drawWidge
     setupButtonGroup();
     setupPanels();
     setupButtonsAndLayout(parent != nullptr);
+    if (drawWidget) drawWidget->installEventFilter(this);
     adjustPos();
 }
 
@@ -262,16 +300,30 @@ void DrawPanel::setupPanels()
 
 void DrawPanel::setupMoreTools(bool hasParent)
 {
-    moreTools_ = new QWidget(this);
+    moreTools_ = new ToolPopup(this, Qt::Tool | Qt::FramelessWindowHint
+                                   | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
     moreTools_->setObjectName(QStringLiteral("DrawPanelMoreTools"));
+    moreTools_->setAttribute(Qt::WA_TranslucentBackground);
+    moreTools_->setAttribute(Qt::WA_ShowWithoutActivating);
     moreTools_->hide();
-    auto* toolsLayout = new QHBoxLayout(moreTools_);
-    toolsLayout->setContentsMargins(Util::scaleSize(8), 0, Util::scaleSize(8), 0);
-    toolsLayout->setSpacing(Util::scaleSize(4));
+    auto* popupLayout = new QVBoxLayout(moreTools_);
+    const int padding = Util::scaleSize(PopupPadding);
+    popupLayout->setContentsMargins(padding, padding, padding, padding);
+    popupLayout->setSpacing(Util::scaleSize(PopupGap));
+    auto* title = new QLabel(QCoreApplication::translate("App", "更多图像工具"), moreTools_);
+    QFont titleFont = title->font(); titleFont.setBold(true); title->setFont(titleFont);
+    popupLayout->addWidget(title);
+    auto* toolsLayout = new QGridLayout;
+    toolsLayout->setContentsMargins(0, 0, 0, 0);
+    toolsLayout->setSpacing(Util::scaleSize(PopupGap));
+    popupLayout->addLayout(toolsLayout);
     auto addTool = [&](const QIcon& icon, const QString& label, void (DrawPanel::*action)()) {
         auto* button = new MoreToolButton(icon, label, moreTools_);
         button->setCursor(Qt::PointingHandCursor);
-        toolsLayout->addWidget(button, 1);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setToolTip(label);
+        const int index = toolsLayout->count();
+        toolsLayout->addWidget(button, index / 2, index % 2);
         connect(button, &QPushButton::clicked, this, [this, action] {
             pbMore_->setChecked(false);
             (this->*action)();
@@ -296,9 +348,26 @@ void DrawPanel::setupMoreTools(bool hasParent)
             &DrawPanel::sigExtractColors);
 
     connect(pbMore_, &QPushButton::toggled, this, [this](bool expanded) {
-        moreTools_->setVisible(expanded);
-        adjustPos();
+        if (expanded) {
+            stampPicker_->hide();
+            shapePopup_->hide();
+            showMoreTools();
+        } else moreTools_->hide();
     });
+    connect(&drawer_, &Drawer::interactionStarted, this, [this] { pbMore_->setChecked(false); });
+}
+
+void DrawPanel::showMoreTools()
+{
+    int buttonHeight = Util::scaleSize(PopupOptionHeight);
+    const auto buttons = moreTools_->findChildren<QPushButton*>();
+    for (auto* button : buttons) {
+        button->setIconSize(QSize(Util::scaleSize(ToolbarIconSize), Util::scaleSize(ToolbarIconSize)));
+        button->setFixedWidth(Util::scaleSize(104));
+        buttonHeight = qMax(buttonHeight, static_cast<MoreToolButton*>(button)->heightForWidth(button->width()));
+    }
+    for (auto* button : buttons) button->setFixedHeight(buttonHeight);
+    showToolPopup(moreTools_, pbMore_);
 }
 
 void DrawPanel::setupButtonsAndLayout(bool hasParent)
@@ -341,10 +410,15 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     QPushButton* pbArrow = createShapeBtn("arrow.png", QCoreApplication::translate("App", "箭头"));
     QPushButton* pbRectangle = createShapeBtn("rectangle.png", QCoreApplication::translate("App", "矩形"));
     QPushButton* pbEllipse = createShapeBtn("ellipse.png", QCoreApplication::translate("App", "椭圆"));
+    QPushButton* pbHighlighter = createShapeBtn("highlighter", QCoreApplication::translate("App", "荧光笔"));
+    pbHighlighter->setObjectName(QStringLiteral("DrawPanelHighlighterButton"));
     QPushButton* pbText = createShapeBtn("text.png", QCoreApplication::translate("App", "文本（Ctrl+Enter 完成，Esc 取消）"));
 
     QPushButton* pbMosaic = createShapeBtn("mosaic.png", QCoreApplication::translate("App", "马赛克"));
-    pbMore_ = createActionBtn("more", QCoreApplication::translate("App", "更多图像工具"));
+    pbStamp_ = createShapeBtn("stamp", QCoreApplication::translate("App", "图章"));
+    pbStamp_->setObjectName(QStringLiteral("DrawPanelStampButton"));
+    setupStampPicker();
+    pbMore_ = createActionBtn("image-tools", QCoreApplication::translate("App", "更多图像工具"));
     pbMore_->setObjectName(QStringLiteral("DrawPanelMoreButton"));
     pbMore_->setCheckable(true);
     setupMoreTools(hasParent);
@@ -383,8 +457,14 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     btns_.push_back(qMakePair(pbArrow, arrowMode));
     btns_.push_back(qMakePair(pbRectangle, rectangleMode));
     btns_.push_back(qMakePair(pbEllipse, ellipseMode));
+    btns_.push_back(qMakePair(pbHighlighter, DrawMode(DrawMode::Highlighter)));
     btns_.push_back(qMakePair(pbText, textMode));
     btns_.push_back(qMakePair(pbMosaic, mosaicMode));
+    btns_.push_back(qMakePair(pbStamp_, DrawMode(DrawMode::Stamp)));
+    pbShapes_ = createActionBtn("shapes", QCoreApplication::translate("App", "形状"));
+    pbShapes_->setObjectName(QStringLiteral("DrawPanelShapesButton"));
+    pbShapes_->setCheckable(true);
+    setupShapePopup({pbPolyLine, pbLine, pbArrow, pbRectangle, pbEllipse, pbHighlighter});
 
     auto* hLayout = new QHBoxLayout();
     toolbarLayout_ = hLayout;
@@ -392,8 +472,10 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
                                 Util::scaleSize(8), Util::scaleSize(6));
     hLayout->setSpacing(Util::scaleSize(2));
     hLayout->addWidget(pbFont_);
-    // Keep every drawing tool together, including mosaic.
-    for (int i = 0; i < btns_.size(); ++i) hLayout->addWidget(btns_.at(i).first);
+    hLayout->addWidget(pbShapes_);
+    hLayout->addWidget(pbText);
+    hLayout->addWidget(pbMosaic);
+    hLayout->addWidget(pbStamp_);
     hLayout->addWidget(pbUndo);
     hLayout->addWidget(createSeparator(), 0, Qt::AlignVCenter);
     hLayout->addWidget(pbMore_);
@@ -415,7 +497,6 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     settingsRow->addWidget(drawSettings_);
     settingsRow->addStretch();
     mLayout->addLayout(settingsRow);
-    mLayout->addWidget(moreTools_, 0, Qt::AlignLeft);
     auto* messageRow = new QHBoxLayout();
     messageRow->setContentsMargins(Util::scaleSize(16), 0, Util::scaleSize(16), 0);
     messageRow->addWidget(toolMessageLabel_);
@@ -438,6 +519,152 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     }
 }
 
+void DrawPanel::setupShapePopup(const QList<QPushButton*>& buttons)
+{
+    shapePopup_ = new ToolPopup(this, Qt::Tool | Qt::FramelessWindowHint
+                                    | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
+    shapePopup_->setObjectName(QStringLiteral("DrawPanelShapePopup"));
+    shapePopup_->setAttribute(Qt::WA_TranslucentBackground);
+    shapePopup_->setAttribute(Qt::WA_ShowWithoutActivating);
+    auto* layout = new QVBoxLayout(shapePopup_);
+    const int padding = Util::scaleSize(PopupPadding);
+    layout->setContentsMargins(padding, padding, padding, padding);
+    layout->setSpacing(Util::scaleSize(PopupGap));
+    auto* title = new QLabel(QCoreApplication::translate("App", "形状"), shapePopup_);
+    QFont font = title->font(); font.setBold(true); title->setFont(font);
+    layout->addWidget(title);
+    auto* grid = new QGridLayout;
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setSpacing(Util::scaleSize(PopupGap));
+    layout->addLayout(grid);
+    for (int i = 0; i < buttons.size(); ++i) {
+        auto* button = buttons.at(i);
+        button->setParent(shapePopup_);
+        button->setProperty("popupOption", true);
+        button->setText(button->toolTip());
+        button->setAccessibleName(button->text());
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::PointingHandCursor);
+        grid->addWidget(button, i / 2, i % 2);
+    }
+    connect(pbShapes_, &QPushButton::clicked, this, [this] {
+        const bool wasVisible = shapePopup_->isVisible();
+        stampPicker_->hide();
+        pbMore_->setChecked(false);
+        if (wasVisible) shapePopup_->hide();
+        else {
+            int width = Util::scaleSize(88);
+            const auto buttons = shapePopup_->findChildren<QPushButton*>();
+            for (auto* button : buttons)
+                width = qMax(width, button->fontMetrics().horizontalAdvance(button->text()) + Util::scaleSize(46));
+            for (auto* button : buttons) {
+                button->setFixedSize(width, Util::scaleSize(PopupOptionHeight));
+                button->setIconSize(QSize(Util::scaleSize(ToolbarIconSize), Util::scaleSize(ToolbarIconSize)));
+            }
+            showToolPopup(shapePopup_, pbShapes_);
+        }
+        syncShapeButton();
+    });
+    connect(&drawer_, &Drawer::interactionStarted, this, [this] {
+        shapePopup_->hide();
+        syncShapeButton();
+    });
+}
+
+void DrawPanel::syncShapeButton()
+{
+    bool selected = false;
+    for (const auto& entry : btns_) {
+        if (entry.first->parentWidget() == shapePopup_ && entry.first->isChecked()) {
+            selected = true;
+            break;
+        }
+    }
+    pbShapes_->setChecked(selected);
+}
+
+void DrawPanel::setupStampPicker()
+{
+    stampPicker_ = new ToolPopup(this, Qt::Tool | Qt::FramelessWindowHint
+                                   | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
+    stampPicker_->setObjectName(QStringLiteral("DrawPanelStampPicker"));
+    stampPicker_->setAttribute(Qt::WA_TranslucentBackground);
+    stampPicker_->setAttribute(Qt::WA_ShowWithoutActivating);
+    auto* layout = new QVBoxLayout(stampPicker_);
+    const int padding = Util::scaleSize(PopupPadding);
+    layout->setContentsMargins(padding, padding, padding, padding);
+    layout->setSpacing(Util::scaleSize(PopupGap));
+    auto* choices = new QButtonGroup(stampPicker_);
+    choices->setExclusive(true);
+    auto addRow = [&](const QString& title, const QList<QPair<Stamp::Kind, QColor>>& items) {
+        auto* label = new QLabel(title, stampPicker_);
+        QFont font = label->font(); font.setBold(true); label->setFont(font);
+        layout->addWidget(label);
+        auto* row = new QHBoxLayout;
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(Util::scaleSize(PopupGap));
+        for (const auto& item : items) {
+            auto* button = new QPushButton(stampPicker_);
+            button->setObjectName(QStringLiteral("stampChoice%1").arg(choices->buttons().size()));
+            button->setProperty("stampKind", int(item.first));
+            button->setProperty("stampColor", item.second);
+            button->setCheckable(true);
+            button->setFocusPolicy(Qt::NoFocus);
+            button->setCursor(Qt::PointingHandCursor);
+            button->setFixedSize(Util::scaleSize(32), Util::scaleSize(32));
+            button->setIconSize(QSize(Util::scaleSize(24), Util::scaleSize(24)));
+            const QStringList names = {QCoreApplication::translate("App", "数字图章"),
+                QCoreApplication::translate("App", "旗帜"), QCoreApplication::translate("App", "爱心"),
+                QCoreApplication::translate("App", "图钉"), QCoreApplication::translate("App", "圆头图钉")};
+            button->setToolTip(names.at(item.first));
+            button->setAccessibleName(names.at(item.first));
+            choices->addButton(button);
+            if (choices->buttons().size() == 1) button->setChecked(true);
+            row->addWidget(button);
+            connect(button, &QPushButton::clicked, this, [this, item] {
+                for (auto& entry : btns_) {
+                    if (entry.first == pbStamp_) entry.second.setStamp(item.first, item.second);
+                }
+                uncheckOtherButtons(pbStamp_);
+                pbStamp_->setChecked(true);
+                drawer_.setMode(getMode());
+                stampPicker_->hide();
+            });
+        }
+        layout->addLayout(row);
+    };
+    addRow(QCoreApplication::translate("App", "数字"), {
+        {Stamp::Number, QColor("#DC3545")}, {Stamp::Number, QColor("#FF7010")},
+        {Stamp::Number, QColor("#319B39")}, {Stamp::Number, QColor("#00AEDB")}});
+    addRow(QCoreApplication::translate("App", "表情符号"), {
+        {Stamp::Flag, QColor("#FF343B")}, {Stamp::Heart, QColor("#FF304F")},
+        {Stamp::Pushpin, QColor("#FF304F")}, {Stamp::MapPin, QColor("#FF1090")}});
+    connect(&drawer_, &Drawer::interactionStarted, stampPicker_, &QWidget::hide);
+}
+
+void DrawPanel::showStampPicker()
+{
+    const auto& tokens = ThemeManager::tokens();
+    stampPicker_->setStyleSheet(QStringLiteral(
+        "QFrame#DrawPanelStampPicker { background: %1; border: 1px solid %2; border-radius: 10px; }"
+        "QLabel { color: %3; background: transparent; border: none; }"
+        "QPushButton { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 0; min-height: 0; }"
+        "QPushButton:hover { background: %4; }"
+        "QPushButton:checked { background: %4; border-color: %5; }")
+        .arg(tokens.surfaceRaised.name(), tokens.border.name(), tokens.textPrimary.name(),
+             tokens.accentSubtle.name(), tokens.accent.name()));
+    for (auto* button : stampPicker_->findChildren<QPushButton*>()) {
+        const qreal dpr = button->devicePixelRatioF();
+        QPixmap icon = QPixmap::fromImage(Stamp::image(
+            static_cast<Stamp::Kind>(button->property("stampKind").toInt()),
+            button->property("stampColor").value<QColor>(), drawer_.nextStampNumber(), qRound(Util::scaleSize(24) * dpr)));
+        icon.setDevicePixelRatio(dpr);
+        button->setIcon(icon);
+    }
+    pbMore_->setChecked(false);
+    showToolPopup(stampPicker_, pbStamp_);
+}
+
 DrawMode DrawPanel::getMode()
 {
     DrawMode mode;
@@ -457,6 +684,8 @@ void DrawPanel::applyCurrentStyle(DrawMode &mode) const
 {
     mode.pen().setColor(DrawSettings::currentColor());
     mode.pen().setWidth(DrawSettings::penWidth());
+    if (mode.shape() == DrawMode::Highlighter)
+        mode.pen().setWidth(Util::scaleSize(qMax(12, DrawSettings::penWidth() * 5)));
     mode.brush().setColor(DrawSettings::currentColor());
     mode.font().setPixelSize(DrawSettings::fontSize());
 }
@@ -467,8 +696,7 @@ void DrawPanel::refreshPanelSize()
     // Its window starts immediately outside the selection, never over its edge.
     constexpr int bridge = 2;
     const bool hasMessage = !toolMessageLabel_->isHidden();
-    const bool hasMoreTools = !moreTools_->isHidden();
-    const bool hasDetails = !drawSettings_->isHidden() || hasMoreTools || hasMessage;
+    const bool hasDetails = !drawSettings_->isHidden() || hasMessage;
     const int bottomPadding = hasDetails
         ? Util::scaleSize(hasMessage ? 16 : (!drawSettings_->isHidden() ? 12 : 7))
         : 0;
@@ -492,35 +720,6 @@ void DrawPanel::refreshPanelSize()
             + 2 * toolMessageLabel_->frameWidth();
         const int messageHeight = qBound(Util::scaleSize(32), contentHeight, Util::scaleSize(160));
         toolMessageLabel_->setFixedHeight(messageHeight);
-    }
-    if (hasMoreTools) {
-        auto* toolsLayout = moreTools_->layout();
-        const int count = toolsLayout->count();
-        const QMargins margins = toolsLayout->contentsMargins();
-        const int rowPadding = margins.left() + margins.right() + (count - 1) * toolsLayout->spacing();
-        QList<MoreToolButton*> buttons;
-        int preferredLabelWidth = 0;
-        int totalButtonPadding = 0;
-        for (int i = 0; i < count; ++i) {
-            auto* button = static_cast<MoreToolButton*>(toolsLayout->itemAt(i)->widget());
-            buttons.append(button);
-            preferredLabelWidth += button->labelWidth();
-            totalButtonPadding += button->widthWithoutLabel();
-        }
-        const int labelBudget = qMax(0, panelWidth - rowPadding - totalButtonPadding);
-        const qreal labelScale = qMin(1.0, qreal(labelBudget) / qMax(1, preferredLabelWidth));
-        int rowWidth = rowPadding;
-        int buttonHeight = 0;
-        for (auto* button : buttons) {
-            const int buttonWidth = button->widthWithoutLabel() + int(button->labelWidth() * labelScale);
-            button->setFixedWidth(buttonWidth);
-            rowWidth += buttonWidth;
-            buttonHeight = qMax(buttonHeight, button->heightForWidth(buttonWidth));
-        }
-        moreTools_->setFixedWidth(rowWidth);
-        for (auto* button : buttons) {
-            button->setFixedHeight(buttonHeight);
-        }
     }
     // Refresh the size hint before Windows handles the native resize request;
     // otherwise its old minimum height can reject shrinking a floating panel.
@@ -640,6 +839,9 @@ Drawer* DrawPanel::drawer()
 
 void DrawPanel::cancelChecked()
 {
+    pbMore_->setChecked(false);
+    shapePopup_->hide();
+    stampPicker_->hide();
     for (const auto &buttonModePair : btns_) {
         if (!buttonModePair.first->isChecked()) {
             continue;
@@ -648,6 +850,7 @@ void DrawPanel::cancelChecked()
         drawer_.setMode(DrawMode(DrawMode::None));
         break;
     }
+    syncShapeButton();
 }
 
 int DrawPanel::fontSize()
@@ -669,6 +872,18 @@ void DrawPanel::onReferRectChanged(const QRect &rect)
 
 void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
 {
+    shapePopup_->hide();
+    if (btn->parentWidget() == shapePopup_) btn->setChecked(true);
+    const bool pickerWasVisible = stampPicker_->isVisible();
+    stampPicker_->hide();
+    if (btn == pbStamp_) {
+        uncheckOtherButtons(btn);
+        // Clicking the active tool opens its palette again without losing the mode.
+        pbStamp_->setChecked(true);
+        drawer_.setMode(getMode());
+        if (!pickerWasVisible) showStampPicker();
+        return;
+    }
     uncheckOtherButtons(btn);
 
     if (btn->isChecked()) {
@@ -685,10 +900,14 @@ void DrawPanel::uncheckOtherButtons(QAbstractButton *checkedButton)
             buttonModePair.first->setChecked(false);
         }
     }
+    syncShapeButton();
 }
 
 void DrawPanel::onColorBtnClicked()
 {
+    shapePopup_->hide();
+    pbMore_->setChecked(false);
+    stampPicker_->hide();
     drawSettings_->setVisible(!drawSettings_->isVisible());
     pbFont_->setChecked(drawSettings_->isVisible());
     adjustPos();
@@ -733,6 +952,8 @@ void DrawPanel::showEvent(QShowEvent *event)
 
 void DrawPanel::hideEvent(QHideEvent *event)
 {
+    shapePopup_->hide();
+    stampPicker_->hide();
     pbMore_->setChecked(false);
     clearToolMessage();
     QWidget::hideEvent(event);
@@ -757,6 +978,11 @@ void DrawPanel::mouseMoveEvent(QMouseEvent* event)
 
 bool DrawPanel::eventFilter(QObject* watched, QEvent* event)
 {
+    if (watched == drawer_.parentWidget() && event->type() == QEvent::MouseButtonPress) {
+        shapePopup_->hide();
+        pbMore_->setChecked(false);
+        stampPicker_->hide();
+    }
     if (toolMessageLabel_ && (watched == toolMessageLabel_ || watched == toolMessageLabel_->viewport()
                               || watched == toolMessageLabel_->verticalScrollBar())) {
         if (event->type() == QEvent::Enter && toolMessageLabel_->isVisible()) {
@@ -856,7 +1082,7 @@ void DrawMode::addPos(const QPoint &pos)
 
 bool DrawMode::isPathShape() const
 {
-    return shape_ == PolyLine || shape_ == Mosaic;
+    return shape_ == PolyLine || shape_ == Mosaic || shape_ == Highlighter;
 }
 
 void DrawMode::initMosaicBrush(const QImage &baseImage, const QPoint &brushOrigin)
@@ -924,6 +1150,10 @@ void DrawMode::updateCursor()
 {
     if (shape_ == Mosaic) {
         cursor_ = createMosaicCursor();
+    } else if (shape_ == Highlighter) {
+        QColor color = pen_.color(); color.setAlpha(96);
+        const QPixmap pixmap = CaptureCursor::brush(pen_.width() + 2, color, Util::getScreenScaleFactor());
+        cursor_ = QCursor(pixmap, pixmap.width() / 2, pixmap.height() / 2);
     } else if (shape_ == PolyLine) {
         cursor_ = createPolyLineCursor();
     } else if (shape_ == Text) {
@@ -959,6 +1189,9 @@ void DrawMode::draw(QPainter &painter)
         return;
     case Line:
         drawLine(start_, end_, painter);
+        return;
+    case Highlighter:
+        drawHighlighter(painter);
         return;
     case Arrow:
         drawArrows(start_, end_, painter);
@@ -1000,6 +1233,32 @@ void DrawMode::drawPolyLine(const QVector<QPoint> &points, QPainter& painter)
     polygon.append(points);
     polygon.append(end_);
     painter.drawPolyline(polygon);
+}
+
+void DrawMode::drawHighlighter(QPainter& painter)
+{
+    QPainterPath path;
+    path.moveTo(start_);
+    for (const auto& point : points_) path.lineTo(point);
+    path.lineTo(end_);
+    QPainterPath outline;
+    if (path.isEmpty()) {
+        const qreal radius = pen_.widthF() / 2;
+        outline.addEllipse(QPointF(start_), radius, radius);
+    } else {
+        QPainterPathStroker stroker;
+        stroker.setWidth(pen_.widthF());
+        stroker.setCapStyle(Qt::RoundCap);
+        stroker.setJoinStyle(Qt::RoundJoin);
+        outline = stroker.createStroke(path);
+    }
+    QColor color = pen_.color();
+    color.setAlpha(96);
+    painter.save();
+    painter.setCompositionMode(QPainter::CompositionMode_Multiply);
+    // Fill the whole stroke once so bends and retraced segments stay evenly translucent.
+    painter.fillPath(outline, color);
+    painter.restore();
 }
 
 void DrawMode::drawLine(const QPoint& startPoint, const QPoint& endPoint, QPainter& painter)
@@ -1131,6 +1390,7 @@ void Drawer::undo()
     drawEndPos_ = QPoint(0, 0);
     if (!undoHistory_.isEmpty()) {
         UndoState previous = undoHistory_.takeLast();
+        nextStampNumber_ = previous.stampNumber;
         if (previous.replacesModes) {
             drawModeCache_ = std::move(previous.modes);
             drawRect_ = previous.drawRect;
@@ -1147,7 +1407,7 @@ void Drawer::rememberState(bool replacesModes, std::function<void()> onUndo)
     undoHistory_.push_back({replacesModes,
                             replacesModes ? drawModeCache_ : QList<DrawMode>{},
                             replacesModes ? drawRect_ : QRect{},
-                            std::move(onUndo)});
+                            std::move(onUndo), nextStampNumber_});
 }
 
 void Drawer::pushBitmap(const QImage &image, const QRect &rect)
@@ -1189,6 +1449,7 @@ void Drawer::clearHistory()
     emit interactionStarted();
     drawModeCache_.clear();
     undoHistory_.clear();
+    nextStampNumber_ = 1;
     drawMode_.clear();
     drawStartPos_ = QPoint(0, 0);
     drawEndPos_ = QPoint(0, 0);
@@ -1301,6 +1562,13 @@ bool Drawer::eventFilter(QObject* watched, QEvent* event)
 
 bool Drawer::onMousePressEvent(QMouseEvent *e)
 {
+    if (isDraw() && drawMode_.shape() == DrawMode::Stamp) {
+        if (e->button() != Qt::LeftButton) return false;
+        emit interactionStarted();
+        const QRect bounds = drawRect_.isValid() ? drawRect_ : parent_->rect();
+        isPressed_ = bounds.contains(e->pos());
+        return true;
+    }
     if (e->button() == Qt::LeftButton) {
         isPressed_ = true;
         drawStartPos_ = e->pos();
@@ -1325,6 +1593,19 @@ bool Drawer::onMousePressEvent(QMouseEvent *e)
 
 bool Drawer::onMouseReleaseEvent(QMouseEvent *e)
 {
+    if (isDraw() && drawMode_.shape() == DrawMode::Stamp && e->button() == Qt::LeftButton) {
+        const QRect bounds = drawRect_.isValid() ? drawRect_ : parent_->rect();
+        if (isPressed_ && bounds.contains(e->pos())) {
+            const int size = qMin(Util::scaleSize(32), qMin(bounds.width(), bounds.height()));
+            const QImage image = Stamp::image(drawMode_.stampKind(), drawMode_.stampColor(), nextStampNumber_, size);
+            const QPoint topLeft(qBound(bounds.left(), e->pos().x() - size / 2, bounds.right() + 1 - size),
+                                 qBound(bounds.top(), e->pos().y() - size / 2, bounds.bottom() + 1 - size));
+            pushBitmap(image, QRect(topLeft, QSize(size, size)));
+            if (drawMode_.stampKind() == Stamp::Number) ++nextStampNumber_;
+        }
+        isPressed_ = false;
+        return true;
+    }
     if (e->button() == Qt::LeftButton) {
         // 绘制文本
         if (isDraw()) {

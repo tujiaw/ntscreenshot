@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include "DrawSettings.h"
+#include "Stamp.h"
 
 class QPushButton;
 class QAbstractButton;
@@ -36,6 +37,8 @@ public:
         Text,
         Mosaic,
         Bitmap,
+        Stamp,
+        Highlighter,
     };
 
     DrawMode();
@@ -55,6 +58,9 @@ public:
     void setBitmap(const QImage &image, const QRect &rect);
     const QImage& bitmap() const { return bitmap_; }
     QRect bitmapRect() const { return bitmapRect_; }
+    void setStamp(::Stamp::Kind kind, const QColor& color) { stampKind_ = kind; stampColor_ = color; }
+    ::Stamp::Kind stampKind() const { return stampKind_; }
+    QColor stampColor() const { return stampColor_; }
     void updateCursor();
     void clear();
     void draw(QPainter &painter);
@@ -64,6 +70,7 @@ public:
 
     void initPainter(QPainter& painter);
     void drawPolyLine(const QVector<QPoint> &points, QPainter& painter);
+    void drawHighlighter(QPainter& painter);
     void drawLine(const QPoint& startPoint, const QPoint& endPoint, QPainter& painter);
     void drawArrows(const QPoint& startPoint, const QPoint& endPoint, QPainter &painter);
     void drawRect(const QPoint &startPoint, const QPoint &endPoint, QPainter& painter);
@@ -85,6 +92,8 @@ private:
     QPoint brushOrigin_;
     QImage bitmap_;
     QRect bitmapRect_;
+    ::Stamp::Kind stampKind_ = ::Stamp::Number;
+    QColor stampColor_ = QColor("#DC3545");
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -112,6 +121,7 @@ public:
     bool saveText();
     void cancelText();
     void setDrawRect(const QRect &rect);
+    int nextStampNumber() const { return nextStampNumber_; }
 
 signals:
     void interactionStarted();
@@ -140,12 +150,14 @@ private:
         QList<DrawMode> modes;
         QRect drawRect;
         std::function<void()> onUndo;
+        int stampNumber = 1;
     };
     QList<UndoState> undoHistory_;
     void rememberState(bool replacesModes = false, std::function<void()> onUndo = {});
     TextEdit *textEdit_;
     QImage bkImage_;
     QRect drawRect_;
+    int nextStampNumber_ = 1;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -201,12 +213,21 @@ private:
     void setupButtonGroup();
     void setupPanels();
     void setupMoreTools(bool hasParent);
+    void showMoreTools();
+    void setupShapePopup(const QList<QPushButton*>& buttons);
+    void syncShapeButton();
     void setupButtonsAndLayout(bool hasParent);
     void refreshPanelSize();
+    void setupStampPicker();
+    void showStampPicker();
 
     QRect referRect_;
     QPushButton *pbFont_ = nullptr;
     QPushButton *pbMore_ = nullptr;
+    QPushButton *pbShapes_ = nullptr;
+    QWidget *shapePopup_ = nullptr;
+    QPushButton *pbStamp_ = nullptr;
+    QWidget *stampPicker_ = nullptr;
     QHBoxLayout *toolbarLayout_ = nullptr;
     QWidget *moreTools_ = nullptr;
     DrawSettings *drawSettings_ = nullptr;

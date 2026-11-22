@@ -36,10 +36,40 @@ public:
             QPainterPath path; path.moveTo(5, 19); path.lineTo(7, 14); path.lineTo(16, 5);
             path.lineTo(19, 8); path.lineTo(10, 17); path.closeSubpath();
             painter->drawPath(path); line(14, 7, 17, 10);
+        } else if (name_ == "highlighter") {
+            QPainterPath body;
+            body.moveTo(6, 12); body.lineTo(14, 4); body.lineTo(20, 10);
+            body.lineTo(12, 18); body.closeSubpath();
+            painter->drawPath(body);
+            line(12, 6, 18, 12);
+            QPainterPath tip; tip.moveTo(6, 12); tip.lineTo(4, 18);
+            tip.lineTo(6, 20); tip.lineTo(12, 18); painter->drawPath(tip);
+            line(3, 22, 14, 22);
         } else if (name_ == "line.png") {
             line(5, 19, 19, 5);
         } else if (name_ == "arrow.png") {
             line(4, 12, 20, 12); line(14, 6, 20, 12); line(14, 18, 20, 12);
+        } else if (name_ == "shapes") {
+            QPainterPath triangle;
+            triangle.moveTo(10, 3); triangle.lineTo(4, 11); triangle.lineTo(16, 11); triangle.closeSubpath();
+            painter->drawPath(triangle);
+            painter->drawRoundedRect(QRectF(3, 14, 7, 7), 0.7, 0.7);
+            painter->drawEllipse(QRectF(14, 13, 8, 8));
+        } else if (name_ == "image-tools") {
+            QPainterPath frame;
+            frame.moveTo(11, 4); frame.lineTo(4, 4); frame.lineTo(4, 20);
+            frame.lineTo(20, 20); frame.lineTo(20, 12);
+            painter->drawPath(frame);
+            painter->drawEllipse(QPointF(8, 8), 1.3, 1.3);
+            QPainterPath mountain;
+            mountain.moveTo(4, 17); mountain.lineTo(10, 11); mountain.lineTo(14, 15);
+            mountain.lineTo(16, 13); mountain.lineTo(20, 17);
+            painter->drawPath(mountain);
+            QPainterPath sparkle;
+            sparkle.moveTo(17, 2); sparkle.lineTo(18, 5); sparkle.lineTo(21, 6);
+            sparkle.lineTo(18, 7); sparkle.lineTo(17, 10); sparkle.lineTo(16, 7);
+            sparkle.lineTo(13, 6); sparkle.lineTo(16, 5); sparkle.closeSubpath();
+            painter->drawPath(sparkle);
         } else if (name_ == "rectangle.png") {
             painter->drawRoundedRect(QRectF(4, 5, 16, 14), 1.5, 1.5);
         } else if (name_ == "ellipse.png") {
@@ -49,6 +79,12 @@ public:
         } else if (name_ == "mosaic.png") {
             for (int y = 0; y < 3; ++y) for (int x = 0; x < 3; ++x)
                 painter->drawRoundedRect(QRectF(4 + x * 6, 4 + y * 6, 3, 3), 0.5, 0.5);
+        } else if (name_ == "stamp") {
+            painter->drawRoundedRect(QRectF(3, 3, 18, 18), 4, 4);
+            painter->drawEllipse(QPointF(8, 9), 0.7, 0.7);
+            painter->drawEllipse(QPointF(16, 9), 0.7, 0.7);
+            QPainterPath smile; smile.moveTo(7, 14); smile.quadTo(12, 19, 17, 14);
+            painter->drawPath(smile);
         } else if (name_ == "undo.png") {
             line(8, 5, 3, 10); line(3, 10, 8, 15);
             QPainterPath path; path.moveTo(3, 10); path.lineTo(13, 10);
