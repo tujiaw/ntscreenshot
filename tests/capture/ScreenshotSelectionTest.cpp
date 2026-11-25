@@ -161,9 +161,11 @@ int runStampAnnotationTest(QApplication& app) {
         shapes->click(); app.processEvents();
         check(shapePopup->isVisible() && !picker->isVisible() && !morePopup->isVisible()
                   && panel.size() == toolbarSize, "shape picker replaces other popups without resizing toolbar");
+        check(shapes->isChecked() && panel.drawer()->mode().shape() == DrawMode::Arrow,
+              "first use of the shape button activates the default arrow");
         const auto buttons = shapePopup->findChildren<QPushButton*>();
-        const QList<DrawMode::Shape> modes = {DrawMode::PolyLine, DrawMode::Line, DrawMode::Arrow,
-                                             DrawMode::Rectangle, DrawMode::Ellipse, DrawMode::Highlighter};
+        const QList<DrawMode::Shape> modes = {DrawMode::Arrow, DrawMode::Rectangle, DrawMode::PolyLine,
+                                             DrawMode::Line, DrawMode::Ellipse, DrawMode::Highlighter};
         check(buttons.size() == modes.size(), "shape picker contains all six tools");
         const auto genericShapeIcon = shapes->icon().cacheKey();
         for (int i = 0; i < qMin(buttons.size(), modes.size()); ++i) {
@@ -673,6 +675,22 @@ int runScreenshotSelectionTest(QApplication& app) {
             QKeyEvent cancel(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
             QApplication::sendEvent(ocrOverlay, &cancel);
             okay &= !ocrOverlay->isVisible() && !ocrOverlay->isRecognizing() && pin->isVisible();
+            auto disabledOcr = manager.setting()->paddleOcrConfig();
+            disabledOcr.enabled = false;
+            manager.setting()->setPaddleOcrConfig(disabledOcr);
+            QMetaObject::invokeMethod(pin, "onOcr", Qt::DirectConnection);
+            QTextEdit* ocrError = nullptr;
+            for (auto* widget : QApplication::topLevelWidgets()) {
+                if (auto* toolbar = qobject_cast<DrawPanel*>(widget)) {
+                    auto* message = toolbar->findChild<QTextEdit*>(QStringLiteral("DrawPanelToolMessage"));
+                    if (message && message->isVisible()) ocrError = message;
+                }
+            }
+            okay &= ocrError && ocrError->isVisible()
+                && ocrError->toPlainText().contains(QStringLiteral("OCR 功能未启用"));
+            okay &= !ocrOverlay->isVisible() && !ocrOverlay->isRecognizing();
+            disabledOcr.enabled = true;
+            manager.setting()->setPaddleOcrConfig(disabledOcr);
             pin->parentWidget()->close();
         }
         QApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);

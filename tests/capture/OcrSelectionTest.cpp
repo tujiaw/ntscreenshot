@@ -153,6 +153,7 @@ int main(int argc, char** argv)
     bool wordBoxesRequested = false;
     bool unexpectedRequest = false;
     QByteArray responseResult = fixture;
+    bool queueFull = false;
     QObject::connect(&server, &QTcpServer::newConnection, &server, [&]() {
         while (server.hasPendingConnections()) {
             auto* socket = server.nextPendingConnection();
@@ -173,7 +174,9 @@ int main(int argc, char** argv)
                 QByteArray body;
                 if (bytes.startsWith("POST /jobs ")) {
                     wordBoxesRequested = bytes.contains("\"returnWordBox\":true");
-                    body = R"({"code":0,"data":{"jobId":"1"}})";
+                    body = queueFull
+                        ? QByteArray(R"({"code":10010,"msg":"queue full, retry later"})")
+                        : QByteArray(R"({"code":0,"data":{"jobId":"1"}})");
                 } else if (bytes.startsWith("GET /jobs/1 ")) {
                     const QJsonObject url{{"jsonUrl", base + QStringLiteral("/result")}};
                     body = QJsonDocument(QJsonObject{{"code", 0}, {"data", QJsonObject{{"state", "done"}, {"resultUrl", url}}}}).toJson();
@@ -230,5 +233,12 @@ int main(int argc, char** argv)
     overlay.recognize(image, config);
     CHECK(error && !overlay.isVisible() && !overlay.isRecognizing());
     CHECK(QApplication::clipboard()->text() == QStringLiteral("keep clipboard"));
+    config.enabled = true;
+    queueFull = true;
+    error = false;
+    overlay.recognize(image, config);
+    CHECK(waitFor([&]() { return error; }));
+    CHECK(status.contains(QStringLiteral("queue full")));
+    CHECK(!overlay.isVisible() && !overlay.isRecognizing());
     return 0;
 }

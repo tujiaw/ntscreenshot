@@ -465,7 +465,8 @@ void DrawPanel::setupButtonsAndLayout(bool hasParent)
     pbShapes_ = createActionBtn("shapes", QCoreApplication::translate("App", "形状"));
     pbShapes_->setObjectName(QStringLiteral("DrawPanelShapesButton"));
     pbShapes_->setCheckable(true);
-    setupShapePopup({pbPolyLine, pbLine, pbArrow, pbRectangle, pbEllipse, pbHighlighter});
+    lastShapeButton_ = pbArrow;
+    setupShapePopup({pbArrow, pbRectangle, pbPolyLine, pbLine, pbEllipse, pbHighlighter});
     pbEllipse->setToolTip(QCoreApplication::translate("App", "椭圆（按住 Shift 绘制正圆）"));
 
     auto* hLayout = new QHBoxLayout();

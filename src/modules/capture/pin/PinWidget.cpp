@@ -473,7 +473,16 @@ void PinWidget::onOcr()
         drawPanel_->cancelChecked();
         drawPanel_->clearToolMessage();
     }
-    if (!ocrOverlay_) ocrOverlay_ = new OcrSelectionOverlay(this, true);
+    if (!ocrOverlay_) {
+        ocrOverlay_ = new OcrSelectionOverlay(this, true);
+        connect(ocrOverlay_, &OcrSelectionOverlay::statusMessage, this,
+                [this](const QString& message, bool error) {
+            if (error) {
+                qWarning() << "OCR recognition failed:" << message;
+                notifyToolMessage(message, true);
+            }
+        });
+    }
     syncOcrGeometry();
     ocrOverlay_->recognize(image, windowManager_->setting()->paddleOcrConfig());
 }
