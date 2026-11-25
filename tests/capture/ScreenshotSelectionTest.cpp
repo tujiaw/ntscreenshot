@@ -175,6 +175,17 @@ int runStampAnnotationTest(QApplication& app) {
         }
         panel.cancelChecked();
         check(!shapes->isChecked() && panel.drawer()->mode().isNone(), "cancel clears shape selection");
+        shapes->click(); app.processEvents();
+        check(shapes->isChecked() && panel.drawer()->mode().shape() == DrawMode::Highlighter,
+              "shape button restores the last shape after cancellation without choosing again");
+        choose(0);
+        shapes->click(); app.processEvents();
+        check(shapes->isChecked() && !stamp->isChecked()
+                  && panel.drawer()->mode().shape() == DrawMode::Highlighter && shapePopup->isVisible(),
+              "returning from another tool restores the last shape and offers the picker");
+        shapes->click(); app.processEvents();
+        check(!shapePopup->isVisible() && panel.drawer()->mode().shape() == DrawMode::Highlighter,
+              "closing the shape picker keeps the remembered shape active");
         choose(0);
     }
     auto click = [&](QPoint pos, Qt::MouseButton button = Qt::LeftButton) {

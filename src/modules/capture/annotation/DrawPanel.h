@@ -228,6 +228,7 @@ private:
     QPushButton *pbMore_ = nullptr;
     QPushButton *pbShapes_ = nullptr;
     QWidget *shapePopup_ = nullptr;
+    QAbstractButton *lastShapeButton_ = nullptr;
     QPushButton *pbStamp_ = nullptr;
     QWidget *stampPicker_ = nullptr;
     QHBoxLayout *toolbarLayout_ = nullptr;

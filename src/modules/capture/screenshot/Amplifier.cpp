@@ -8,7 +8,6 @@
 #include <QPixmap>
 
 #include "core/platform/Util.h"
-#include "core/theme/ThemeManager.h"
 
 namespace {
 const QSize ImageSize(30, 22);
@@ -109,15 +108,13 @@ void AmplifierWidget::onPositionChanged(int x, int y)
 
 void AmplifierWidget::paintEvent(QPaintEvent*)
 {
-    const auto& tokens = ThemeManager::tokens();
     const int padding = Util::scaleSize(ContentPadding);
     const int gap = Util::scaleSize(RowGap);
     const qreal radius = Util::scaleSize(8);
     const QRectF surface = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    const bool light = tokens.theme == AppTheme::Light;
-    const QColor background(light ? QStringLiteral("#FFFFFF") : QStringLiteral("#242424"));
-    const QColor border(light ? QStringLiteral("#DADCE0") : QStringLiteral("#454545"));
-    const QColor keyBackground(light ? QStringLiteral("#F1F3F4") : QStringLiteral("#303030"));
+    const QColor background(0, 0, 0, 225);
+    const QColor border(QStringLiteral("#454545"));
+    const QColor keyBackground(QStringLiteral("#303030"));
 
     QPainter painter(this);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
@@ -161,14 +158,11 @@ void AmplifierWidget::paintEvent(QPaintEvent*)
                                preview.y() + (sampleSize.height() / 2) * pixelHeight,
                                pixelWidth, pixelHeight);
     const QPointF center = selectedPixel.center();
-    painter.setPen(QPen(crossColor_, qMax(1, Util::scaleSize(1))));
+    painter.setPen(QPen(crossColor_, pixelWidth, Qt::SolidLine, Qt::FlatCap));
     painter.drawLine(QPointF(center.x(), preview.top()), QPointF(center.x(), preview.bottom()));
+    painter.setPen(QPen(crossColor_, pixelHeight, Qt::SolidLine, Qt::FlatCap));
     painter.drawLine(QPointF(preview.left(), center.y()), QPointF(preview.right(), center.y()));
     painter.fillRect(selectedPixel, cursorPointColor_);
-    painter.setPen(QPen(Qt::black, 1));
-    painter.drawRect(selectedPixel.adjusted(-1, -1, 1, 1));
-    painter.setPen(QPen(Qt::white, 1));
-    painter.drawRect(selectedPixel);
     painter.restore();
     painter.setPen(QPen(border, 1));
     painter.drawLine(QPointF(0, imageHeight_ + 0.5), QPointF(width(), imageHeight_ + 0.5));
@@ -178,31 +172,36 @@ void AmplifierWidget::paintEvent(QPaintEvent*)
     const int contentWidth = width() - 2 * padding;
     int y = preview.y() + preview.height() + padding;
     const QPoint globalPosition = QCursor::pos();
-    painter.setPen(tokens.textSecondary);
-    painter.drawText(QRect(left, y, contentWidth, rowHeight_), Qt::AlignLeft | Qt::AlignVCenter,
+    painter.setPen(Qt::white);
+    painter.drawText(QRect(left, y, contentWidth, rowHeight_), Qt::AlignCenter,
                      QStringLiteral("X %1   Y %2").arg(globalPosition.x()).arg(globalPosition.y()));
     y += rowHeight_ + gap;
 
     const int swatchSize = Util::scaleSize(12);
-    const QRectF swatch(left, y + (rowHeight_ - swatchSize) / 2.0, swatchSize, swatchSize);
-    painter.setPen(QPen(tokens.borderStrong, 1));
+    const QString colorText = getCursorPointColor();
+    const int colorTextWidth = painter.fontMetrics().horizontalAdvance(colorText);
+    const int colorInset = swatchSize + 2 * gap;
+    const int colorLeft = left + (contentWidth - colorInset - colorTextWidth) / 2;
+    const QRectF swatch(colorLeft, y + (rowHeight_ - swatchSize) / 2.0, swatchSize, swatchSize);
+    painter.setPen(QPen(border, 1));
     painter.setBrush(cursorPointColor_);
     painter.drawRoundedRect(swatch, Util::scaleSize(4), Util::scaleSize(4));
-    painter.setPen(tokens.textPrimary);
-    const int colorInset = swatchSize + 2 * gap;
-    painter.drawText(QRect(left + colorInset, y, contentWidth - colorInset, rowHeight_),
-                     Qt::AlignLeft | Qt::AlignVCenter, getCursorPointColor());
+    painter.setPen(Qt::white);
+    painter.drawText(QRect(colorLeft + colorInset, y, colorTextWidth, rowHeight_),
+                     Qt::AlignCenter, colorText);
     y += rowHeight_ + gap;
 
     const int keyWidth = painter.fontMetrics().horizontalAdvance(QStringLiteral("ALT")) + Util::scaleSize(8);
-    const QRectF keycap(left + contentWidth - keyWidth, y, keyWidth, rowHeight_);
+    const QString mode = modeText(useOpenCVMode_);
+    const int modeWidth = painter.fontMetrics().horizontalAdvance(mode);
+    const int modeLeft = left + (contentWidth - modeWidth - 2 * gap - keyWidth) / 2;
+    const QRectF keycap(modeLeft + modeWidth + 2 * gap, y, keyWidth, rowHeight_);
     painter.setPen(QPen(border, 1));
     painter.setBrush(keyBackground);
     painter.drawRoundedRect(keycap, Util::scaleSize(5), Util::scaleSize(5));
-    painter.setPen(tokens.textSecondary);
+    painter.setPen(Qt::white);
     painter.drawText(keycap, Qt::AlignCenter, QStringLiteral("ALT"));
-    painter.drawText(QRect(left, y, contentWidth - keyWidth - 2 * gap, rowHeight_),
-                     Qt::AlignLeft | Qt::AlignVCenter, modeText(useOpenCVMode_));
+    painter.drawText(QRect(modeLeft, y, modeWidth, rowHeight_), Qt::AlignCenter, mode);
     painter.setClipping(false);
     painter.setPen(QPen(border, 1));
     painter.setBrush(Qt::NoBrush);

@@ -553,6 +553,7 @@ void DrawPanel::setupShapePopup(const QList<QPushButton*>& buttons)
         const bool wasVisible = shapePopup_->isVisible();
         stampPicker_->hide();
         pbMore_->setChecked(false);
+        if (lastShapeButton_) onShapeBtnClicked(lastShapeButton_);
         if (wasVisible) shapePopup_->hide();
         else {
             int width = Util::scaleSize(88);
@@ -875,7 +876,10 @@ void DrawPanel::onReferRectChanged(const QRect &rect)
 void DrawPanel::onShapeBtnClicked(QAbstractButton* btn)
 {
     shapePopup_->hide();
-    if (btn->parentWidget() == shapePopup_) btn->setChecked(true);
+    if (btn->parentWidget() == shapePopup_) {
+        lastShapeButton_ = btn;
+        btn->setChecked(true);
+    }
     const bool pickerWasVisible = stampPicker_->isVisible();
     stampPicker_->hide();
     if (btn == pbStamp_) {
