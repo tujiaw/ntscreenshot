@@ -72,6 +72,7 @@ public:
     void onCursorPosChanged(int x, int y);
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     virtual void contextMenuEvent(QContextMenuEvent *);
     virtual void mouseDoubleClickEvent(QMouseEvent*);
     virtual void mousePressEvent(QMouseEvent *);

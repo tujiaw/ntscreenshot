@@ -298,7 +298,11 @@ int runStampAnnotationTest(QApplication& app) {
     return okay ? 0 : 1;
 }
 
+int runScreenshotKeyboardTest(QApplication& app);
+
 int runScreenshotSelectionTest(QApplication& app) {
+    if (qEnvironmentVariableIsSet("NTSCREENSHOT_KEYBOARD_TEST"))
+        return runScreenshotKeyboardTest(app);
     if (qEnvironmentVariableIsSet("NTSCREENSHOT_AUTO_SAVE_TEST"))
         return runScreenshotAutoSaveTest(app);
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));

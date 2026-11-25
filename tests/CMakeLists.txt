@@ -17,6 +17,7 @@ endfunction()
 
 target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/capture/ScreenshotSelectionTest.cpp)
 target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_SELECTION_TEST=1)
+target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/capture/ScreenshotKeyboardTest.cpp)
 target_sources(ntscreenshot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/image_browser/ImageBrowserTest.cpp)
 target_compile_definitions(ntscreenshot PRIVATE NT_BUILD_IMAGE_BROWSER_TEST=1)
 
@@ -46,6 +47,26 @@ add_test(NAME screenshot_selection_release COMMAND ${CMAKE_COMMAND} -E env
     "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
     $<TARGET_FILE:ntscreenshot>)
 set_tests_properties(screenshot_selection_release PROPERTIES TIMEOUT 30)
+add_test(NAME screenshot_alt_escape COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_SELECTION_TEST=1"
+    "NTSCREENSHOT_KEYBOARD_TEST=1"
+    "QT_FORCE_STDERR_LOGGING=1"
+    "QT_QPA_PLATFORM=offscreen"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(screenshot_alt_escape PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+if(WIN32)
+    add_test(NAME screenshot_alt_escape_native COMMAND ${CMAKE_COMMAND} -E env
+        "NTSCREENSHOT_SELECTION_TEST=1"
+        "NTSCREENSHOT_KEYBOARD_TEST=1"
+        "QT_FORCE_STDERR_LOGGING=1"
+        "QT_QPA_PLATFORM=windows"
+        "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+        "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+        $<TARGET_FILE:ntscreenshot>)
+    set_tests_properties(screenshot_alt_escape_native PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+endif()
 add_test(NAME screenshot_auto_save COMMAND ${CMAKE_COMMAND} -E env
     "NTSCREENSHOT_SELECTION_TEST=1"
     "NTSCREENSHOT_AUTO_SAVE_TEST=1"

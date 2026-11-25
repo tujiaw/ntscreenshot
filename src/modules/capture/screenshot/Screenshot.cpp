@@ -168,11 +168,16 @@ ScreenshotWidget::ScreenshotWidget(WindowManager* windowManager, QWidget *parent
     connect(actionController_.get(), &ScreenshotActionController::sigScreenshotCompleted,
             this, &ScreenshotWidget::sigSaveScreenshot);
 
+    // Child controls and owned tool windows may consume ALT/ESC before they
+    // propagate to this widget. Keep picking shortcuts scoped to this overlay.
+    qApp->installEventFilter(this);
+
 	qDebug() << "ScreenshotWidget init";
 }
 
 ScreenshotWidget::~ScreenshotWidget(void) 
 {
+	qApp->removeEventFilter(this);
 	qDebug() << "ScreenshotWidget destory";
 }
 
@@ -1094,6 +1099,35 @@ void ScreenshotWidget::handleArrowKeyPress(QKeyEvent *e)
 	}
 }
 	
+bool ScreenshotWidget::eventFilter(QObject* watched, QEvent* event)
+{
+    if (!isVisible() || currentState_ == ScreenState::Editing)
+        return QWidget::eventFilter(watched, event);
+
+    if (event->type() != QEvent::ShortcutOverride && event->type() != QEvent::KeyPress
+        && event->type() != QEvent::KeyRelease)
+        return QWidget::eventFilter(watched, event);
+
+    auto* receiver = qobject_cast<QWidget*>(watched);
+    // QWidget::isAncestorOf stops at window boundaries; a Qt::Tool/Popup
+    // still belongs to this screenshot through its QObject parent chain.
+    QObject* owner = receiver;
+    while (owner && owner != this) owner = owner->parent();
+    if (owner != this)
+        return QWidget::eventFilter(watched, event);
+
+    auto* key = static_cast<QKeyEvent*>(event);
+    if (key->key() != Qt::Key_Alt && key->key() != Qt::Key_Escape)
+        return QWidget::eventFilter(watched, event);
+
+    // Accept the whole press/release sequence so ALT does not fall through to
+    // menu navigation. ShortcutOverride reserves ESC for the active picker.
+    key->accept();
+    if (event->type() == QEvent::KeyPress && !key->isAutoRepeat())
+        keyPressEvent(key);
+    return true;
+}
+
 void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
 	if (e->key() == Qt::Key_Escape) {
 		emit sigClose();
@@ -1125,6 +1159,8 @@ void ScreenshotWidget::keyPressEvent(QKeyEvent *e) {
 	}
 
     if (e->key() == Qt::Key_Alt) {
+        e->accept();
+        if (e->isAutoRepeat()) return;
         useOpenCVMode_ = !useOpenCVMode_;
 
         // 记住模式

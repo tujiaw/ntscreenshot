@@ -16,7 +16,8 @@
 
 void SystemWindowDetector::init(std::shared_ptr<QPixmap> originScreen, std::function<void()> onReady)
 {
-    Util::cacheAllWindows();
+    // Detection uses the live window hit-test, not the snapshot cache. Walking
+    // every window and descendant here blocks keyboard handling on each ALT.
     if (onReady) onReady();
 }
 
@@ -205,7 +206,7 @@ void OpenCVDetector::init(std::shared_ptr<QPixmap> originScreen, std::function<v
     // OpenCV 吸附基于图像边缘检测，运行时使用 getRectFromCurrentPoint 的 realTime 分支做窗口命中，
     // 并不读取 HWndRectCacheManager 的缓存；而 cacheAllWindows() 会同步 EnumWindows + 递归
     // EnumChildWindows 枚举所有窗口的全部子控件，在窗口/控件密集系统上耗时 >1s 且对 OpenCV 模式毫无作用，
-    // 因此移除它（窗口检测模式仍保留在 SystemWindowDetector::init 中）。
+    // 因此两个探测器都不再构建窗口快照缓存。
     originScreen_ = originScreen;
 
     if (onReady) onReady();

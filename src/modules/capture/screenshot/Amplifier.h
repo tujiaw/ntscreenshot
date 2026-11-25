@@ -9,7 +9,7 @@ class AmplifierWidget : public QWidget
 public:
     explicit AmplifierWidget(const std::shared_ptr<QPixmap> &originPainting, QWidget *parent = 0);
     QString getCursorPointColor() const;
-    void setRgbColor(bool yes) { isRgbColor_ = yes; }
+    void setRgbColor(bool yes) { isRgbColor_ = yes; update(); }
     bool rgbColor() const { return isRgbColor_; }
     void setOpenCVMode(bool enabled) { useOpenCVMode_ = enabled; update(); }
     void setCrossColor(const QColor& color) { if (color.isValid()) { crossColor_ = color; update(); } }
@@ -23,12 +23,14 @@ protected:
 
 private:
     Q_DISABLE_COPY(AmplifierWidget)
-    QSize screenSize_;
+    void updateMetrics();
+    QString modeText(bool smart) const;
     QPoint cursorPoint_;
-    int imageHeight_;
+    int imageHeight_ = 0;
+    int rowHeight_ = 0;
     QColor cursorPointColor_;
     QColor crossColor_ = Style::AMPLIFIER_CROSS_COLOR;
-    bool isRgbColor_;
+    bool isRgbColor_ = false;
     bool useOpenCVMode_{false};
     std::shared_ptr<QPixmap> originPainting_;
     QImage originImage_;
