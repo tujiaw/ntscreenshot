@@ -13,6 +13,7 @@
 #include <memory>
 #include <utility>
 #include "core/imaging/ScrollStitcher.h"
+#include "LongScreenshotProgress.h"
 
 class LongScreenshotControlPanel;
 class WindowManager;
@@ -55,6 +56,8 @@ private:
     static bool isReliableShift(int shift, double score, int imageHeight);
     void updateInfoLabel();
     void positionControlPanel();
+    void finishAtLimit(LongScreenshotProgress::Limit limit);
+    qint64 pendingBytes() const;
 
 private:
     QRect captureRect_;
@@ -72,7 +75,8 @@ private:
     bool panelIntersectsCapture_ = false;
     bool panelPositioned_ = false;
     bool captureOverloaded_ = false;
-    int unmatchedMotionCount_ = 0;
+    LongScreenshotProgress progress_;
+    QString limitMessage_;
     bool completionRequested_ = false;
     std::shared_ptr<std::atomic_bool> lifetimeToken_ = std::make_shared<std::atomic_bool>(true);
     static constexpr int CAPTURE_INTERVAL_MS = 150;

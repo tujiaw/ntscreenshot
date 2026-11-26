@@ -34,9 +34,11 @@ void LongScreenshotControlPanel::setupUI()
     infoLabel_ = new QLabel(this);
     infoLabel_->setObjectName(QStringLiteral("longScreenshotInfoLabel"));
     infoLabel_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    // The capture hint is intentionally omitted. A changing label resizes the
-    // native floating panel and makes it jump while frames are captured.
-    infoLabel_->setVisible(false);
+    infoLabel_->setText(QCoreApplication::translate("App", "请回滚重试"));
+    infoLabel_->setToolTip(QCoreApplication::translate("App", "匹配中断，请放慢并回滚至已截取位置"));
+    infoLabel_->setStyleSheet(QStringLiteral("color: %1; padding: 0 4px;")
+                             .arg(ThemeManager::tokens().warning.name()));
+    infoLabel_->hide();
 
     finishButton_ = new QPushButton(
         ThemeIcon::icon(QStringLiteral("ok.png"), IconTone::OnAccent, iconSize), QString(), this);
@@ -62,19 +64,19 @@ void LongScreenshotControlPanel::setupUI()
 
     QHBoxLayout* hLayout = new QHBoxLayout(this);
     CaptureControlPanelStyle::setup(this, hLayout);
+    hLayout->addWidget(infoLabel_);
     hLayout->addWidget(finishButton_);
     hLayout->addWidget(cancelButton_);
 
-    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    hLayout->setSizeConstraint(QLayout::SetFixedSize);
 }
 
-void LongScreenshotControlPanel::setInfoText(const QString &text)
+void LongScreenshotControlPanel::setRecoveryWarning(bool visible)
 {
-    if (infoLabel_) {
-        infoLabel_->setText(text);
-        infoLabel_->adjustSize();
-        adjustSize();
-    }
+    if (visible == !infoLabel_->isHidden()) return;
+    infoLabel_->setVisible(visible);
+    layout()->activate();
+    adjustSize();
 }
 
 void LongScreenshotControlPanel::paintEvent(QPaintEvent *)

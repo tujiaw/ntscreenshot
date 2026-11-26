@@ -67,6 +67,16 @@ if(WIN32)
         $<TARGET_FILE:ntscreenshot>)
     set_tests_properties(screenshot_alt_escape_native PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
 endif()
+add_test(NAME long_screenshot_panel COMMAND ${CMAKE_COMMAND} -E env
+    "NTSCREENSHOT_SELECTION_TEST=1"
+    "NTSCREENSHOT_LONG_PANEL_TEST=1"
+    "QT_FORCE_STDERR_LOGGING=1"
+    "QT_QPA_PLATFORM=windows"
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>;${nt_opencv_runtime_dirs};$ENV{PATH}"
+    "QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    $<TARGET_FILE:ntscreenshot>)
+set_tests_properties(long_screenshot_panel PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+
 add_test(NAME screenshot_auto_save COMMAND ${CMAKE_COMMAND} -E env
     "NTSCREENSHOT_SELECTION_TEST=1"
     "NTSCREENSHOT_AUTO_SAVE_TEST=1"
@@ -203,6 +213,11 @@ add_executable(scroll_stitcher_tests
 target_include_directories(scroll_stitcher_tests PRIVATE ${NT_SOURCE_DIR})
 target_link_libraries(scroll_stitcher_tests PRIVATE Qt6::Core Qt6::Gui)
 nt_add_qt_test(long_screenshot_stitcher scroll_stitcher_tests)
+
+add_executable(long_screenshot_progress_tests capture/LongScreenshotProgressTest.cpp)
+target_include_directories(long_screenshot_progress_tests PRIVATE ${NT_SOURCE_DIR})
+target_link_libraries(long_screenshot_progress_tests PRIVATE Qt6::Core)
+nt_add_qt_test(long_screenshot_progress long_screenshot_progress_tests)
 
 add_executable(code_scanner_tests
     imaging/CodeScannerTest.cpp

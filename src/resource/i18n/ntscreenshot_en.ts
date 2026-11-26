@@ -1813,6 +1813,15 @@ Copied to clipboard</translation>
       <source>正在识别文字，按 Esc 取消</source>
       <translation>Recognizing text. Press Esc to cancel.</translation>
     </message>
+    <message><source>匹配中断，请放慢并回滚至已截取位置</source><translation>Matching interrupted. Scroll slowly back to captured content.</translation></message>
+    <message><source>请回滚重试</source><translation>Scroll back to retry</translation></message>
+    <message><source>已达到长截图内存预算，已保存已截取部分</source><translation>Memory budget reached. Saved captured content.</translation></message>
+    <message><source>已达到长截图高度上限，已保存已截取部分</source><translation>Height limit reached. Saved captured content.</translation></message>
+    <message><source>已达到长截图像素上限，已保存已截取部分</source><translation>Pixel limit reached. Saved captured content.</translation></message>
+    <message><source>已达到长截图帧数上限，已保存已截取部分</source><translation>Frame limit reached. Saved captured content.</translation></message>
+    <message><source>匹配尚未恢复，仅保存已截取部分</source><translation>Matching has not recovered. Only captured content was saved.</translation></message>
+    <message><source>长截图完成</source><translation>Long screenshot complete</translation></message>
+    <message><source>已复制到剪贴板</source><translation>Copied to clipboard</translation></message>
   </context>
   <context>
     <name>QHotkey</name>

@@ -1,3 +1,4 @@
+#include "modules/capture/long_screenshot/LongScreenshotControlPanel.h"
 #include "app/WindowManager.h"
 #include "app/ModuleRegistry.h"
 #include "modules/capture/CaptureModule.h"
@@ -311,11 +312,42 @@ int runStampAnnotationTest(QApplication& app) {
     return okay ? 0 : 1;
 }
 
+static int runLongScreenshotPanelTest(QApplication& app) {
+    app.setQuitOnLastWindowClosed(false);
+    for (auto theme : {AppTheme::Light, AppTheme::Dark}) {
+        ThemeManager::apply(theme);
+        LongScreenshotControlPanel panel;
+        panel.show();
+        panel.adjustSize();
+        app.processEvents();
+        const QSize normalSize = panel.size();
+        if (panel.width() > Util::scaleSize(100)) {
+            qCritical() << "Normal long screenshot toolbar must contain only two adjacent buttons" << panel.size();
+            return 1;
+        }
+        const QString output = qEnvironmentVariable("NTSCREENSHOT_LONG_PANEL_OUTPUT");
+        if (!output.isEmpty()) panel.grab().save(output + (theme == AppTheme::Light ? "/panel-light.png" : "/panel-dark.png"));
+        panel.setRecoveryWarning(true);
+        app.processEvents();
+        if (panel.height() != normalSize.height() || panel.width() >= Util::scaleSize(300)) return 1;
+        if (!output.isEmpty()) panel.grab().save(output + (theme == AppTheme::Light ? "/warning-light.png" : "/warning-dark.png"));
+        const QSize warningSize = panel.size();
+        panel.setRecoveryWarning(true);
+        if (panel.size() != warningSize) return 1;
+        panel.setRecoveryWarning(false);
+        app.processEvents();
+        if (panel.size() != normalSize) return 1;
+    }
+    return 0;
+}
+
 int runScreenshotKeyboardTest(QApplication& app);
 
 int runScreenshotSelectionTest(QApplication& app) {
     if (qEnvironmentVariableIsSet("NTSCREENSHOT_KEYBOARD_TEST"))
         return runScreenshotKeyboardTest(app);
+    if (qEnvironmentVariableIsSet("NTSCREENSHOT_LONG_PANEL_TEST"))
+        return runLongScreenshotPanelTest(app);
     if (qEnvironmentVariableIsSet("NTSCREENSHOT_AUTO_SAVE_TEST"))
         return runScreenshotAutoSaveTest(app);
     app.setApplicationName(QStringLiteral("ntscreenshot-selection-test"));

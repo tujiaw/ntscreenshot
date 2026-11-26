@@ -13,7 +13,7 @@ public:
     explicit LongScreenshotControlPanel(QWidget *parent = nullptr);
     ~LongScreenshotControlPanel();
 
-    void setInfoText(const QString &text);
+    void setRecoveryWarning(bool visible);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

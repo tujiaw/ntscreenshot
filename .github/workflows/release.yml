@@ -74,6 +74,17 @@ jobs:
           ctest --test-dir build/release-windows --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw 'Release tests failed.' }
 
+      # 上一步按测试需求把 in-process 测试入口编进了主程序；这些入口会读
+      # NTSCREENSHOT_*_TEST 环境变量并绕过单实例锁，不能随发行包出去。
+      # 复用同一个构建目录关掉 BUILD_TESTING 重新链接，只重编主程序本身。
+      - name: Rebuild shipping binary without test harness
+        shell: pwsh
+        run: |
+          cmake -S . -B build/release-windows -DBUILD_TESTING=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'Shipping configure failed.' }
+          cmake --build build/release-windows --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'Shipping build failed.' }
+
       - name: Package and checksum
         shell: pwsh
         run: |

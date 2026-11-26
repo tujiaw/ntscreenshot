@@ -13,13 +13,19 @@ $SourceRoot = (Resolve-Path $SourceRoot).Path
 # Modules that still receive the application controller through explicit
 # constructor injection. Keep this boundary explicit so it can be replaced by
 # narrower interfaces without allowing hidden service-locator dependencies.
+# Settings 对话框按页面拆成多个编译单元后，它们都是同一个 Settings 对象的成员
+# 实现，仍然通过构造函数注入的 WindowManager 访问设置、快捷键与 HTTP 服务。
 $legacyAppIncludes = @(
   'modules/capture/CaptureModule.cpp',
   'modules/capture/long_screenshot/LongScreenshotWidget.cpp',
   'modules/capture/pin/PinWidget.cpp',
   'modules/capture/screenshot/Screenshot.cpp',
   'modules/capture/screenshot/ScreenshotActionController.cpp',
-  'modules/settings/Settings.cpp'
+  'modules/settings/Settings.cpp',
+  'modules/settings/SettingsAppearance.cpp',
+  'modules/settings/SettingsBehavior.cpp',
+  'modules/settings/SettingsHttpServer.cpp',
+  'modules/settings/SettingsLocalSearch.cpp'
 )
 
 $legacyCrossModuleIncludes = @(

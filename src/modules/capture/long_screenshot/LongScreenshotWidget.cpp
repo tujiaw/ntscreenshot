@@ -71,11 +71,9 @@ void LongScreenshotWidget::updateInfoLabel()
     if (!controlPanel_) {
         return;
     }
-    // Keep the panel's content width stable while capturing. Appending and
-    // removing a warning here changes its size/position and makes the hint
-    // visibly jump between frames.
-    QString text = QString(QCoreApplication::translate("App", "已截取: %1 帧")).arg(capturedFrames_.size());
-    controlPanel_->setInfoText(text);
+    const QSize oldSize = controlPanel_->size();
+    controlPanel_->setRecoveryWarning(progress_.needsRecovery());
+    if (controlPanel_->size() != oldSize) positionControlPanel();
 
     if (!finishRequested_ && !controlPanel_->isVisible()) {
         controlPanel_->show();
@@ -127,15 +125,12 @@ void LongScreenshotWidget::startCapture()
 
     capturedFrames_.clear();
     captureCurrentFrame();
+    if (completionRequested_ || finishRequested_) return;
     captureTimer_->start(CAPTURE_INTERVAL_MS);
 
     // 初始化并显示控制面板信息
     if (controlPanel_) {
-        // Use the final text shape before positioning, then freeze the
-        // top-level panel size. Resizing a floating native window while the
-        // frame count changes can make Windows re-center it visually.
-        controlPanel_->setInfoText(QCoreApplication::translate("App", "已截取: 0 帧"));
-        controlPanel_->setFixedSize(controlPanel_->size());
+        controlPanel_->setRecoveryWarning(false);
         positionControlPanel();
         controlPanel_->show();
         controlPanel_->raise();
@@ -152,12 +147,18 @@ void LongScreenshotWidget::captureCurrentFrame()
     }
 
     if (capturedFrames_.size() >= MAX_CAPTURED_FRAMES) {
-        onFinish();
+        finishAtLimit(LongScreenshotProgress::Limit::Frames);
         return;
     }
 
     // 截图必须在主线程执行
     QRect innerRect = captureRect_.adjusted(borderWidth_, borderWidth_, -borderWidth_, -borderWidth_);
+    const qint64 frameBytes = lastCapturedImage_.isNull()
+        ? qint64(innerRect.width()) * innerRect.height() * 4 : lastCapturedImage_.sizeInBytes();
+    if (!progress_.canCapture(frameBytes, pendingBytes())) {
+        finishAtLimit(LongScreenshotProgress::Limit::Memory);
+        return;
+    }
     const bool restorePanel = panelIntersectsCapture_ && controlPanel_ && controlPanel_->isVisible();
     if (restorePanel) controlPanel_->hide();
     QImage currentImage = Util::grabDesktopImage(innerRect);
@@ -174,6 +175,11 @@ void LongScreenshotWidget::captureCurrentFrame()
     }
 
     if (capturedFrames_.isEmpty() && !analysisInProgress_ && pendingFrames_.isEmpty()) {
+        const auto limit = progress_.append(currentImage.width(), currentImage.height(), 0, currentImage.sizeInBytes());
+        if (limit != LongScreenshotProgress::Limit::None) {
+            finishAtLimit(limit);
+            return;
+        }
         capturedFrames_.push_back({currentImage, 0, 0.0});
         lastCapturedImage_ = currentImage;
         return;
@@ -224,10 +230,15 @@ void LongScreenshotWidget::processNextFrame()
                 return;
             }
             if (!accepted) {
-                if (motion) ++self->unmatchedMotionCount_;
+                self->progress_.rejected(motion);
                 qDebug() << "[LongScr] frame rejected, frames so far:" << self->capturedFrames_.size();
             } else {
-                self->unmatchedMotionCount_ = 0;
+                const auto limit = self->progress_.append(currentImage.width(), currentImage.height(),
+                    shift, currentImage.sizeInBytes(), self->pendingBytes() + currentImage.sizeInBytes());
+                if (limit != LongScreenshotProgress::Limit::None) {
+                    self->finishAtLimit(limit);
+                    return;
+                }
                 self->capturedFrames_.push_back({currentImage, shift, score});
                 self->lastCapturedImage_ = currentImage;
                 qDebug() << "frame count:" << self->capturedFrames_.size();
@@ -239,9 +250,8 @@ void LongScreenshotWidget::processNextFrame()
                 self->captureTimer_->start(CAPTURE_INTERVAL_MS);
             }
             if (self->capturedFrames_.size() >= MAX_CAPTURED_FRAMES) {
-                self->pendingFrames_.clear();
-                self->finishRequested_ = true;
-                self->captureTimer_->stop();
+                self->finishAtLimit(LongScreenshotProgress::Limit::Frames);
+                return;
             }
             self->processNextFrame();
         }, Qt::QueuedConnection);
@@ -309,11 +319,6 @@ bool LongScreenshotWidget::shouldAppendFrame(const QImage& currentImage, const Q
 
     *shiftFromPrev = 0;
     *matchScore = 0.0;
-
-    if (!hasGlobalMotion(currentImage, prevImage)) {
-        qDebug() << "[LongScr] skip: no global motion";
-        return false;
-    }
 
     int imageHeight = qMin(currentImage.height(), prevImage.height());
     if (imageHeight <= MIN_APPEND_HEIGHT_PX) {
@@ -385,9 +390,18 @@ void LongScreenshotWidget::onFinish()
     }
     // The final screen state must be queued behind in-flight analysis.
     QRect innerRect = captureRect_.adjusted(borderWidth_, borderWidth_, -borderWidth_, -borderWidth_);
-    QImage finalFrame = Util::grabDesktopImage(innerRect);
-    if (!finalFrame.isNull() && !capturedFrames_.isEmpty()) {
+    QImage finalFrame;
+    if (progress_.canCapture(lastCapturedImage_.isNull()
+            ? qint64(innerRect.width()) * innerRect.height() * 4 : lastCapturedImage_.sizeInBytes(), pendingBytes())) {
+        finalFrame = Util::grabDesktopImage(innerRect);
+    } else {
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图内存预算，已保存已截取部分");
+    }
+    if (!finalFrame.isNull() && !capturedFrames_.isEmpty()
+        && progress_.canCapture(finalFrame.sizeInBytes(), pendingBytes())) {
         pendingFrames_.enqueue(finalFrame.convertToFormat(QImage::Format_RGB32));
+    } else if (!finalFrame.isNull()) {
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图内存预算，已保存已截取部分");
     }
     processNextFrame();
 }
@@ -420,13 +434,49 @@ void LongScreenshotWidget::finishCapture()
         WindowManager* windowManager = windowManager_;
         QTimer::singleShot(0, [windowManager, finalImage, pos]() { PinWidget::popup(windowManager, finalImage, pos); });
 
-        // 弹出成功提示
-        TipsWidget::popup(nullptr, QString(QCoreApplication::translate("App", "长截图完成\n已复制到剪贴板")), 3, 0, true);
+        QString message = limitMessage_;
+        if (message.isEmpty() && progress_.needsRecovery()) {
+            message = QCoreApplication::translate("App", "匹配尚未恢复，仅保存已截取部分");
+        }
+        if (message.isEmpty()) message = QCoreApplication::translate("App", "长截图完成");
+        message += "\n" + QCoreApplication::translate("App", "已复制到剪贴板");
+        TipsWidget::popup(nullptr, message, 5, 0, true);
     } else {
         TipsWidget::popup(this, QCoreApplication::translate("App", "拼接失败"), 2, 0, true);
         emit sigWindowClosed();
         close();
     }
+}
+
+qint64 LongScreenshotWidget::pendingBytes() const
+{
+    qint64 bytes = 0;
+    for (const auto& image : pendingFrames_) bytes += image.sizeInBytes();
+    return bytes;
+}
+
+void LongScreenshotWidget::finishAtLimit(LongScreenshotProgress::Limit limit)
+{
+    switch (limit) {
+    case LongScreenshotProgress::Limit::Height:
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图高度上限，已保存已截取部分");
+        break;
+    case LongScreenshotProgress::Limit::Pixels:
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图像素上限，已保存已截取部分");
+        break;
+    case LongScreenshotProgress::Limit::Frames:
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图帧数上限，已保存已截取部分");
+        break;
+    default:
+        limitMessage_ = QCoreApplication::translate("App", "已达到长截图内存预算，已保存已截取部分");
+        break;
+    }
+    finishRequested_ = true;
+    captureTimer_->stop();
+    pendingFrames_.clear();
+    if (controlPanel_) controlPanel_->hide();
+    // A worker may still own a captured image; wait for its callback before finishing.
+    if (!analysisInProgress_) finishCapture();
 }
 
 void LongScreenshotWidget::onCancel()
